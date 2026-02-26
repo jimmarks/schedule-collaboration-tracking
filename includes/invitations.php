@@ -2,7 +2,7 @@
 /**
  * Parent-Child Invitation System
  *
- * @package Schedule_Collaboration_Tracking
+ * @package Family_Travel_Tracker
  */
 
 // Exit if accessed directly

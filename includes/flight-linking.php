@@ -2,7 +2,7 @@
 /**
  * Flight Linking and Price Comparison
  *
- * @package Schedule_Collaboration_Tracking
+ * @package Family_Travel_Tracker
  */
 
 // Exit if accessed directly

@@ -2,7 +2,7 @@
 /**
  * Template: Calendar View
  *
- * @package Summer_Regiment_Tracker
+ * @package Family_Travel_Tracker
  */
 
 // Exit if accessed directly
@@ -13,7 +13,7 @@ if (!defined('ABSPATH')) {
 
 <div class="srt-container">
     <div class="srt-calendar-header">
-        <h2><?php esc_html_e('Schedule Schedule', 'schedule-collaboration-tracking'); ?></h2>
+        <h2><?php esc_html_e('Family Calendar', 'schedule-collaboration-tracking'); ?></h2>
         
         <?php
         // Show member selector for parents

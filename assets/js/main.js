@@ -1,7 +1,7 @@
 /**
- * Main JavaScript for Summer Regiment Tracker
+ * Main JavaScript for Family Travel Tracker
  *
- * @package Summer_Regiment_Tracker
+ * @package Family_Travel_Tracker
  */
 
 (function($) {

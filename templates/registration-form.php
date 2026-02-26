@@ -2,7 +2,7 @@
 /**
  * Template: Registration Form
  *
- * @package Summer_Regiment_Tracker
+ * @package Family_Travel_Tracker
  */
 
 // Exit if accessed directly
@@ -33,7 +33,7 @@ $is_parent_invite = !empty($invite_code);
     
     <?php if ($is_parent_invite) : ?>
         <div class="srt-invite-notice" style="background: #d1ecf1; border: 1px solid #bee5eb; border-radius: 4px; padding: 15px; margin-bottom: 20px; color: #0c5460;">
-            <strong>🎺 Parent Registration</strong>
+            <strong>✈️ Parent Registration</strong>
             <p style="margin: 5px 0 0 0;">You're registering as a parent using an invitation code from your child.</p>
         </div>
     <?php endif; ?>
@@ -42,14 +42,14 @@ $is_parent_invite = !empty($invite_code);
         <?php wp_nonce_field('srt_register', 'srt_register_nonce'); ?>
         <input type="hidden" name="redirect_to" value="<?php echo esc_url(home_url('/')); ?>">
         
-        <h2><?php esc_html_e('Register for Schedule Events', 'schedule-collaboration-tracking'); ?></h2>
+        <h2><?php esc_html_e('Register for Family Travel Tracker', 'schedule-collaboration-tracking'); ?></h2>
         
         <!-- User Type Selection -->
         <div class="srt-form-field">
-            <label><?php esc_html_e('I am registering as a:', 'schedule-collaboration-tracking'); ?> <span class="required">*</span></label>
+            <label><?php esc_html_e('I am registering as:', 'schedule-collaboration-tracking'); ?> <span class="required">*</span></label>
             <label class="srt-radio-label">
                 <input type="radio" name="user_type" value="member" required <?php echo !$is_parent_invite ? 'checked' : ''; ?>>
-                <?php esc_html_e('Member', 'schedule-collaboration-tracking'); ?>
+                <?php esc_html_e('Child/Student', 'schedule-collaboration-tracking'); ?>
             </label>
             <label class="srt-radio-label">
                 <input type="radio" name="user_type" value="parent" required <?php echo $is_parent_invite ? 'checked' : ''; ?>>
@@ -94,22 +94,26 @@ $is_parent_invite = !empty($invite_code);
         
         <!-- Member-specific fields -->
         <div id="member-fields" class="srt-conditional-fields" style="display: <?php echo $is_parent_invite ? 'none' : 'block'; ?>;">
-            <h3><?php esc_html_e('Member Information', 'schedule-collaboration-tracking'); ?></h3>
+            <h3><?php esc_html_e('Activity Information (Optional)', 'schedule-collaboration-tracking'); ?></h3>
             
             <div class="srt-form-row">
                 <div class="srt-form-field">
-                    <label for="member_section"><?php esc_html_e('Section', 'schedule-collaboration-tracking'); ?></label>
+                    <label for="member_section"><?php esc_html_e('Activity Type', 'schedule-collaboration-tracking'); ?></label>
                     <select id="member_section" name="member_section">
                         <option value=""><?php esc_html_e('Select...', 'schedule-collaboration-tracking'); ?></option>
-                        <option value="brass"><?php esc_html_e('Brass', 'schedule-collaboration-tracking'); ?></option>
-                        <option value="percussion"><?php esc_html_e('Percussion', 'schedule-collaboration-tracking'); ?></option>
-                        <option value="color_guard"><?php esc_html_e('Color Guard', 'schedule-collaboration-tracking'); ?></option>
-                        <option value="front_ensemble"><?php esc_html_e('Front Ensemble', 'schedule-collaboration-tracking'); ?></option>
+                        <option value="brass"><?php esc_html_e('Marching Band - Brass', 'schedule-collaboration-tracking'); ?></option>
+                        <option value="percussion"><?php esc_html_e('Marching Band - Percussion', 'schedule-collaboration-tracking'); ?></option>
+                        <option value="color_guard"><?php esc_html_e('Marching Band - Color Guard', 'schedule-collaboration-tracking'); ?></option>
+                        <option value="front_ensemble"><?php esc_html_e('Marching Band - Front Ensemble', 'schedule-collaboration-tracking'); ?></option>
+                        <option value="sports"><?php esc_html_e('Sports Team', 'schedule-collaboration-tracking'); ?></option>
+                        <option value="dance"><?php esc_html_e('Dance/Cheer', 'schedule-collaboration-tracking'); ?></option>
+                        <option value="music"><?php esc_html_e('Music Competition', 'schedule-collaboration-tracking'); ?></option>
+                        <option value="other"><?php esc_html_e('Other Activity', 'schedule-collaboration-tracking'); ?></option>
                     </select>
                 </div>
                 <div class="srt-form-field">
-                    <label for="member_instrument"><?php esc_html_e('Instrument/Position', 'schedule-collaboration-tracking'); ?></label>
-                    <input type="text" id="member_instrument" name="member_instrument" placeholder="<?php esc_attr_e('e.g., Trumpet, Snare, Flag', 'schedule-collaboration-tracking'); ?>">
+                    <label for="member_instrument"><?php esc_html_e('Position/Role', 'schedule-collaboration-tracking'); ?></label>
+                    <input type="text" id="member_instrument" name="member_instrument" placeholder="<?php esc_attr_e('e.g., Trumpet, Forward, Flag', 'schedule-collaboration-tracking'); ?>">
                 </div>
             </div>
         </div>
@@ -125,7 +129,7 @@ $is_parent_invite = !empty($invite_code);
             </div>
             
             <div class="srt-form-field">
-                <label for="member_email"><?php esc_html_e('Or Member\'s Email', 'schedule-collaboration-tracking'); ?></label>
+                <label for="member_email"><?php esc_html_e('Or Child\'s Email', 'schedule-collaboration-tracking'); ?></label>
                 <input type="email" id="member_email" name="member_email">
                 <p class="description"><?php esc_html_e('If your child is already registered but you don\'t have a code, enter their email.', 'schedule-collaboration-tracking'); ?></p>
             </div>

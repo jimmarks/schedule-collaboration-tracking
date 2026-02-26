@@ -2,7 +2,7 @@
 /**
  * Template: Admin - Manage Users
  *
- * @package Summer_Regiment_Tracker
+ * @package Family_Travel_Tracker
  */
 
 // Exit if accessed directly
@@ -22,7 +22,7 @@ $parents = SRT_Roles::get_all_parents();
     
     <div class="srt-admin-tabs">
         <nav class="nav-tab-wrapper">
-            <a href="#members" class="nav-tab nav-tab-active"><?php esc_html_e('Members', 'schedule-collaboration-tracking'); ?> (<?php echo count($members); ?>)</a>
+            <a href="#members" class="nav-tab nav-tab-active"><?php esc_html_e('Children', 'schedule-collaboration-tracking'); ?> (<?php echo count($members); ?>)</a>
             <a href="#parents" class="nav-tab"><?php esc_html_e('Parents', 'schedule-collaboration-tracking'); ?> (<?php echo count($parents); ?>)</a>
             <a href="#all-users" class="nav-tab"><?php esc_html_e('All Users', 'schedule-collaboration-tracking'); ?></a>
             <a href="#relationships" class="nav-tab"><?php esc_html_e('Manage Relationships', 'schedule-collaboration-tracking'); ?></a>
@@ -30,8 +30,8 @@ $parents = SRT_Roles::get_all_parents();
         
         <!-- Members Tab -->
         <div id="members" class="tab-content" style="display: block;">
-            <h2><?php esc_html_e('Members', 'schedule-collaboration-tracking'); ?></h2>
-            <p><?php esc_html_e('Users marked as active members who travel on events.', 'schedule-collaboration-tracking'); ?></p>
+            <h2><?php esc_html_e('Children', 'schedule-collaboration-tracking'); ?></h2>
+            <p><?php esc_html_e('Children registered in the system who have activities and travel schedules.', 'schedule-collaboration-tracking'); ?></p>
             
             <table class="wp-list-table widefat fixed striped">
                 <thead>
@@ -47,7 +47,7 @@ $parents = SRT_Roles::get_all_parents();
                 <tbody>
                     <?php if (empty($members)) : ?>
                         <tr>
-                            <td colspan="6"><?php esc_html_e('No members found. Add members by editing user profiles.', 'schedule-collaboration-tracking'); ?></td>
+                            <td colspan="6"><?php esc_html_e('No children found. Add children by editing user profiles.', 'schedule-collaboration-tracking'); ?></td>
                         </tr>
                     <?php else : ?>
                         <?php foreach ($members as $member) : ?>

@@ -2,7 +2,7 @@
 /**
  * Page Management Functions
  *
- * @package Summer_Regiment_Tracker
+ * @package Family_Travel_Tracker
  */
 
 // Exit if accessed directly
@@ -25,7 +25,7 @@ class SRT_Pages {
                 'shortcode' => '[srt_dashboard]',
                 'slug' => 'sc-dashboard',
                 'menu_order' => 1,
-                'description' => 'Main hub for schedule members, parents, and admins',
+                'description' => 'Main hub for children, parents, and administrators',
             ),
             'calendar' => array(
                 'title' => 'Schedule Events Calendar',

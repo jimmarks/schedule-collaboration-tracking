@@ -1,12 +1,23 @@
-# 🎺 Summer Regiment Tracker - WordPress Plugin
+# ✈️ Family Travel Tracker - WordPress Plugin
 
-A comprehensive WordPress plugin for tracking Summer Phantom Regiment schedules with advanced travel and flight tracking.
+A comprehensive WordPress plugin for tracking children's activities, travel schedules, and flight prices. Perfect for busy families, divorced/co-parenting situations, and managing multiple children's events.
 
 ## ✅ Project Status: COMPLETE & PRODUCTION READY
 
-**Version**: 1.0.0  
+**Version**: 1.0.23  
 **License**: GPL v2  
 **Requirements**: WordPress 6.0+, PHP 8.0+
+
+---
+
+## 👨‍👩‍👧‍👦 Who Is This For?
+
+- **Busy Families**: Track all your children's activities in one place
+- **Divorced/Co-Parents**: Share calendars and travel schedules seamlessly  
+- **Travel Sports Families**: Hockey, soccer, baseball tournaments with flight tracking
+- **Competitive Activities**: Dance, cheer, music competitions
+- **Multi-Child Households**: Manage complex schedules across multiple children
+- **Extended Family**: Grandparents and guardians can have view access
 
 ---
 
@@ -40,9 +51,15 @@ A comprehensive WordPress plugin for tracking Summer Phantom Regiment schedules 
 
 ## 🎯 Key Features
 
+✅ **Multi-Child Support**
+- Track events for multiple children
+- Parents can link to all their children
+- Divorced parents can both access same child's calendar
+- Each child has their own schedule
+
 ✅ **Event Management**
 - Custom post type with 12 metadata fields
-- 11 event types with color coding
+- Activity types (sports, music, dance, etc.)
 - Timezone support
 - Rich notes and descriptions
 
@@ -58,13 +75,15 @@ A comprehensive WordPress plugin for tracking Summer Phantom Regiment schedules 
 - Booking status tracking
 - Confirmation numbers
 - Baggage tracking
+- **Flight price alerts** - Get notified when prices drop!
 
 ✅ **User Interfaces**
-- Interactive calendar (FullCalendar)
+- Interactive family calendar (FullCalendar)
 - Event management form
-- Travel dashboard (3 views)
+- Personalized dashboards (parent/child views)
 - Simple event list
 - Mobile responsive
+- Calendar sync (iCal subscription)
 
 ✅ **REST API**
 - Complete CRUD operations

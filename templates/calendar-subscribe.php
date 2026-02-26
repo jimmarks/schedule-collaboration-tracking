@@ -2,7 +2,7 @@
 /**
  * Template: Calendar Subscription Instructions
  *
- * @package Summer_Regiment_Tracker
+ * @package Family_Travel_Tracker
  */
 
 // Exit if accessed directly
@@ -15,9 +15,9 @@ $requires_auth = $settings['ical_require_auth'] ?? false;
 ?>
 
 <div class="srt-container srt-subscribe-page">
-    <h2><?php esc_html_e('Subscribe to Schedule', 'schedule-collaboration-tracking'); ?></h2>
+    <h2><?php esc_html_e('Subscribe to Calendar', 'schedule-collaboration-tracking'); ?></h2>
     
-    <p><?php esc_html_e('Subscribe to the schedule in your calendar app to automatically receive updates when events are added or changed.', 'schedule-collaboration-tracking'); ?></p>
+    <p><?php esc_html_e('Subscribe to your family calendar in your calendar app to automatically receive updates when events are added or changed.', 'schedule-collaboration-tracking'); ?></p>
     
     <?php if ($requires_auth && empty($feed_url)) : ?>
         <div class="srt-notice srt-notice-info">

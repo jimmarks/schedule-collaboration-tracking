@@ -1,4 +1,4 @@
-# Summer Regiment Tracker - Installation & Quick Start Guide
+# Family Travel Tracker - Installation & Quick Start Guide
 
 ## 🚀 Quick Installation
 
@@ -8,7 +8,7 @@
 ```bash
 # Zip the plugin directory
 cd /path/to/parent-directory
-zip -r summer-regiment-tracker.zip summer-regiment-tracker/
+zip -r family-travel-tracker.zip schedule-collaboration-tracking/
 
 # Then upload via WordPress Admin:
 # Plugins → Add New → Upload Plugin → Choose File → Install Now → Activate
@@ -17,10 +17,10 @@ zip -r summer-regiment-tracker.zip summer-regiment-tracker/
 **Option B: Manual Installation**
 ```bash
 # Copy to your WordPress plugins directory
-cp -r summer-regiment-tracker /path/to/wordpress/wp-content/plugins/
+cp -r schedule-collaboration-tracking /path/to/wordpress/wp-content/plugins/
 
 # Then activate via WordPress Admin:
-# Plugins → Installed Plugins → Summer Regiment Tracker → Activate
+# Plugins → Installed Plugins → Family Travel Tracker → Activate
 ```
 
 ### 2. Install FullCalendar Library

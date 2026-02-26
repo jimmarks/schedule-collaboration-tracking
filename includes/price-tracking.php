@@ -2,7 +2,7 @@
 /**
  * Flight Price Tracking
  *
- * @package Summer_Regiment_Tracker
+ * @package Family_Travel_Tracker
  */
 
 // Exit if accessed directly

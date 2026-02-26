@@ -2,7 +2,7 @@
 /**
  * Template: Dashboard (Main Hub)
  *
- * @package Summer_Regiment_Tracker
+ * @package Family_Travel_Tracker
  */
 
 // Exit if accessed directly
@@ -42,7 +42,7 @@ console.log('============================');
     <!-- Main Navigation -->
     <div class="srt-main-nav">
         <div class="srt-nav-logo">
-            <h1>🎺 <?php esc_html_e('Schedule Dashboard', 'schedule-collaboration-tracking'); ?></h1>
+            <h1>✈️ <?php esc_html_e('Family Dashboard', 'schedule-collaboration-tracking'); ?></h1>
         </div>
         <nav class="srt-nav-menu">
             <?php if ($calendar_url): ?>
@@ -98,9 +98,9 @@ console.log('============================');
         <!-- Public View: Welcome + Register -->
         <div class="srt-welcome-section">
             <div class="srt-welcome-content">
-                <h2><?php esc_html_e('Welcome to Schedule Tracking', 'schedule-collaboration-tracking'); ?></h2>
+                <h2><?php esc_html_e('Welcome to Family Travel Tracker', 'schedule-collaboration-tracking'); ?></h2>
                 <p class="srt-welcome-text">
-                    <?php esc_html_e('Track events, manage travel, and get flight price alerts for schedule members and families.', 'schedule-collaboration-tracking'); ?>
+                    <?php esc_html_e('Track your children\'s activities, manage travel schedules, and get flight price alerts - all in one place. Perfect for busy families, divorced co-parents, and anyone managing kids\' events.', 'schedule-collaboration-tracking'); ?>
                 </p>
                 <div class="srt-welcome-actions">
                     <a href="<?php echo wp_login_url(get_permalink()); ?>" class="button button-primary button-large">
@@ -122,7 +122,7 @@ console.log('============================');
             <?php if ($calendar_url): ?>
                 <div class="srt-public-calendar">
                     <h3><?php esc_html_e('Upcoming Events', 'schedule-collaboration-tracking'); ?></h3>
-                    <p><?php esc_html_e('View all schedule events on the calendar:', 'schedule-collaboration-tracking'); ?></p>
+                    <p><?php esc_html_e('View all family events and activities on the calendar:', 'schedule-collaboration-tracking'); ?></p>
                     <a href="<?php echo esc_url($calendar_url); ?>" class="button"><?php esc_html_e('View Full Calendar', 'schedule-collaboration-tracking'); ?></a>
                 </div>
             <?php endif; ?>
@@ -141,7 +141,7 @@ console.log('============================');
             if (!empty($children)):
             ?>
                 <div class="srt-family-section">
-                    <h3><?php esc_html_e('Your Members', 'schedule-collaboration-tracking'); ?></h3>
+                    <h3><?php esc_html_e('Your Children', 'schedule-collaboration-tracking'); ?></h3>
                     <div class="srt-children-list">
                         <?php foreach ($children as $child_id):
                             $child = get_userdata($child_id);
@@ -317,7 +317,7 @@ console.log('============================');
                     } elseif ($section) {
                         echo esc_html(ucfirst(str_replace('_', ' ', $section)));
                     } else {
-                        esc_html_e('Member', 'schedule-collaboration-tracking');
+                        esc_html_e('Student', 'schedule-collaboration-tracking');
                     }
                     ?>
                 </p>
@@ -427,7 +427,7 @@ console.log('============================');
                                         <span class="dashicons dashicons-clipboard"></span> <?php esc_html_e('Copy', 'schedule-collaboration-tracking'); ?>
                                     </button>
                                 </div>
-                                <p class="description"><?php esc_html_e('Share this code with your parents so they can link to your account.', 'schedule-collaboration-tracking'); ?></p>
+                                <p class="description"><?php esc_html_e('Share this code with your parents/guardians so they can link to your account and see your schedule.', 'schedule-collaboration-tracking'); ?></p>
                             </div>
                             
                             <div class="srt-invitation-actions">

@@ -2,7 +2,7 @@
 /**
  * User Roles Management
  *
- * @package Summer_Regiment_Tracker
+ * @package Family_Travel_Tracker
  */
 
 // Exit if accessed directly
@@ -13,7 +13,7 @@ if (!defined('ABSPATH')) {
 /**
  * SRT User Management Class
  * 
- * Manages schedule members and parent relationships using user meta
+ * Manages children and parent relationships using user meta
  * instead of custom roles to allow flexibility (admin can also be parent, etc.)
  */
 class SRT_Roles {
@@ -30,7 +30,7 @@ class SRT_Roles {
     }
     
     /**
-     * Make user a schedule member
+     * Make user a child/student in the system
      */
     public static function make_member($user_id) {
         update_user_meta($user_id, 'srt_is_member', true);
@@ -220,7 +220,7 @@ class SRT_Roles {
             return;
         }
         ?>
-        <h2><?php esc_html_e('Schedule Member Information', 'schedule-collaboration-tracking'); ?></h2>
+        <h2><?php esc_html_e('Child/Student Information', 'schedule-collaboration-tracking'); ?></h2>
         <table class="form-table">
             <tr>
                 <th><label for="srt_is_member"><?php esc_html_e('Member', 'schedule-collaboration-tracking'); ?></label></th>

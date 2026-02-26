@@ -2,7 +2,7 @@
 /**
  * Cron Setup Admin Page
  *
- * @package Summer_Regiment_Tracker
+ * @package Family_Travel_Tracker
  */
 
 // Exit if accessed directly
@@ -483,7 +483,7 @@ bash wp-content/plugins/schedule-collaboration-tracking/setup-cron.sh</pre>
                 
                 <h3>Step 2: Add Crontab Entry</h3>
                 <p>Run <code>crontab -e</code> and add:</p>
-                <pre style="background: #f0f0f0; padding: 10px; overflow-x: auto;"># Summer Regiment Tracker - WordPress Cron (5x daily)
+                <pre style="background: #f0f0f0; padding: 10px; overflow-x: auto;"># Family Travel Tracker - WordPress Cron (5x daily)
 0 0,2,6,12,18 * * * cd <?php echo ABSPATH; ?> && wp cron event run --due-now >> /dev/null 2>&1</pre>
                 
                 <p><strong>Schedule Breakdown:</strong></p>

@@ -2,7 +2,7 @@
 /**
  * Template: Event Form
  *
- * @package Summer_Regiment_Tracker
+ * @package Family_Travel_Tracker
  */
 
 // Exit if accessed directly
@@ -43,7 +43,7 @@ $default_airport = $settings['default_home_airport'] ?? '';
                 <div class="srt-form-field">
                     <label for="member_id"><?php esc_html_e('Event For', 'schedule-collaboration-tracking'); ?> *</label>
                     <select id="member_id" name="member_id" required>
-                        <option value=""><?php esc_html_e('Select Member...', 'schedule-collaboration-tracking'); ?></option>
+                        <option value=""><?php esc_html_e('Select Child...', 'schedule-collaboration-tracking'); ?></option>
                         <?php
                         // Parents see their children
                         if (!empty($children)) {
@@ -63,7 +63,7 @@ $default_airport = $settings['default_home_airport'] ?? '';
                         }
                         ?>
                     </select>
-                    <small class="description"><?php esc_html_e('Select which member this event belongs to', 'schedule-collaboration-tracking'); ?></small>
+                    <small class="description"><?php esc_html_e('Select which child this event belongs to', 'schedule-collaboration-tracking'); ?></small>
                 </div>
             <?php elseif ($is_member) : ?>
                 <!-- Hidden field for members creating their own events -->
