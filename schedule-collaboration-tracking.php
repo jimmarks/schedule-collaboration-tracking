@@ -87,6 +87,13 @@ class Summer_Regiment_Tracker {
         require_once SRT_PLUGIN_DIR . 'includes/cron-setup.php';
         require_once SRT_PLUGIN_DIR . 'includes/flight-linking.php';
         require_once SRT_PLUGIN_DIR . 'includes/class-child-colors.php';
+        
+        // Stripe & Billing (only if Stripe library is available)
+        if (file_exists(SRT_PLUGIN_DIR . 'lib/stripe-php/init.php')) {
+            require_once SRT_PLUGIN_DIR . 'includes/stripe/class-stripe-integration.php';
+            require_once SRT_PLUGIN_DIR . 'includes/stripe/class-stripe-webhooks.php';
+            require_once SRT_PLUGIN_DIR . 'includes/billing/class-billing-manager.php';
+        }
     }
     
     /**

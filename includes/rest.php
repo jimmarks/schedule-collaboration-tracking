@@ -233,6 +233,33 @@ class SRT_REST {
             'callback'            => array(__CLASS__, 'update_user_preferences'),
             'permission_callback' => 'is_user_logged_in',
         ));
+        
+        // Billing endpoints
+        if (class_exists('FTT_Stripe_Integration')) {
+            register_rest_route('ftt/v1', '/create-checkout', array(
+                'methods'             => 'POST',
+                'callback'            => array(__CLASS__, 'create_checkout_session'),
+                'permission_callback' => 'is_user_logged_in',
+            ));
+            
+            register_rest_route('ftt/v1', '/add-child-addon', array(
+                'methods'             => 'POST',
+                'callback'            => array(__CLASS__, 'add_child_addon'),
+                'permission_callback' => 'is_user_logged_in',
+            ));
+            
+            register_rest_route('ftt/v1', '/cancel-subscription', array(
+                'methods'             => 'POST',
+                'callback'            => array(__CLASS__, 'cancel_subscription'),
+                'permission_callback' => 'is_user_logged_in',
+            ));
+            
+            register_rest_route('ftt/v1', '/reactivate-subscription', array(
+                'methods'             => 'POST',
+                'callback'            => array(__CLASS__, 'reactivate_subscription'),
+                'permission_callback' => 'is_user_logged_in',
+            ));
+        }
     }
     
     /**
@@ -1301,7 +1328,73 @@ class SRT_REST {
         
         return $event;
     }
-}
-
+    
+    /**
+     * Create Stripe checkout session
+     */
+    public static function create_checkout_session($request) {
+        $user_id = get_current_user_id();
+        $params = $request->get_json_params();
+        
+        $interval = $params['interval'] ?? 'month';
+        $addon_quantity = (int) ($params['addon_quantity'] ?? 0);
+        
+        if (!in_array($interval, ['month', 'year'])) {
+            return new WP_Error('invalid_interval', 'Invalid billing interval', ['status' => 400]);
+        }
+        
+        $session = FTT_Stripe_Integration::create_checkout_session($user_id, $interval, $addon_quantity);
+        
+        if (!$session) {
+            return new WP_Error('checkout_failed', 'Failed to create checkout session', ['status' => 500]);
+        }
+        
+        return rest_ensure_response($session);
+    }
+    
+    /**
+     * Add child addon to subscription
+     */
+    public static function add_child_addon($request) {
+        $user_id = get_current_user_id();
+        
+        $success = FTT_Stripe_Integration::add_child_addon($user_id);
+        
+        if (!$success) {
+            return new WP_Error('addon_failed', 'Failed to add child addon', ['status' => 500]);
+        }
+        
+        return rest_ensure_response(['success' => true]);
+    }
+    
+    /**
+     * Cancel subscription
+     */
+    public static function cancel_subscription($request) {
+        $user_id = get_current_user_id();
+        
+        $success = FTT_Stripe_Integration::cancel_subscription($user_id);
+        
+        if (!$success) {
+            return new WP_Error('cancel_failed', 'Failed to cancel subscription', ['status' => 500]);
+        }
+        
+        return rest_ensure_response(['success' => true]);
+    }
+    
+    /**
+     * Reactivate canceled subscription
+     */
+    public static function reactivate_subscription($request) {
+        $user_id = get_current_user_id();
+        
+        $success = FTT_Stripe_Integration::reactivate_subscription($user_id);
+        
+        if (!$success) {
+            return new WP_Error('reactivate_failed', 'Failed to reactivate subscription', ['status' => 500]);
+        }
+        
+        return rest_ensure_response(['success' => true]);
+    }
 // Initialize
 SRT_REST::init();
