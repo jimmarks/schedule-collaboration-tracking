@@ -39,8 +39,13 @@ class SRT_Roles {
         // Grant event editing capabilities
         $user = get_user_by('id', $user_id);
         if ($user) {
-            $user->add_cap('edit_posts');
             $user->add_cap('read');
+            $user->add_cap('edit_posts');
+            $user->add_cap('edit_published_posts');
+            $user->add_cap('publish_posts');
+            $user->add_cap('delete_posts');
+            $user->add_cap('delete_published_posts');
+            $user->add_cap('upload_files');
         }
     }
     

@@ -16,10 +16,30 @@ if (!defined('ABSPATH')) {
 class SRT_Price_Tracking {
     
     /**
+     * Get notification email address from settings
+     */
+    public static function get_notification_email() {
+        $settings = get_option('srt_settings', array());
+        $email = $settings['notification_from_email'] ?? '';
+        return !empty($email) ? $email : get_option('admin_email');
+    }
+    
+    /**
+     * Get notification sender name from settings  
+     */
+    public static function get_notification_from_name() {
+        $settings = get_option('srt_settings', array());
+        $name = $settings['notification_from_name'] ?? '';
+        return !empty($name) ? $name : get_bloginfo('name');
+    }
+    
+    /**
      * Initialize
      */
     public static function init() {
         add_action('init', array(__CLASS__, 'create_tables'));
+        add_action('init', array(__CLASS__, 'upgrade_schema'));
+        add_action('init', array(__CLASS__, 'handle_alert_deactivation'));
         add_action('srt_check_flight_prices', array(__CLASS__, 'check_all_prices'));
         add_action('srt_daily_digest', array(__CLASS__, 'process_daily_digests'));
         add_filter('cron_schedules', array(__CLASS__, 'add_custom_cron_schedule'));
@@ -34,6 +54,83 @@ class SRT_Price_Tracking {
             $tomorrow_2am = strtotime('tomorrow 2:00am');
             wp_schedule_event($tomorrow_2am, 'daily_2am', 'srt_daily_digest');
         }
+    }
+    
+    /**
+     * Upgrade database schema for existing installations
+     */
+    public static function upgrade_schema() {
+        if (get_option('srt_price_tracking_schema_v2')) {
+            return;
+        }
+        
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'srt_price_history';
+        
+        // Check if table exists
+        $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table_name'");
+        if (!$table_exists) {
+            return; // Table hasn't been created yet, create_tables() will handle it
+        }
+        
+        // Check if google_insights column exists
+        $column_exists = $wpdb->get_results("SHOW COLUMNS FROM $table_name LIKE 'google_insights'");
+        
+        if (empty($column_exists)) {
+            // Add google_insights column
+            $wpdb->query("ALTER TABLE $table_name ADD COLUMN google_insights TEXT DEFAULT NULL AFTER checked_at");
+            error_log('SRT: Added google_insights column to price_history table');
+        }
+        
+        update_option('srt_price_tracking_schema_v2', true);
+    }
+    
+    /**
+     * Handle alert deactivation from email link (no login required)
+     */
+    public static function handle_alert_deactivation() {
+        if (!isset($_GET['action']) || $_GET['action'] !== 'srt_deactivate_alert') {
+            return;
+        }
+        
+        if (!isset($_GET['alert_id']) || !isset($_GET['token'])) {
+            wp_die('Invalid request', 'Error', array('response' => 400));
+        }
+        
+        $alert_id = intval($_GET['alert_id']);
+        $token = sanitize_text_field($_GET['token']);
+        
+        // Validate token
+        if (!self::validate_alert_token($alert_id, $token)) {
+            wp_die('Invalid or expired link', 'Error', array('response' => 403));
+        }
+        
+        // Deactivate alert
+        global $wpdb;
+        $alerts_table = $wpdb->prefix . 'srt_price_alerts';
+        $result = $wpdb->update(
+            $alerts_table,
+            array('is_active' => 0),
+            array('id' => $alert_id),
+            array('%d'),
+            array('%d')
+        );
+        
+        if ($result === false) {
+            wp_die('Failed to deactivate alert', 'Error', array('response' => 500));
+        }
+        
+        // Show success message
+        wp_die(
+            '<div style="font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 40px; text-align: center;">' .
+            '<h1 style="color: #10b981; font-size: 48px; margin-bottom: 20px;">✓</h1>' .
+            '<h2 style="color: #333; font-size: 24px; margin-bottom: 10px;">Price Alert Deactivated</h2>' .
+            '<p style="color: #666; font-size: 16px; margin-bottom: 30px;">You will no longer receive price updates for this flight.</p>' .
+            '<a href="' . home_url('/member-dashboard/') . '" style="display: inline-block; background: #0066cc; color: white; text-decoration: none; padding: 12px 30px; border-radius: 6px; font-weight: 600; font-size: 14px;">Go to Dashboard</a>' .
+            '</div>',
+            'Alert Deactivated',
+            array('response' => 200)
+        );
     }
     
     /**
@@ -71,6 +168,7 @@ class SRT_Price_Tracking {
             depart_date date NOT NULL,
             price decimal(10,2) NOT NULL,
             checked_at datetime NOT NULL,
+            google_insights TEXT DEFAULT NULL,
             PRIMARY KEY  (id),
             KEY event_id (event_id),
             KEY route_date (origin, destination, depart_date),
@@ -177,19 +275,30 @@ class SRT_Price_Tracking {
         
         error_log("SRT record_price: event=$event_id, leg=$leg_index, route=$origin->$destination, date=$depart_date, price=$price, source=$source");
         
-        $result = $wpdb->insert(
-            $table_name,
-            array(
-                'event_id'     => $event_id,
-                'leg_index'    => $leg_index,
-                'origin'       => $origin,
-                'destination'  => $destination,
-                'depart_date'  => $depart_date,
-                'price'        => $price,
-                'checked_at'   => current_time('mysql'),
-            ),
-            array('%d', '%d', '%s', '%s', '%s', '%f', '%s')
+        // Extract Google price insights if available in raw_data
+        $google_insights = null;
+        if ($raw_data && isset($raw_data['price_insights'])) {
+            $google_insights = wp_json_encode($raw_data['price_insights']);
+        }
+        
+        $insert_data = array(
+            'event_id'     => $event_id,
+            'leg_index'    => $leg_index,
+            'origin'       => $origin,
+            'destination'  => $destination,
+            'depart_date'  => $depart_date,
+            'price'        => $price,
+            'checked_at'   => current_time('mysql'),
         );
+        
+        $format = array('%d', '%d', '%s', '%s', '%s', '%f', '%s');
+        
+        if ($google_insights) {
+            $insert_data['google_insights'] = $google_insights;
+            $format[] = '%s';
+        }
+        
+        $result = $wpdb->insert($table_name, $insert_data, $format);
         
         if ($result === false) {
             error_log("SRT record_price ERROR: " . $wpdb->last_error);
@@ -441,7 +550,7 @@ class SRT_Price_Tracking {
                         $price = is_array($price_result) ? $price_result['price'] : $price_result;
                         
                         if ($price !== false && $price > 0) {
-                            $recorded = self::record_price($event->ID, $index, $leg['depart_airport'], $leg['arrive_airport'], $depart_date, $price, 'serpapi');
+                            $recorded = self::record_price($event->ID, $index, $leg['depart_airport'], $leg['arrive_airport'], $depart_date, $price, 'serpapi', $price_result);
                             if ($recorded !== false) {
                                 $prices_recorded++;
                             }
@@ -556,10 +665,14 @@ class SRT_Price_Tracking {
             'response' => $body,
         );
         
+        // Extract price insights from Google Flights response
+        $price_insights = isset($body['price_insights']) ? $body['price_insights'] : null;
+        
         // SerpAPI returns best flights in 'best_flights' array
         if (isset($body['best_flights'][0]['price'])) {
             return array(
                 'price' => floatval($body['best_flights'][0]['price']),
+                'price_insights' => $price_insights,
                 'debug' => $debug_info,
             );
         }
@@ -568,6 +681,7 @@ class SRT_Price_Tracking {
         if (isset($body['other_flights'][0]['price'])) {
             return array(
                 'price' => floatval($body['other_flights'][0]['price']),
+                'price_insights' => $price_insights,
                 'debug' => $debug_info,
             );
         }
@@ -579,6 +693,7 @@ class SRT_Price_Tracking {
         
         return array(
             'price' => false,
+            'price_insights' => $price_insights,
             'debug' => $debug_info,
         );
     }
@@ -702,36 +817,140 @@ class SRT_Price_Tracking {
             return;
         }
         
+        // Get latest price record to check for Google insights
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'srt_price_history';
+        $latest_record = $wpdb->get_row($wpdb->prepare(
+            "SELECT google_insights FROM $table_name 
+            WHERE event_id = %d AND leg_index = %d 
+            ORDER BY checked_at DESC LIMIT 1",
+            $alert->event_id,
+            $alert->leg_index
+        ));
+        
+        $google_insights = null;
+        if ($latest_record && !empty($latest_record->google_insights)) {
+            $google_insights = json_decode($latest_record->google_insights, true);
+        }
+        
         $subject = sprintf('[%s] Flight Price Alert: %s',
             get_bloginfo('name'),
             $event->post_title
         );
         
-        $message = sprintf(
-            "Hi %s,\n\nGood news! We found a price update for your flight:\n\n" .
-            "Event: %s\n" .
-            "Route: %s (%s) → %s (%s)\n" .
-            "Date: %s\n" .
-            "Current Price: $%s\n\n" .
-            "View event: %s\n\n" .
-            "Happy travels!\n%s",
-            $user->display_name,
-            $event->post_title,
-            $leg['depart_location'],
-            $leg['depart_airport'],
-            $leg['arrive_location'],
-            $leg['arrive_airport'],
-            $leg['depart_date'] ?? 'TBD',
-            number_format($current_price, 2),
-            get_permalink($event->ID),
-            get_bloginfo('name')
-        );
+        // Build HTML email
+        $message = self::build_price_alert_email($user, $event, $leg, $current_price, $google_insights);
         
         error_log("SRT: Sending price alert email to {$user->user_email}");
-        $result = wp_mail($user->user_email, $subject, $message);
+        
+        $from_name = self::get_notification_from_name();
+        $from_email = self::get_notification_email();
+        
+        $headers = array(
+            'Content-Type: text/html; charset=UTF-8',
+            sprintf('From: %s <%s>', $from_name, $from_email),
+        );
+        
+        $result = wp_mail($user->user_email, $subject, $message, $headers);
         error_log("SRT: Email send result: " . ($result ? 'success' : 'failed'));
         
         do_action('srt_price_alert_sent', $alert, $current_price, $user, $event);
+    }
+    
+    /**
+     * Build price alert email HTML
+     */
+    private static function build_price_alert_email($user, $event, $leg, $current_price, $google_insights = null) {
+        $site_name = get_bloginfo('name');
+        $event_url = get_permalink($event->ID);
+        
+        ob_start();
+        ?>
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f5f5f5;">
+            
+            <div style="background: #fff; border-radius: 8px; padding: 30px; margin-bottom: 20px;">
+                <h1 style="color: #0066cc; border-bottom: 3px solid #0066cc; padding-bottom: 10px; margin-top: 0; font-size: 24px;">✈️ Flight Price Alert</h1>
+                <p style="margin: 15px 0; font-size: 16px;">Hi <?php echo esc_html($user->display_name); ?>,</p>
+                <p style="margin: 15px 0; font-size: 14px; color: #666;">Great news! We found a price update for your flight:</p>
+            </div>
+            
+            <div style="background: #fff; border-radius: 8px; padding: 25px; margin-bottom: 20px;">
+                <div style="font-weight: bold; font-size: 18px; color: #333; margin-bottom: 10px;">
+                    <?php echo esc_html($event->post_title); ?>
+                </div>
+                
+                <div style="font-size: 14px; color: #666; margin-bottom: 20px;">
+                    <strong><?php echo esc_html($leg['depart_airport']); ?></strong> → <strong><?php echo esc_html($leg['arrive_airport']); ?></strong>
+                    <br>
+                    <?php echo esc_html($leg['depart_date'] ?? 'TBD'); ?>
+                </div>
+                
+                <?php if ($google_insights): ?>
+                    <?php 
+                    $price_level = isset($google_insights['price_level']) ? strtolower($google_insights['price_level']) : '';
+                    $typical_low = isset($google_insights['typical_price_range'][0]) ? $google_insights['typical_price_range'][0] : null;
+                    $typical_high = isset($google_insights['typical_price_range'][1]) ? $google_insights['typical_price_range'][1] : null;
+                    
+                    if ($price_level && $typical_high):
+                        $bg_color = $price_level === 'low' ? '#ecfdf5' : ($price_level === 'high' ? '#fef2f2' : '#fffbeb');
+                        $border_color = $price_level === 'low' ? '#10b981' : ($price_level === 'high' ? '#ef4444' : '#f59e0b');
+                        $text_color = $price_level === 'low' ? '#065f46' : ($price_level === 'high' ? '#991b1b' : '#92400e');
+                        $icon = $price_level === 'low' ? '✨' : ($price_level === 'high' ? '⚠️' : 'ℹ️');
+                        
+                        $savings = $typical_high - $current_price;
+                        $message = '';
+                        
+                        if ($price_level === 'low' && $savings > 0) {
+                            $message = sprintf('Prices are currently <strong>low</strong> — $%d cheaper than usual for this route', round($savings));
+                        } elseif ($price_level === 'high') {
+                            $message = 'Prices are currently <strong>high</strong> — Consider waiting or alternative dates';
+                        } else {
+                            $message = 'Prices are <strong>typical</strong> for this route';
+                        }
+                    ?>
+                    <div style="background: <?php echo $bg_color; ?>; border-left: 4px solid <?php echo $border_color; ?>; padding: 15px; margin-bottom: 20px; border-radius: 4px;">
+                        <div style="font-size: 14px; color: <?php echo $text_color; ?>; font-weight: 600; margin-bottom: 6px;">
+                            <?php echo $icon; ?> Google Flights Insight
+                        </div>
+                        <div style="font-size: 13px; color: <?php echo $text_color; ?>;">
+                            <?php echo $message; ?>
+                        </div>
+                        <?php if ($typical_low && $typical_high): ?>
+                            <div style="font-size: 12px; color: <?php echo $text_color; ?>; opacity: 0.85; margin-top: 6px;">
+                                Typical range: $<?php echo number_format($typical_low, 0); ?>–$<?php echo number_format($typical_high, 0); ?>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                    <?php endif; ?>
+                <?php endif; ?>
+                
+                <div style="background: #f0f9ff; border: 2px solid #0891b2; padding: 20px; border-radius: 8px; text-align: center;">
+                    <div style="font-size: 14px; color: #0c5460; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">Current Price</div>
+                    <div style="font-size: 36px; font-weight: bold; color: #0891b2;">$<?php echo number_format($current_price, 0); ?></div>
+                </div>
+                
+                <div style="text-align: center; margin-top: 25px;">
+                    <a href="<?php echo esc_url($event_url); ?>" style="display: inline-block; background: #0066cc; color: white; text-decoration: none; padding: 12px 30px; border-radius: 6px; font-weight: 600; font-size: 14px;">
+                        View Event Details →
+                    </a>
+                </div>
+            </div>
+            
+            <div style="background: #fff; border-radius: 8px; padding: 20px; text-align: center; font-size: 12px; color: #666;">
+                <p style="margin: 10px 0;">You're receiving this because you set up a price alert. Manage your alerts in your <a href="<?php echo home_url('/member-dashboard/'); ?>" style="color: #0066cc; text-decoration: none;">Member Dashboard</a>.</p>
+                <p style="margin: 10px 0;">&copy; <?php echo date('Y'); ?> <?php echo esc_html($site_name); ?></p>
+            </div>
+            
+        </body>
+        </html>
+        <?php
+        return ob_get_clean();
     }
     
     /**
@@ -775,11 +994,223 @@ class SRT_Price_Tracking {
     }
     
     /**
+     * Generate unsubscribe token for an alert
+     */
+    private static function generate_alert_token($alert_id, $user_id) {
+        return hash_hmac('sha256', $alert_id . '|' . $user_id, AUTH_KEY);
+    }
+    
+    /**
+     * Validate unsubscribe token
+     */
+    public static function validate_alert_token($alert_id, $token) {
+        global $wpdb;
+        $alerts_table = $wpdb->prefix . 'srt_price_alerts';
+        
+        $alert = $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM $alerts_table WHERE id = %d",
+            $alert_id
+        ));
+        
+        if (!$alert) {
+            return false;
+        }
+        
+        $expected_token = self::generate_alert_token($alert->id, $alert->user_id);
+        return hash_equals($expected_token, $token);
+    }
+    
+    /**
+     * Send confirmation email when price alert is created
+     */
+    public static function send_alert_confirmation($alert_id) {
+        global $wpdb;
+        $alerts_table = $wpdb->prefix . 'srt_price_alerts';
+        
+        $alert = $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM $alerts_table WHERE id = %d",
+            $alert_id
+        ));
+        
+        if (!$alert) {
+            return false;
+        }
+        
+        $user = get_userdata($alert->user_id);
+        if (!$user) {
+            return false;
+        }
+        
+        $event = get_post($alert->event_id);
+        if (!$event) {
+            return false;
+        }
+        
+        $travel_legs = json_decode(get_post_meta($event->ID, 'travel_legs', true) ?: '[]', true);
+        $leg = isset($travel_legs[$alert->leg_index]) ? $travel_legs[$alert->leg_index] : null;
+        
+        if (!$leg) {
+            return false;
+        }
+        
+        $site_name = get_bloginfo('name');
+        $from_name = self::get_notification_from_name();
+        $from_email = self::get_notification_email();
+        
+        $headers = array(
+            'Content-Type: text/html; charset=UTF-8',
+            sprintf('From: %s <%s>', $from_name, $from_email),
+        );
+        $subject = sprintf('[%s] Price Alert Confirmation - %s', $site_name, $event->post_title);
+        
+        $message = self::build_confirmation_email($user, $event, $leg, $alert);
+        
+        $email_sent = wp_mail($user->user_email, $subject, $message, $headers);
+        
+        return array(
+            'success' => $email_sent,
+            'subject' => $subject,
+        );
+    }
+    
+    /**
+     * Build confirmation email HTML
+     */
+    private static function build_confirmation_email($user, $event, $leg, $alert) {
+        $site_name = get_bloginfo('name');
+        $event_url = get_permalink($event->ID);
+        $token = self::generate_alert_token($alert->id, $alert->user_id);
+        $unsubscribe_url = add_query_arg(array(
+            'action' => 'srt_deactivate_alert',
+            'alert_id' => $alert->id,
+            'token' => $token,
+        ), home_url());
+        
+        $alert_type_label = $alert->alert_type === 'daily_digest' ? 'Daily Digest' : 'Price Drop Alert';
+        
+        ob_start();
+        ?>
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f5f5f5;">
+            
+            <div style="background: #fff; border-radius: 8px; padding: 30px; margin-bottom: 20px;">
+                <h1 style="color: #0066cc; border-bottom: 3px solid #0066cc; padding-bottom: 10px; margin-top: 0; font-size: 24px;">✅ Price Alert Activated</h1>
+                <p style="margin: 15px 0; font-size: 16px;">Hi <?php echo esc_html($user->display_name); ?>,</p>
+                <p style="margin: 15px 0; font-size: 14px; color: #666;">Your flight price alert has been successfully set up!</p>
+            </div>
+            
+            <div style="background: #fff; border-radius: 8px; padding: 25px; margin-bottom: 20px;">
+                <h2 style="margin-top: 0; font-size: 18px; color: #333;">Alert Details</h2>
+                
+                <div style="background: #f9fafb; padding: 15px; border-radius: 6px; margin: 15px 0;">
+                    <div style="font-weight: bold; font-size: 16px; color: #333; margin-bottom: 8px;">
+                        <?php echo esc_html($event->post_title); ?>
+                    </div>
+                    <div style="font-size: 14px; color: #666; margin-bottom: 8px;">
+                        <strong><?php echo esc_html($leg['depart_airport']); ?></strong> → <strong><?php echo esc_html($leg['arrive_airport']); ?></strong>
+                        <br>
+                        <?php echo esc_html($leg['depart_date'] ?? 'TBD'); ?>
+                    </div>
+                    <div style="font-size: 13px; color: #666;">
+                        Alert Type: <strong><?php echo esc_html($alert_type_label); ?></strong>
+                    </div>
+                </div>
+                
+                <p style="font-size: 14px; color: #666; margin: 15px 0;">
+                    <?php if ($alert->alert_type === 'daily_digest'): ?>
+                        You'll receive a daily email with price updates for this flight.
+                    <?php else: ?>
+                        You'll be notified when prices drop or change significantly.
+                    <?php endif; ?>
+                </p>
+            </div>
+            
+            <!-- Important: Keep Out of Spam Section -->
+            <div style="background: #fffbeb; border: 2px solid #f59e0b; border-radius: 8px; padding: 20px 25px; margin-bottom: 20px;">
+                <h2 style="margin: 0 0 15px 0; font-size: 16px; color: #92400e;">
+                    <span style="display: inline-block; width: 18px; height: 18px; background: #f59e0b; border-radius: 3px; text-align: center; line-height: 18px; color: white; font-size: 12px; margin-right: 6px;">!</span>
+                    Important: Ensure You Receive Our Emails
+                </h2>
+                <p style="font-size: 13px; color: #78350f; margin: 0 0 15px 0;">
+                    To make sure our price alerts don't end up in your spam folder, please add us to your contacts or safe senders list.
+                </p>
+                
+                <!-- Gmail Instructions -->
+                <div style="background: white; border-left: 3px solid #ea4335; padding: 12px 15px; margin: 10px 0; border-radius: 4px;">
+                    <div style="font-weight: 600; font-size: 14px; color: #374151; margin-bottom: 8px;">Gmail Instructions</div>
+                    <div style="font-size: 12px; color: #4b5563; line-height: 1.5;">
+                        1. Find this email in your inbox (check Promotions or Spam tabs if needed)<br>
+                        2. Drag this email to the "Primary" tab<br>
+                        3. Click "Yes" when asked "Do this for future messages from <?php echo esc_html(self::get_notification_email()); ?>?"<br>
+                        <span style="font-style: italic; color: #6b7280;">Alternative: Click the three dots (⋮) → Add to Contacts</span>
+                    </div>
+                </div>
+                
+                <!-- Outlook Instructions -->
+                <div style="background: white; border-left: 3px solid #0078d4; padding: 12px 15px; margin: 10px 0; border-radius: 4px;">
+                    <div style="font-weight: 600; font-size: 14px; color: #374151; margin-bottom: 8px;">Outlook/Hotmail Instructions</div>
+                    <div style="font-size: 12px; color: #4b5563; line-height: 1.5;">
+                        1. Open this email<br>
+                        2. Click the three dots (⋯) at the top<br>
+                        3. Select "Add to Safe Senders"<br>
+                        <span style="font-style: italic; color: #6b7280;">Or: Settings → Mail → Junk email → Safe senders → Add <?php echo esc_html(self::get_notification_email()); ?></span>
+                    </div>
+                </div>
+                
+                <!-- Yahoo Instructions -->
+                <div style="background: white; border-left: 3px solid #6001d2; padding: 12px 15px; margin: 10px 0; border-radius: 4px;">
+                    <div style="font-weight: 600; font-size: 14px; color: #374151; margin-bottom: 8px;">Yahoo Mail Instructions</div>
+                    <div style="font-size: 12px; color: #4b5563; line-height: 1.5;">
+                        1. Open this email<br>
+                        2. Click on our sender name at the top<br>
+                        3. Click "Add to Contacts"<br>
+                        <span style="font-style: italic; color: #6b7280;">Or: Click the three dots (⋯) → "Mark as Not Spam" if in spam folder</span>
+                    </div>
+                </div>
+                
+                <div style="background: #fef3c7; padding: 10px 12px; border-radius: 4px; margin: 15px 0 0 0;">
+                    <p style="font-size: 12px; color: #78350f; margin: 0;">
+                        <strong>Our emails come from:</strong> <?php echo esc_html(self::get_notification_email()); ?>
+                    </p>
+                </div>
+            </div>
+            
+            <div style="background: #fff; border-radius: 8px; padding: 20px; text-align: center; margin-bottom: 20px;">
+                <a href="<?php echo esc_url($event_url); ?>" style="display: inline-block; background: #0066cc; color: white; text-decoration: none; padding: 12px 30px; border-radius: 6px; font-weight: 600; font-size: 14px; margin: 5px;">
+                    View Event Details
+                </a>
+                <a href="<?php echo home_url('/member-dashboard/'); ?>" style="display: inline-block; background: #6b7280; color: white; text-decoration: none; padding: 12px 30px; border-radius: 6px; font-weight: 600; font-size: 14px; margin: 5px;">
+                    Manage All Alerts
+                </a>
+            </div>
+            
+            <div style="background: #fff; border-radius: 8px; padding: 20px; text-align: center; font-size: 12px; color: #666;">
+                <p style="margin: 10px 0;">No longer need this alert? <a href="<?php echo esc_url($unsubscribe_url); ?>" style="color: #0066cc; text-decoration: none;">Turn it off</a></p>
+                <p style="margin: 10px 0;">&copy; <?php echo date('Y'); ?> <?php echo esc_html($site_name); ?></p>
+            </div>
+            
+        </body>
+        </html>
+        <?php
+        return ob_get_clean();
+    }
+    
+    /**
      * Process daily digests for all users
      */
     public static function process_daily_digests() {
         global $wpdb;
         $alerts_table = $wpdb->prefix . 'srt_price_alerts';
+        
+        // FIRST: Run price check to ensure we have fresh data with Google insights
+        error_log('[SRT Daily Digest] Running price check before sending emails...');
+        self::check_all_prices('digest');
+        error_log('[SRT Daily Digest] Price check complete, now sending emails');
         
         // Get all users with active daily digest alerts
         $users = $wpdb->get_results(
@@ -888,6 +1319,13 @@ class SRT_Price_Tracking {
             $change = $current - $first;
             $change_percent = ($change / $first) * 100;
             
+            // Get Google insights from latest record
+            $google_insights = null;
+            $latest_record = end($history);
+            if ($latest_record && !empty($latest_record->google_insights)) {
+                $google_insights = json_decode($latest_record->google_insights, true);
+            }
+            
             // Build flight info
             $flight_info = array(
                 'event_title' => $event->post_title,
@@ -901,7 +1339,8 @@ class SRT_Price_Tracking {
                 'change_percent' => $change_percent,
                 'trend' => $trend,
                 'days_to_departure' => $days_to_departure,
-                'recommendation' => ''
+                'recommendation' => '',
+                'google_insights' => $google_insights
             );
             
             // Categorize and add recommendation
@@ -931,7 +1370,13 @@ class SRT_Price_Tracking {
         if ($total_flights > 0) {
             $email_body = self::build_digest_email($user, $digest_data);
             
-            $headers = array('Content-Type: text/html; charset=UTF-8');
+            $from_name = self::get_notification_from_name();
+            $from_email = self::get_notification_email();
+            
+            $headers = array(
+                'Content-Type: text/html; charset=UTF-8',
+                sprintf('From: %s <%s>', $from_name, $from_email),
+            );
             $subject = sprintf('Daily Flight Price Digest - %d flights tracked', $total_flights);
             
             wp_mail($user->user_email, $subject, $email_body, $headers);
@@ -1050,6 +1495,46 @@ class SRT_Price_Tracking {
                             <?php echo $trend_icon; ?> <?php echo ucfirst($flight['trend']); ?>
                         </span>
                     </div>
+                    
+                    <?php if (!empty($flight['google_insights'])): ?>
+                        <?php 
+                        $insights = $flight['google_insights'];
+                        $price_level = isset($insights['price_level']) ? strtolower($insights['price_level']) : '';
+                        $typical_low = isset($insights['typical_price_range'][0]) ? $insights['typical_price_range'][0] : null;
+                        $typical_high = isset($insights['typical_price_range'][1]) ? $insights['typical_price_range'][1] : null;
+                        
+                        // Google Flights Price Insight Banner
+                        if ($price_level && $typical_high):
+                            $bg_color = $price_level === 'low' ? '#ecfdf5' : ($price_level === 'high' ? '#fef2f2' : '#fffbeb');
+                            $border_color = $price_level === 'low' ? '#10b981' : ($price_level === 'high' ? '#ef4444' : '#f59e0b');
+                            $text_color = $price_level === 'low' ? '#065f46' : ($price_level === 'high' ? '#991b1b' : '#92400e');
+                            $icon = $price_level === 'low' ? '✨' : ($price_level === 'high' ? '⚠️' : 'ℹ️');
+                            
+                            // Calculate savings for low prices
+                            $savings = $typical_high - $flight['current_price'];
+                            $message = '';
+                            
+                            if ($price_level === 'low' && $savings > 0) {
+                                $message = sprintf('Prices are currently <strong>low</strong> — $%d cheaper than usual for this route', round($savings));
+                            } elseif ($price_level === 'high') {
+                                $message = sprintf('Prices are currently <strong>high</strong> — Consider waiting or checking alternative dates');
+                            } else {
+                                $message = sprintf('Prices are <strong>typical</strong> for this route');
+                            }
+                        ?>
+                        <!-- Google Flights Price Insight -->
+                        <div style="background: <?php echo $bg_color; ?>; border-left: 4px solid <?php echo $border_color; ?>; padding: 12px 15px; margin-bottom: 15px; border-radius: 4px;">
+                            <div style="font-size: 13px; color: <?php echo $text_color; ?>; font-weight: 500;">
+                                <?php echo $icon; ?> <strong>Google Flights:</strong> <?php echo $message; ?>
+                            </div>
+                            <?php if ($typical_low && $typical_high): ?>
+                                <div style="font-size: 12px; color: <?php echo $text_color; ?>; opacity: 0.85; margin-top: 4px;">
+                                    Typical price range: $<?php echo number_format($typical_low, 0); ?>–$<?php echo number_format($typical_high, 0); ?>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                        <?php endif; ?>
+                    <?php endif; ?>
                     
                     <!-- Main Price Info -->
                     <table width="100%" cellpadding="0" cellspacing="0" style="background: #f9f9f9; border-radius: 6px; margin: 15px 0;">

@@ -3,7 +3,7 @@
  * Plugin Name: Schedule Collaboration Tracking
  * Plugin URI: https://github.com/jimmarks/schedule-collaboration-tracking
  * Description: Multi-child schedule coordination with travel planning, flight tracking, and shared calendars for families
- * Version: 1.0.8
+ * Version: 1.0.23
  * Author: Jim Marks
  * Author URI: https://github.com/jimmarks
  * License: GPL v2 or later
@@ -19,7 +19,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('SRT_VERSION', '1.0.8');
+define('SRT_VERSION', '1.0.23');
 define('SRT_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('SRT_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('SRT_PLUGIN_BASENAME', plugin_basename(__FILE__));
@@ -167,6 +167,9 @@ class Summer_Regiment_Tracker {
         
         // Migrate existing events to have member_id
         $this->migrate_member_ids();
+        
+        // Upgrade member capabilities (v1.0.8+)
+        $this->upgrade_member_capabilities();
     }
     
     /**
@@ -198,6 +201,37 @@ class Summer_Regiment_Tracker {
         
         // Mark migration as done
         update_option('srt_member_id_migration_done', true);
+    }
+    
+    /**
+     * Upgrade member capabilities to include full post editing
+     * Added in v1.0.8 to allow members to add/edit events
+     */
+    private function upgrade_member_capabilities() {
+        // Check if upgrade already done
+        if (get_option('srt_member_caps_upgraded_v1_0_8')) {
+            return;
+        }
+        
+        // Get all members
+        $members = get_users(array(
+            'meta_key' => 'srt_is_member',
+            'meta_value' => '1',
+        ));
+        
+        foreach ($members as $member) {
+            // Add all necessary capabilities for post editing
+            $member->add_cap('read');
+            $member->add_cap('edit_posts');
+            $member->add_cap('edit_published_posts');
+            $member->add_cap('publish_posts');
+            $member->add_cap('delete_posts');
+            $member->add_cap('delete_published_posts');
+            $member->add_cap('upload_files');
+        }
+        
+        // Mark upgrade as done
+        update_option('srt_member_caps_upgraded_v1_0_8', true);
     }
     
     /**
@@ -281,6 +315,7 @@ class Summer_Regiment_Tracker {
         // Localize script
         $settings = get_option('srt_settings', array());
         wp_localize_script('srt-main', 'srtData', array(
+            'pluginUrl' => SRT_PLUGIN_URL,
             'restUrl' => rest_url('srt/v1/'),
             'nonce' => wp_create_nonce('wp_rest'),
             'isAdmin' => current_user_can('edit_posts'),

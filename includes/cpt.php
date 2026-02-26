@@ -77,6 +77,7 @@ class SRT_CPT {
             'query_var'          => true,
             'rewrite'            => array('slug' => 'regiment-event'),
             'capability_type'    => 'post',
+            'map_meta_cap'       => true,
             'has_archive'        => true,
             'hierarchical'       => false,
             'menu_position'      => 20,

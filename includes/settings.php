@@ -94,6 +94,22 @@ class SRT_Settings {
             'srt_general_section'
         );
         
+        add_settings_field(
+            'notification_from_email',
+            __('Notification From Email', 'schedule-collaboration-tracking'),
+            array(__CLASS__, 'render_notification_from_email_field'),
+            'srt-settings-general',
+            'srt_general_section'
+        );
+        
+        add_settings_field(
+            'notification_from_name',
+            __('Notification From Name', 'schedule-collaboration-tracking'),
+            array(__CLASS__, 'render_notification_from_name_field'),
+            'srt-settings-general',
+            'srt_general_section'
+        );
+        
         // TAB 2: API KEYS
         add_settings_section(
             'srt_api_section',
@@ -207,6 +223,12 @@ class SRT_Settings {
         if (isset($input['login_menu_mode'])) {
             $sanitized['login_menu_mode'] = in_array($input['login_menu_mode'], array('login_only', 'both')) ? 
                 $input['login_menu_mode'] : 'both';
+        }
+        if (isset($input['notification_from_email'])) {
+            $sanitized['notification_from_email'] = sanitize_email($input['notification_from_email']);
+        }
+        if (isset($input['notification_from_name'])) {
+            $sanitized['notification_from_name'] = sanitize_text_field($input['notification_from_name']);
         }
         if (isset($input['geocoding_provider'])) {
             $sanitized['geocoding_provider'] = in_array($input['geocoding_provider'], array('none', 'mapbox', 'google')) ? 
@@ -341,6 +363,37 @@ class SRT_Settings {
             <option value="both" <?php selected($value, 'both'); ?>><?php esc_html_e('Login/Logout (show both)', 'schedule-collaboration-tracking'); ?></option>
         </select>
         <p class="description"><?php esc_html_e('Choose whether to show only login link or both login/logout links in menus.', 'schedule-collaboration-tracking'); ?></p>
+        <?php
+    }
+    
+    /**
+     * Render notification from email field
+     */
+    public static function render_notification_from_email_field() {
+        $settings = get_option('srt_settings', array());
+        $value = $settings['notification_from_email'] ?? '';
+        $default = get_option('admin_email');
+        ?>
+        <input type="email" name="srt_settings[notification_from_email]" value="<?php echo esc_attr($value); ?>" class="regular-text" placeholder="<?php echo esc_attr($default); ?>">
+        <p class="description">
+            <?php esc_html_e('Email address to use as the "From" address for price alerts and notifications. Leave blank to use WordPress admin email.', 'schedule-collaboration-tracking'); ?>
+            <br><strong><?php esc_html_e('Note:', 'schedule-collaboration-tracking'); ?></strong> <?php esc_html_e('If using an SMTP plugin, configure it to send from this address for best deliverability.', 'schedule-collaboration-tracking'); ?>
+        </p>
+        <?php
+    }
+    
+    /**
+     * Render notification from name field
+     */
+    public static function render_notification_from_name_field() {
+        $settings = get_option('srt_settings', array());
+        $value = $settings['notification_from_name'] ?? '';
+        $default = get_bloginfo('name');
+        ?>
+        <input type="text" name="srt_settings[notification_from_name]" value="<?php echo esc_attr($value); ?>" class="regular-text" placeholder="<?php echo esc_attr($default); ?>">
+        <p class="description">
+            <?php esc_html_e('Name to display as the email sender. Leave blank to use site name.', 'schedule-collaboration-tracking'); ?>
+        </p>
         <?php
     }
     

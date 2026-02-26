@@ -206,7 +206,7 @@ console.log('============================');
                 </div>
                 
                 <div class="srt-dashboard-section">
-                    <h4><?php esc_html_e('Upcoming Travel (Next 14 Days)', 'schedule-collaboration-tracking'); ?></h4>
+                    <h4><?php esc_html_e('Upcoming Travel (Next 30 Days)', 'schedule-collaboration-tracking'); ?></h4>
                     <div id="srt-upcoming-travel" class="srt-dashboard-content">
                         <div class="srt-loading"></div>
                     </div>
@@ -355,7 +355,7 @@ console.log('============================');
                 </div>
                 
                 <div class="srt-dashboard-section">
-                    <h4>📅 <?php esc_html_e('Upcoming Travel (Next 14 Days)', 'schedule-collaboration-tracking'); ?></h4>
+                    <h4>📅 <?php esc_html_e('Upcoming Travel (Next 30 Days)', 'schedule-collaboration-tracking'); ?></h4>
                     <div id="srt-upcoming-travel" class="srt-dashboard-content">
                         <div class="srt-loading"></div>
                     </div>
@@ -469,7 +469,7 @@ console.log('============================');
             </div>
             
             <div class="srt-dashboard-section">
-                <h3><?php esc_html_e('Upcoming Travel (Next 14 Days)', 'schedule-collaboration-tracking'); ?></h3>
+                <h3><?php esc_html_e('Upcoming Travel (Next 30 Days)', 'schedule-collaboration-tracking'); ?></h3>
                 <div id="srt-upcoming-travel" class="srt-dashboard-content">
                     <div class="srt-loading"></div>
                 </div>

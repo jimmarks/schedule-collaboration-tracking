@@ -429,10 +429,24 @@ class SRT_REST {
      * Delete event
      */
     public static function delete_event($request) {
+        global $wpdb;
+        
         $post = get_post($request['id']);
         
         if (!$post || $post->post_type !== 'srt_event') {
             return new WP_Error('not_found', __('Event not found', 'schedule-collaboration-tracking'), array('status' => 404));
+        }
+        
+        // Delete all price alerts associated with this event
+        $alerts_table = $wpdb->prefix . 'srt_price_alerts';
+        $deleted_alerts = $wpdb->delete(
+            $alerts_table,
+            array('event_id' => $post->ID),
+            array('%d')
+        );
+        
+        if ($deleted_alerts) {
+            error_log("SRT: Deleted $deleted_alerts price alert(s) for deleted event {$post->ID}");
         }
         
         $result = wp_delete_post($post->ID, true);
@@ -574,9 +588,6 @@ class SRT_REST {
             $member_id = get_post_meta($post->ID, 'member_id', true);
             error_log('Event ID ' . $post->ID . ' (' . $post->post_title . ') has member_id: ' . ($member_id ?: 'NOT SET'));
             
-            $event_data = self::format_event($post);
-            $flights_needed_data[] = $event_data;
-            
             // Check if any legs are not booked
             $travel_legs = json_decode(get_post_meta($post->ID, 'travel_legs', true) ?: '[]', true);
             $has_unbooked = false;
@@ -588,12 +599,15 @@ class SRT_REST {
                 }
             }
             
+            // Only add to flights_needed if there's at least one unbooked leg
             if ($has_unbooked) {
+                $event_data = self::format_event($post);
+                $flights_needed_data[] = $event_data;
                 $not_booked_data[] = $event_data;
             }
         }
         
-        // Upcoming travel (next 14 days with travel_needed = true)
+        // Upcoming travel (next 30 days with travel_needed = true)
         $upcoming_travel = new WP_Query(array(
             'post_type'      => 'srt_event',
             'posts_per_page' => -1,
@@ -614,7 +628,7 @@ class SRT_REST {
                 ),
                 array(
                     'key'     => 'start_datetime',
-                    'value'   => $two_weeks,
+                    'value'   => $thirty_days,
                     'compare' => '<=',
                     'type'    => 'DATETIME',
                 ),
@@ -722,6 +736,8 @@ class SRT_REST {
      * Update event meta fields
      */
     private static function update_event_meta($post_id, $request) {
+        global $wpdb;
+        
         $meta_fields = array(
             'member_id',
             'start_datetime',
@@ -741,6 +757,13 @@ class SRT_REST {
             'travel_legs',
         );
         
+        // Get old travel_legs before updating to check for newly booked flights
+        $old_travel_legs = array();
+        if ($request->has_param('travel_legs')) {
+            $old_travel_legs_json = get_post_meta($post_id, 'travel_legs', true);
+            $old_travel_legs = json_decode($old_travel_legs_json ?: '[]', true);
+        }
+        
         foreach ($meta_fields as $field) {
             if ($request->has_param($field)) {
                 update_post_meta($post_id, $field, $request->get_param($field));
@@ -750,6 +773,40 @@ class SRT_REST {
         // If member_id not provided, default to current user (for backward compatibility)
         if (!$request->has_param('member_id') && !get_post_meta($post_id, 'member_id', true)) {
             update_post_meta($post_id, 'member_id', get_current_user_id());
+        }
+        
+        // Check for newly booked flights and delete associated price alerts
+        if ($request->has_param('travel_legs')) {
+            $new_travel_legs = json_decode($request->get_param('travel_legs'), true);
+            
+            if (is_array($new_travel_legs) && is_array($old_travel_legs)) {
+                foreach ($new_travel_legs as $index => $new_leg) {
+                    // Check if this is a flight leg
+                    if (isset($new_leg['mode']) && $new_leg['mode'] === 'fly' && isset($new_leg['booked']) && $new_leg['booked']) {
+                        // Check if it wasn't booked before (or didn't exist before)
+                        $was_booked = isset($old_travel_legs[$index]) && 
+                                     isset($old_travel_legs[$index]['booked']) && 
+                                     $old_travel_legs[$index]['booked'];
+                        
+                        if (!$was_booked) {
+                            // This leg was just marked as booked - delete all price alerts for it
+                            $alerts_table = $wpdb->prefix . 'srt_price_alerts';
+                            $deleted = $wpdb->delete(
+                                $alerts_table,
+                                array(
+                                    'event_id' => $post_id,
+                                    'leg_index' => $index,
+                                ),
+                                array('%d', '%d')
+                            );
+                            
+                            if ($deleted) {
+                                error_log("SRT: Deleted $deleted price alert(s) for event $post_id, leg $index (marked as booked)");
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
     
@@ -793,10 +850,17 @@ class SRT_REST {
             return new WP_Error('insert_failed', 'Failed to create price alert', array('status' => 500));
         }
         
+        $alert_id = $wpdb->insert_id;
+        
+        // Send confirmation email
+        $confirmation = SRT_Price_Tracking::send_alert_confirmation($alert_id);
+        
         return rest_ensure_response(array(
             'success' => true,
-            'alert_id' => $wpdb->insert_id,
-            'message' => 'Price alert created successfully',
+            'alert_id' => $alert_id,
+            'message' => 'Price alert created successfully. Check your email for confirmation.',
+            'email_sent' => $confirmation['success'] ?? false,
+            'email_subject' => $confirmation['subject'] ?? '',
         ));
     }
     
@@ -919,9 +983,13 @@ class SRT_REST {
             $leg['arrive_airport'],
             $leg['depart_date'],
             $price,
-            $trip_type
+            $trip_type,
+            $price_result
         );
         error_log("SRT: Price recorded with ID: $recorded_id");
+        
+        // Extract Google price insights if available
+        $google_insights = is_array($price_result) && isset($price_result['price_insights']) ? $price_result['price_insights'] : null;
         
         // Build Google Flights verification link
         $google_flights_url = 'https://www.google.com/travel/flights/search?tfs=CBwQAhokag0IAhIJL20vMDFfajBjEgoyMDI2LTA0LTIzcg0IAhIJL20vMDFfZDRnGgA';
@@ -944,7 +1012,7 @@ class SRT_REST {
             );
         }
         
-        return rest_ensure_response(array(
+        $response_data = array(
             'success' => true,
             'price' => $price,
             'currency' => 'USD',
@@ -953,7 +1021,13 @@ class SRT_REST {
             'return_date' => $return_date,
             'google_flights_url' => $google_flights_url,
             'debug' => $debug_info,
-        ));
+        );
+        
+        if ($google_insights) {
+            $response_data['google_insights'] = $google_insights;
+        }
+        
+        return rest_ensure_response($response_data);
     }
     
     /**
@@ -969,8 +1043,16 @@ class SRT_REST {
         
         error_log("SRT get_price_history: event=$event_id, leg=$leg_index");
         
+        // First, check if the table has any data for this event at all
+        $total_for_event = $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM $table_name WHERE event_id = %d",
+            $event_id
+        ));
+        error_log("SRT get_price_history: Total records for event $event_id: $total_for_event");
+        
+        // Check specific leg
         $history = $wpdb->get_results($wpdb->prepare(
-            "SELECT price, checked_at 
+            "SELECT price, checked_at, google_insights 
             FROM $table_name 
             WHERE event_id = %d 
             AND leg_index = %d 
@@ -980,9 +1062,20 @@ class SRT_REST {
             $leg_index
         ));
         
-        error_log("SRT get_price_history: Found " . count($history) . " records");
+        error_log("SRT get_price_history: Found " . count($history) . " records for event=$event_id, leg=$leg_index");
+        error_log("SRT get_price_history: Last query: " . $wpdb->last_query);
+        
         if ($wpdb->last_error) {
             error_log("SRT get_price_history ERROR: " . $wpdb->last_error);
+        }
+        
+        // If no results, let's see what legs exist for this event
+        if (empty($history) && $total_for_event > 0) {
+            $legs_in_db = $wpdb->get_results($wpdb->prepare(
+                "SELECT DISTINCT leg_index, origin, destination FROM $table_name WHERE event_id = %d",
+                $event_id
+            ));
+            error_log("SRT get_price_history: Legs in database for event $event_id: " . print_r($legs_in_db, true));
         }
         
         if (empty($history)) {
@@ -1019,10 +1112,23 @@ class SRT_REST {
         $stats['change_percent'] = $stats['first'] > 0 ? 
             round((($stats['current'] - $stats['first']) / $stats['first']) * 100, 1) : 0;
         
-        return rest_ensure_response(array(
+        // Get Google insights from most recent check
+        $google_insights = null;
+        $latest_record = end($history);
+        if ($latest_record && !empty($latest_record->google_insights)) {
+            $google_insights = json_decode($latest_record->google_insights, true);
+        }
+        
+        $response = array(
             'prices' => $history,
             'stats' => $stats,
-        ));
+        );
+        
+        if ($google_insights) {
+            $response['google_insights'] = $google_insights;
+        }
+        
+        return rest_ensure_response($response);
     }
     
     /**

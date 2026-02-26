@@ -9,14 +9,43 @@
     
     const SRT = {
         
+        // Airport data loaded from JSON
+        airportData: {},
+        
         /**
          * Initialize
          */
         init: function() {
+            this.loadAirportData();
             this.initCalendar();
             this.initEventForm();
             this.initDashboard();
             this.initEventList();
+        },
+        
+        /**
+         * Load airport data from JSON file
+         */
+        loadAirportData: function() {
+            const self = this;
+            $.ajax({
+                url: srtData.pluginUrl + '/assets/js/airports.json',
+                dataType: 'json',
+                async: false, // Load synchronously to ensure data is available
+                success: function(data) {
+                    self.airportData = data;
+                },
+                error: function() {
+                    console.warn('Could not load airport data, using fallback list');
+                    // Fallback to basic list
+                    self.airportData = {
+                        'BDL': 'Hartford, CT', 'BWI': 'Baltimore, MD', 'ORD': 'Chicago, IL',
+                        'LAX': 'Los Angeles, CA', 'DFW': 'Dallas, TX', 'ATL': 'Atlanta, GA',
+                        'DEN': 'Denver, CO', 'SFO': 'San Francisco, CA', 'SEA': 'Seattle, WA',
+                        'BNA': 'Nashville, TN', 'PHX': 'Phoenix, AZ', 'BOS': 'Boston, MA'
+                    };
+                }
+            });
         },
         
         /**
@@ -492,16 +521,7 @@
         addTravelLeg: function(data) {
             const container = $('#srt-travel-legs-container');
             const index = container.children().length;
-            
-            // Airport lookup function
-            const airportLookup = {
-                'BDL': 'Hartford, CT', 'BWI': 'Baltimore, MD', 'ORD': 'Chicago, IL', 'LAX': 'Los Angeles, CA',
-                'DFW': 'Dallas, TX', 'ATL': 'Atlanta, GA', 'DEN': 'Denver, CO', 'SFO': 'San Francisco, CA',
-                'SEA': 'Seattle, WA', 'MSP': 'Minneapolis, MN', 'DTW': 'Detroit, MI', 'PHX': 'Phoenix, AZ',
-                'IAH': 'Houston, TX', 'MIA': 'Miami, FL', 'MCO': 'Orlando, FL', 'LAS': 'Las Vegas, NV',
-                'CLT': 'Charlotte, NC', 'BOS': 'Boston, MA', 'JFK': 'New York, NY', 'EWR': 'Newark, NJ',
-                'SLC': 'Salt Lake City, UT', 'PDX': 'Portland, OR', 'PHL': 'Philadelphia, PA'
-            };
+            const self = this;
             
             const html = `
                 <div class="srt-travel-leg" data-index="${index}">
@@ -677,8 +697,8 @@
             $newLeg.find('.srt-airport-code').on('input', function() {
                 const code = $(this).val().toUpperCase();
                 const $nameField = $(this).siblings('.srt-airport-name');
-                if (airportLookup[code]) {
-                    $nameField.text(airportLookup[code]).css('color', '#666');
+                if (self.airportData[code]) {
+                    $nameField.text(self.airportData[code]).css('color', '#666');
                 } else if (code.length === 3) {
                     $nameField.text('Unknown airport code').css('color', '#c00');
                 } else {
@@ -1251,15 +1271,32 @@
                     data: JSON.stringify(payload),
                     contentType: 'application/json',
                     success: function(response) {
-                        modal.find('#srt-alert-message')
-                            .html('<p style="color: green;">✓ Price alert created! You\'ll receive an email when prices meet your criteria.</p>')
-                            .show();
+                        const subjectLine = response.email_subject ? 
+                            `<p style="color: #047857; margin: 10px 0 0 0; font-size: 12px; background: #ecfdf5; padding: 8px; border-radius: 4px;">
+                                🔍 <strong>Subject:</strong> <code style="background: white; padding: 2px 6px; border-radius: 3px; font-size: 11px;">${response.email_subject}</code>
+                            </p>` : '';
+                        
+                        const message = `
+                            <div style="background: #d1fae5; border: 2px solid #10b981; padding: 15px; border-radius: 6px;">
+                                <p style="color: #065f46; margin: 0 0 10px 0; font-weight: 600;">
+                                    ✓ Price Alert Created Successfully!
+                                </p>
+                                <p style="color: #065f46; margin: 0 0 10px 0; font-size: 14px;">
+                                    📧 <strong>Check your email</strong> for a confirmation message.
+                                </p>
+                                <p style="color: #047857; margin: 0; font-size: 13px;">
+                                    <em>Important:</em> Make sure to add us to your safe senders list to ensure you receive price alerts!
+                                </p>
+                                ${subjectLine}
+                            </div>
+                        `;
+                        modal.find('#srt-alert-message').html(message).show();
                         
                         setTimeout(function() {
                             modal.fadeOut(function() {
                                 modal.remove();
                             });
-                        }, 2000);
+                        }, 5000); // Increased to 5 seconds so they can read the message
                     },
                     error: function(xhr) {
                         let errorMsg = 'Failed to create alert. Please try again.';
@@ -1660,7 +1697,34 @@
                     console.log('🔗 Google Flights URL:', response.google_flights_url);
                     console.log('🎫 Trip Type:', response.trip_type);
                     
-                    let html = '<div style="background: #f0f9ff; border: 1px solid #0891b2; padding: 10px; margin: 10px 0; border-radius: 4px;">';
+                    let html = '';
+                    
+                    // Show Google Price Insights if available
+                    if (response.google_insights) {
+                        const insights = response.google_insights;
+                        html += '<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 4px; padding: 10px; margin: 10px 0;">';
+                        html += '<div style="font-size: 0.85em; font-weight: 600; margin-bottom: 6px;">✈️ Google Flights Insights</div>';
+                        
+                        if (insights.price_level) {
+                            let priceLevel = insights.price_level.toLowerCase();
+                            let levelIcon = priceLevel === 'low' ? '💚' : (priceLevel === 'high' ? '🔴' : '🟡');
+                            html += `<div style="font-size: 1.05em; margin-bottom: 4px;">${levelIcon} Price is <strong>${priceLevel}</strong></div>`;
+                        }
+                        
+                        if (insights.typical_price_range) {
+                            let range = insights.typical_price_range;
+                            html += `<div style="font-size: 0.85em; opacity: 0.95;">Typical: $${range[0]}–${range[1]}</div>`;
+                        }
+                        
+                        if (insights.lowest_price) {
+                            html += `<div style="font-size: 0.85em; opacity: 0.9;">Lowest: $${insights.lowest_price}</div>`;
+                        }
+                        
+                        html += '</div>';
+                    }
+                    
+                    // Current price box
+                    html += '<div style="background: #f0f9ff; border: 1px solid #0891b2; padding: 10px; margin: 10px 0; border-radius: 4px;">';
                     html += '<strong style="color: #0891b2; font-size: 1.2em;">$' + price.toFixed(2) + '</strong> ';
                     html += '<span style="color: #666; font-size: 0.9em;">as of ' + checked + '</span>';
                     
@@ -1698,6 +1762,8 @@
          * Load price history
          */
         loadPriceHistory: function(eventId, legIndex, modal) {
+            console.log('🔍 Loading price history:', { eventId, legIndex });
+            
             $.ajax({
                 url: srtData.restUrl + 'price-history',
                 method: 'GET',
@@ -1709,12 +1775,44 @@
                     leg_index: legIndex
                 },
                 success: function(response) {
+                    console.log('📊 Price history response:', response);
                     if (response.prices && response.prices.length > 0) {
+                        // Check if data is older than 4 hours
+                        const latestPrice = response.prices[response.prices.length - 1];
+                        const checkedAt = new Date(latestPrice.checked_at);
+                        const now = new Date();
+                        const hoursSinceCheck = (now - checkedAt) / (1000 * 60 * 60);
+                        
+                        console.log('⏰ Data freshness:', {
+                            checkedAt: checkedAt.toLocaleString(),
+                            hoursSinceCheck: hoursSinceCheck.toFixed(1),
+                            needsRefresh: hoursSinceCheck > 4
+                        });
+                        
+                        // If data is older than 4 hours, trigger auto-refresh
+                        if (hoursSinceCheck > 4) {
+                            console.log('🔄 Data is stale (>4 hours), auto-refreshing...');
+                            const $button = modal.find('#srt-check-price-' + legIndex);
+                            if ($button.length) {
+                                // Show message that we're auto-updating
+                                const $container = modal.find('#srt-price-info-' + legIndex);
+                                $container.html('<div style="padding: 20px; text-align: center; color: #666;"><div style="margin-bottom: 10px;">🔄 Refreshing price data...</div><div style="font-size: 12px;">Last checked ' + hoursSinceCheck.toFixed(1) + ' hours ago</div></div>');
+                                
+                                // Trigger price check
+                                setTimeout(function() {
+                                    $button.click();
+                                }, 500);
+                                return;
+                            }
+                        }
+                        
                         SRT.renderPriceHistory(eventId, legIndex, response, modal);
+                    } else {
+                        console.warn('⚠️ No price history found for event:', eventId, 'leg:', legIndex);
                     }
                 },
-                error: function() {
-                    // Silent fail - history is optional
+                error: function(xhr, status, error) {
+                    console.error('❌ Price history load error:', { xhr, status, error });
                 }
             });
         },
@@ -1746,7 +1844,62 @@
             const trendColor = stats.trend === 'down' ? 'green' : (stats.trend === 'up' ? 'red' : '#666');
             const changeSign = change >= 0 ? '+' : '';
             
-            let html = `
+            let html = '';
+            
+            // Get the latest price record to show checked_at time
+            const latestPrice = data.prices[data.prices.length - 1];
+            const checked = latestPrice ? new Date(latestPrice.checked_at).toLocaleString() : '';
+            
+            // Google Flights Price Insights (if available from latest check)
+            if (data.google_insights) {
+                const insights = data.google_insights;
+                let priceLevel = null; // Declare at block scope so it's available to all nested ifs
+                
+                html += '<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 4px; padding: 12px; margin: 10px 0;">';
+                html += '<div style="display: flex; align-items: center; margin-bottom: 8px;">';
+                html += '<svg style="width: 20px; height: 20px; margin-right: 8px; fill: white;" viewBox="0 0 24 24"><path d="M21,16V14L13,9V3.5A1.5,1.5 0 0,0 11.5,2A1.5,1.5 0 0,0 10,3.5V9L2,14V16L10,13.5V19L8,20.5V22L11.5,21L15,22V20.5L13,19V13.5L21,16Z" /></svg>';
+                html += '<strong style="font-size: 0.95em;">Google Flights Price Insights</strong>';
+                html += '</div>';
+                
+                if (insights.price_level) {
+                    priceLevel = insights.price_level.toLowerCase();
+                    let levelIcon = priceLevel === 'low' ? '💚' : (priceLevel === 'high' ? '🔴' : '🟡');
+                    let levelText = priceLevel.charAt(0).toUpperCase() + priceLevel.slice(1);
+                    html += `<div style="font-size: 1.15em; margin-bottom: 6px;">${levelIcon} <strong>Price is ${levelText}</strong></div>`;
+                }
+                
+                if (insights.typical_price_range) {
+                    let range = insights.typical_price_range;
+                    let low = range[0];
+                    let high = range[1];
+                    html += `<div style="font-size: 0.9em; opacity: 0.95; margin-bottom: 4px;">`;
+                    html += `Typical range: $${low}–${high}`;
+                    
+                    // Show how much cheaper if price_level is low
+                    if (priceLevel === 'low' && high > current) {
+                        let savings = Math.round(high - current);
+                        if (savings > 0) {
+                            html += ` <span style="background: rgba(255,255,255,0.25); padding: 2px 6px; border-radius: 3px; margin-left: 6px;">~$${savings} cheaper</span>`;
+                        }
+                    }
+                    html += '</div>';
+                }
+                
+                if (insights.lowest_price) {
+                    html += `<div style="font-size: 0.85em; opacity: 0.9;">Lowest found: $${insights.lowest_price}</div>`;
+                }
+                
+                html += '</div>';
+            }
+            
+            // Show current price box (latest from history)
+            html += '<div style="background: #f0f9ff; border: 1px solid #0891b2; padding: 10px; margin: 10px 0; border-radius: 4px;">';
+            html += '<strong style="color: #0891b2; font-size: 1.2em;">$' + current.toFixed(2) + '</strong> ';
+            html += '<span style="color: #666; font-size: 0.9em;">as of ' + checked + '</span>';
+            html += '</div>';
+            
+            // Our tracked price history
+            html += `
                 <div style="background: #f9fafb; border: 1px solid #e5e7eb; padding: 10px; margin: 10px 0; border-radius: 4px;">
                     <h4 style="margin: 0 0 10px 0;">Price History (${stats.count} checks)</h4>
                     <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px;">
@@ -1777,12 +1930,14 @@
             
             html += '</div>';
             
-            // Append or replace
-            const existing = $container.find('> div:last-child');
-            if (existing.length) {
-                existing.replaceWith(html);
+            // Check if there's already a price history section
+            const existingHistory = $container.find('.srt-price-history');
+            if (existingHistory.length) {
+                // Replace existing price history only
+                existingHistory.replaceWith('<div class="srt-price-history">' + html + '</div>');
             } else {
-                $container.append(html);
+                // Append new price history (after current price info if it exists)
+                $container.append('<div class="srt-price-history">' + html + '</div>');
             }
         },
         
