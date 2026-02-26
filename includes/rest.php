@@ -1396,5 +1396,5 @@ class SRT_REST {
         
         return rest_ensure_response(['success' => true]);
     }
-// Initialize
-SRT_REST::init();
+}
+
