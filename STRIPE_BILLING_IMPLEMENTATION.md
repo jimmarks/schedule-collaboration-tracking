@@ -1,8 +1,9 @@
 # Stripe Billing Implementation - Family Travel Tracker
 
-**Document Version:** 1.0  
+**Document Version:** 2.0  
 **Date:** February 26, 2026  
-**Status:** Planning / Pre-Implementation
+**Status:** Planning / Pre-Implementation  
+**Last Updated:** Pricing model simplified to pure add-on model
 
 ---
 
@@ -11,40 +12,52 @@
 This document outlines the complete Stripe billing integration for Family Travel Tracker, transforming it from a free plugin into a subscription-based SaaS product.
 
 **Key Decisions:**
-- Per-child pricing with family plan option
-- 14-day free trial with upfront payment collection
-- Soft limits with upgrade prompts
-- 7-day grace period for failed payments
-- Up to 4 parents/guardians per child account
+- **Simple per-child add-on pricing** (no complex family plan tiers)
+- **14-day free trial** with upfront payment collection
+- **Soft limits** with upgrade prompts
+- **7-day grace period** for failed payments
+- **Up to 4 parents/guardians** per child account
+- **Color-coded calendar** for multi-child families
 
 ---
 
-## 💰 Pricing Structure
+## 💰 Pricing Structure (SIMPLIFIED)
 
-### **Plan Tiers**
+### **Pure Add-On Model**
 
-| Plan | Monthly | Yearly (Save) | Children | Parents/Guardians |
-|------|---------|---------------|----------|-------------------|
-| **Single Child** | $9.99/mo | $89.99/yr ($30) | 1 | Up to 4 |
-| **Family Plan** | $24.99/mo | $279.99/yr ($20) | Up to 4 | Up to 4 per child |
-| **Additional Child** | +$5/mo | +$50/yr | Per child over 4 | Up to 4 per child |
+**Base Price:** $9.99/month ($99/year) - Includes 1 child  
+**Each Additional Child:** +$5/month (+$50/year)
 
-### **Pricing Logic**
+| Children | Monthly Price | Yearly Price | Savings vs Monthly |
+|----------|--------------|--------------|-------------------|
+| 1 | $9.99 | $99.00 | $20.88/yr |
+| 2 | $14.99 | $149.00 | $30.88/yr |
+| 3 | $19.99 | $199.00 | $40.88/yr |
+| 4 | $24.99 | $249.00 | $50.88/yr |
+| 5 | $29.99 | $299.00 | $60.88/yr |
+| 6 | $34.99 | $349.00 | $70.88/yr |
+| 7 | $39.99 | $399.00 | $80.88/yr |
 
-```
-1 child  = $9.99/mo or $89.99/yr
-2 children = $24.99/mo (auto-upgrade to Family Plan: saves $4.99/mo)
-3 children = $24.99/mo (Family Plan)
-4 children = $24.99/mo (Family Plan)
-5 children = $29.99/mo (Family + 1 additional)
-6 children = $34.99/mo (Family + 2 additional)
-```
+**Parents/Guardians:** Up to 4 per child (included at all levels)
 
-**Why this works:**
-- Fair for single-child families
-- Strong incentive to upgrade at 2 children
-- Predictable pricing for large families
-- Each parent can independently access all their children
+### **Why This Pricing Works**
+
+✅ **Transparent:** Simple math - everyone understands $5 per child  
+✅ **Fair:** Pay only for what you use  
+✅ **Scales linearly:** No confusing tier jumps  
+✅ **No forced upgrades:** 2-child families don't need "family plan"  
+✅ **Flexible:** Works for 1 child or 10+ children  
+✅ **Better for customers:** $14.99 for 2 kids vs old $24.99 "family plan"  
+✅ **Better margins:** Each child costs minimal server resources  
+
+### **Comparison to Old Model**
+
+| Scenario | Old Pricing | New Pricing | Customer Saves |
+|----------|-------------|-------------|----------------|
+| 2 children | $24.99 (forced family) | $14.99 | **$10/mo!** |
+| 3 children | $24.99 (family) | $19.99 | $5/mo |
+| 4 children | $24.99 (family) | $24.99 | Same |
+| 5 children | $29.99 (family + addon) | $29.99 | Same |
 
 ---
 
@@ -82,42 +95,70 @@ After Trial (Day 15+):
 
 ### **Products to Create in Stripe Dashboard**
 
-#### **Product 1: Single Child**
+#### **Product 1: Base Subscription (First Child)**
 ```
-Name: Family Travel Tracker - Single Child
-Description: Track events and travel for one child
+Name: Family Travel Tracker - Base Subscription
+Description: Track events and travel for your first child
 
 Prices:
-  - price_single_monthly: $9.99/month recurring
-  - price_single_yearly: $89.99/year recurring
+  - price_base_monthly: $9.99/month recurring
+  - price_base_yearly: $99.00/year recurring
 
 Trial: 14 days
 Billing Cycle Anchor: On trial end
 ```
 
-#### **Product 2: Family Plan**
-```
-Name: Family Travel Tracker - Family Plan
-Description: Track events and travel for up to 4 children
-
-Prices:
-  - price_family_monthly: $24.99/month recurring
-  - price_family_yearly: $279.99/year recurring
-
-Trial: 14 days
-Billing Cycle Anchor: On trial end
-```
-
-#### **Product 3: Additional Child**
+#### **Product 2: Additional Child (Metered)**
 ```
 Name: Family Travel Tracker - Additional Child
-Description: Add one more child beyond the family plan
+Description: Add another child to your account ($5/month each)
 
 Prices:
-  - price_addon_monthly: $5.00/month recurring
-  - price_addon_yearly: $50.00/year recurring
+  - price_addon_monthly: $5.00/month recurring (metered by quantity)
+  - price_addon_yearly: $50.00/year recurring (metered by quantity)
 
-Note: This is a metered/quantity-based add-on
+Note: This is quantity-based. If user has 3 children total:
+  → Base: $9.99/mo (first child)
+  → Add-on: $5/mo × 2 (additional children) = $10/mo
+  → Total: $19.99/mo
+  
+Stripe handles the quantity automatically when we update subscription.
+```
+
+### **How Stripe Handles This**
+
+```php
+// User starts with 1 child
+$subscription = \Stripe\Subscription::create([
+    'customer' => $customer_id,
+    'items' => [
+        ['price' => 'price_base_monthly', 'quantity' => 1], // Always 1
+    ],
+    'trial_period_days' => 14,
+]);
+
+// User adds 2nd child → Add addon line item
+\Stripe\Subscription::update($subscription_id, [
+    'items' => [
+        ['price' => 'price_base_monthly', 'quantity' => 1],
+        ['price' => 'price_addon_monthly', 'quantity' => 1], // 1 addon
+    ],
+    'proration_behavior' => 'always_invoice',
+]);
+
+// User adds 3rd child → Increase addon quantity
+\Stripe\Subscription::update($subscription_id, [
+    'items' => [
+        ['price' => 'price_base_monthly', 'quantity' => 1],
+        ['price' => 'price_addon_monthly', 'quantity' => 2], // 2 addons
+    ],
+    'proration_behavior' => 'always_invoice',
+]);
+
+// Result:
+// 1 child: $9.99
+// 2 children: $9.99 + $5 = $14.99
+// 3 children: $9.99 + $10 = $19.99
 ```
 
 ---
@@ -131,9 +172,10 @@ Note: This is a metered/quantity-based add-on
 'ftt_stripe_customer_id'       => 'cus_ABC123XYZ'           // Stripe customer ID
 'ftt_stripe_subscription_id'   => 'sub_DEF456UVW'           // Current subscription ID
 'ftt_subscription_status'      => 'active'                   // active, trialing, past_due, canceled, incomplete
-'ftt_subscription_plan'        => 'family_monthly'           // Plan identifier
 'ftt_subscription_interval'    => 'month'                    // month or year
-'ftt_subscription_price'       => '24.99'                    // Current price paid
+'ftt_subscription_price'       => '19.99'                    // Current total price
+'ftt_base_price'               => '9.99'                     // Base subscription price
+'ftt_addon_quantity'           => 2                          // Number of addon children
 
 // Limits & Usage
 'ftt_children_limit'           => 4                          // Max children allowed
@@ -171,21 +213,387 @@ Note: This is a metered/quantity-based add-on
     'live_secret_key' => 'sk_live_xxx',
     'webhook_secret' => 'whsec_xxx',
     
-    // Price IDs from Stripe
-    'price_single_monthly' => 'price_xxx',
-    'price_single_yearly' => 'price_yyy',
-    'price_family_monthly' => 'price_zzz',
-    'price_family_yearly' => 'price_aaa',
-    'price_addon_monthly' => 'price_bbb',
-    'price_addon_yearly' => 'price_ccc',
+    // Price IDs from Stripe (Simplified Model)
+    'price_base_monthly' => 'price_xxx',                     // $9.99/mo base
+    'price_base_yearly' => 'price_yyy',                      // $99/yr base
+    'price_addon_monthly' => 'price_zzz',                    // $5/mo per child
+    'price_addon_yearly' => 'price_aaa',                     // $50/yr per child
     
     // Feature flags
     'trial_days' => 14,
     'grace_period_days' => 7,
     'max_parents_per_child' => 4,
-    'family_plan_children_limit' => 4,
+    
+    // Color Palette for Children
+    'child_color_palette' => array(
+        '#FF6B6B',  // Red
+        '#4ECDC4',  // Teal
+        '#FFD93D',  // Yellow
+        '#95E1D3',  // Mint
+        '#A8E6CF',  // Light Green
+        '#FF8B94',  // Pink
+        '#C7CEEA',  // Lavender
+        '#FFDAC1',  // Peach
+        '#B4A7D6',  // Purple
+        '#89C2D9',  // Sky Blue
+    ),
 );
 ```
+
+### **Child-Specific Meta Keys (NEW - Color Coding)**
+
+```php
+// Per-child calendar customization
+'ftt_calendar_color'           => '#FF6B6B'                  // Hex color for calendar
+'ftt_calendar_color_name'      => 'red'                      // Human-readable name
+'ftt_calendar_icon'            => '⚽'                        // Optional emoji/icon
+'ftt_calendar_visible'         => true                       // Show/hide in parent view
+```
+
+---
+
+## 🎨 Color Coding System (Multi-Child Calendar)
+
+### **Problem Statement**
+
+Parents with multiple children viewing a shared calendar need to quickly distinguish which events belong to which child. Without color coding:
+- ❌ "Soccer Practice" - Whose practice?
+- ❌ "Dance Recital" - Which child's recital?
+- ❌ Calendar becomes confusing with 2+ children
+
+### **Solution: Automatic Color Assignment**
+
+Each child is automatically assigned a unique color when added to the system. Events for that child display in their assigned color across all calendar views.
+
+### **Color Assignment Algorithm**
+
+```php
+class FTT_Child_Colors {
+    
+    private static $color_palette = [
+        ['hex' => '#FF6B6B', 'name' => 'Red'],
+        ['hex' => '#4ECDC4', 'name' => 'Teal'],
+        ['hex' => '#FFD93D', 'name' => 'Yellow'],
+        ['hex' => '#95E1D3', 'name' => 'Mint'],
+        ['hex' => '#A8E6CF', 'name' => 'Light Green'],
+        ['hex' => '#FF8B94', 'name' => 'Pink'],
+        ['hex' => '#C7CEEA', 'name' => 'Lavender'],
+        ['hex' => '#FFDAC1', 'name' => 'Peach'],
+        ['hex' => '#B4A7D6', 'name' => 'Purple'],
+        ['hex' => '#89C2D9', 'name' => 'Sky Blue'],
+    ];
+    
+    /**
+     * Assign color to new child
+     */
+    public static function assign_color($child_id, $parent_id) {
+        // Get existing children for this parent
+        $children = SRT_Roles::get_children($parent_id);
+        $child_index = count($children) - 1;  // Zero-indexed
+        
+        // Cycle through palette if more than 10 children
+        $color_index = $child_index % count(self::$color_palette);
+        $color = self::$color_palette[$color_index];
+        
+        // Store color info
+        update_user_meta($child_id, 'ftt_calendar_color', $color['hex']);
+        update_user_meta($child_id, 'ftt_calendar_color_name', $color['name']);
+        update_user_meta($child_id, 'ftt_calendar_visible', true);
+        
+        return $color;
+    }
+    
+    /**
+     * Allow parent to change child's color
+     */
+    public static function update_color($child_id, $new_color_hex) {
+        // Validate hex color
+        if (!preg_match('/^#[0-9A-F]{6}$/i', $new_color_hex)) {
+            return false;
+        }
+        
+        update_user_meta($child_id, 'ftt_calendar_color', $new_color_hex);
+        return true;
+    }
+}
+```
+
+### **Calendar Rendering with Colors**
+
+#### **Frontend Calendar (FullCalendar.js)**
+
+```javascript
+// When loading events for parent
+$('#calendar').fullCalendar({
+    events: function(start, end, timezone, callback) {
+        $.ajax({
+            url: '/wp-json/ftt/v1/events',
+            data: {
+                start: start.format(),
+                end: end.format(),
+                include_colors: true,  // Include child colors
+            },
+            success: function(events) {
+                // Events now have color property
+                callback(events);
+            }
+        });
+    },
+    
+    // Apply colors to events
+    eventRender: function(event, element) {
+        element.css('background-color', event.backgroundColor);
+        element.css('border-color', event.borderColor);
+        
+        // Add child name badge
+        const badge = $('<span>')
+            .addClass('child-badge')
+            .text(event.childName)
+            .css('background-color', event.backgroundColor);
+        element.find('.fc-title').prepend(badge);
+    }
+});
+```
+
+#### **REST API Response**
+
+```php
+// In SRT_REST::get_events()
+$events_data = array();
+foreach ($events as $event) {
+    $member_id = get_post_meta($event->ID, 'member_id', true);
+    $child = get_userdata($member_id);
+    $child_color = get_user_meta($member_id, 'ftt_calendar_color', true) ?: '#808080';
+    $child_name = $child ? $child->display_name : 'Unknown';
+    
+    $events_data[] = array(
+        'id' => $event->ID,
+        'title' => $event->post_title,
+        'start' => get_post_meta($event->ID, 'start_datetime', true),
+        'end' => get_post_meta($event->ID, 'end_datetime', true),
+        
+        // Color info
+        'backgroundColor' => $child_color,
+        'borderColor' => $child_color,
+        'textColor' => self::get_contrast_color($child_color), // White or black
+        
+        // Child info
+        'childId' => $member_id,
+        'childName' => $child_name,
+        'childColor' => $child_color,
+    );
+}
+```
+
+### **iCal Export with Colors**
+
+```php
+// In SRT_iCal::generate_feed()
+foreach ($events as $event) {
+    $member_id = get_post_meta($event->ID, 'member_id', true);
+    $child = get_userdata($member_id);
+    $child_name = $child ? $child->display_name : '';
+    $child_color = get_user_meta($member_id, 'ftt_calendar_color', true);
+    
+    $ical_event = "BEGIN:VEVENT\n";
+    $ical_event .= "UID:" . $event->ID . "@familytraveltracker.app\n";
+    
+    // Prepend child name to title for clarity in external calendars
+    $ical_event .= "SUMMARY:[{$child_name}] " . $event->post_title . "\n";
+    
+    // Color support (works in Apple Calendar, Google Calendar)
+    if ($child_color) {
+        $ical_event .= "COLOR:{$child_color}\n";
+    }
+    
+    // ... rest of event properties
+    $ical_event .= "END:VEVENT\n";
+}
+```
+
+### **Child Filter UI**
+
+#### **Design**
+
+```html
+<!-- Sidebar or header filter -->
+<div class="ftt-child-filter">
+    <h4>Show Events For:</h4>
+    <div class="ftt-child-toggles">
+        <!-- Auto-generated per child -->
+        <label class="ftt-child-toggle">
+            <input type="checkbox" 
+                   data-child-id="1" 
+                   checked 
+                   class="ftt-filter-checkbox">
+            <span class="ftt-color-dot" style="background: #FF6B6B;"></span>
+            <span class="ftt-child-name">Emma</span>
+            <span class="ftt-event-count">(12)</span>
+        </label>
+        
+        <label class="ftt-child-toggle">
+            <input type="checkbox" 
+                   data-child-id="2" 
+                   checked 
+                   class="ftt-filter-checkbox">
+            <span class="ftt-color-dot" style="background: #4ECDC4;"></span>
+            <span class="ftt-child-name">Lily</span>
+            <span class="ftt-event-count">(8)</span>
+        </label>
+    </div>
+    
+    <div class="ftt-filter-actions">
+        <button class="ftt-show-all">Show All</button>
+        <button class="ftt-hide-all">Hide All</button>
+    </div>
+</div>
+
+<style>
+.ftt-child-toggle {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    margin: 4px 0;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+
+.ftt-child-toggle:hover {
+    background: #f5f5f5;
+}
+
+.ftt-color-dot {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    margin: 0 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.ftt-child-name {
+    flex: 1;
+    font-weight: 500;
+}
+
+.ftt-event-count {
+    color: #666;
+    font-size: 0.9em;
+}
+</style>
+```
+
+#### **Filter Logic**
+
+```javascript
+// Toggle child visibility
+$('.ftt-filter-checkbox').on('change', function() {
+    const childId = $(this).data('child-id');
+    const isVisible = $(this).prop('checked');
+    
+    // Update user preference
+    $.post(ajaxurl, {
+        action: 'ftt_update_child_visibility',
+        child_id: childId,
+        visible: isVisible
+    });
+    
+    // Filter calendar
+    $('#calendar').fullCalendar('rerenderEvents');
+});
+
+// Filter events on calendar
+$('#calendar').fullCalendar({
+    eventRender: function(event, element) {
+        // Check if this child is filtered out
+        const checkbox = $('.ftt-filter-checkbox[data-child-id="' + event.childId + '"]');
+        if (!checkbox.prop('checked')) {
+            return false;  // Don't render this event
+        }
+        return true;
+    }
+});
+```
+
+### **Settings: Color Customization**
+
+Parents can optionally change assigned colors:
+
+```html
+<!-- In account settings -->
+<div class="ftt-child-colors-settings">
+    <h3>Child Calendar Colors</h3>
+    <p>Customize how each child's events appear on your calendar.</p>
+    
+    <div class="ftt-color-settings-list">
+        <div class="ftt-color-setting">
+            <span class="ftt-child-name">Emma</span>
+            <input type="color" 
+                   value="#FF6B6B" 
+                   data-child-id="1"
+                   class="ftt-color-picker">
+            <span class="ftt-color-label">Red</span>
+        </div>
+        
+        <div class="ftt-color-setting">
+            <span class="ftt-child-name">Lily</span>
+            <input type="color" 
+                   value="#4ECDC4" 
+                   data-child-id="2"
+                   class="ftt-color-picker">
+            <span class="ftt-color-label">Teal</span>
+        </div>
+    </div>
+    
+    <button class="button" id="save-colors">Save Colors</button>
+</div>
+```
+
+### **Visual Examples**
+
+#### **Before Color Coding** ❌
+```
+March 2026
+│ Mon  │ Tue  │ Wed  │ Thu  │ Fri  │
+│  10  │  11  │  12  │  13  │  14  │
+│      │ Soccer│Dance │Hockey│Soccer│
+│      │ 3pm  │ 4pm  │ 6pm  │ 9am  │
+
+Problem: Which child has which activity?
+```
+
+#### **After Color Coding** ✅
+```
+March 2026
+│ Mon  │ Tue  │ Wed  │ Thu  │ Fri  │
+│  10  │  11  │  12  │  13  │  14  │
+│      │🔴Soccer│🟡Dance│🔴Hockey│🟡Soccer│
+│      │Emma 3pm│Lily 4pm│Emma 6pm│Lily 9am│
+
+Legend: 🔴 Emma | 🟡 Lily | ☑️ Show/Hide
+```
+
+### **Implementation Priority**
+
+**Phase 1: Core Color System** (Week 1)
+- ✅ Color assignment on child creation
+- ✅ Store colors in user meta
+- ✅ Update REST API with color data
+
+**Phase 2: Calendar Integration** (Week 2)
+- ✅ FullCalendar color rendering
+- ✅ iCal export with colors
+- ✅ Child name in event titles
+
+**Phase 3: UI Controls** (Week 3)
+- ✅ Filter sidebar
+- ✅ Toggle visibility
+- ✅ Show/hide all buttons
+
+**Phase 4: Customization** (Future)
+- ⏳ Color picker in settings
+- ⏳ Custom icons/emojis per child
+- ⏳ Export color legend
 
 ---
 
@@ -203,10 +611,11 @@ Note: This is a metered/quantity-based add-on
    - "I am registering as: [Child] or [Parent]"
    ↓
 4. Select Plan Page
-   - [•] Single Child - $9.99/mo ($89.99/yr)
-   - [ ] Family Plan (2-4 children) - $24.99/mo ($279.99/yr)
+   - Base Subscription: $9.99/mo or $89.99/yr
+   - Each additional child: +$5/mo or +$50/yr
    - Toggle: [Monthly] / [Yearly]
    - Shows: "14-day free trial, cancel anytime"
+   - Note: "Start with 1 child, add more anytime"
    ↓
 5. Redirect to Stripe Checkout (Hosted)
    - Stripe collects payment info
@@ -227,38 +636,73 @@ Note: This is a metered/quantity-based add-on
    - Prompt to add first child/event
 ```
 
-### **Flow 2: Adding a Second Child (Auto-Upgrade)**
+### **Flow 2: Adding Additional Children (Simple Add-On)**
 
 ```
-User has: Single Child plan, 1 child added
+User has: Base subscription ($9.99/mo), 1 child added
    ↓
 User clicks: "Add Child" button
    ↓
-System checks:
-  - Current plan: single_monthly
-  - Children count: 1
-  - Children limit: 1
-   ↓
-Show Prompt:
+Show Confirmation Prompt:
   ╔══════════════════════════════════════════════════╗
-  ║  🎉 Add More Children!                           ║
-  ║                                                  ║
-  ║  To add a second child, upgrade to Family Plan  ║
+  ║  ➕ Add Another Child                            ║
   ║                                                  ║
   ║  Current: $9.99/mo for 1 child                  ║
-  ║  Upgrade: $24.99/mo for up to 4 children        ║
+  ║  Adding: +$5/mo for 2nd child                   ║
   ║                                                  ║
-  ║  You'll save: $4.99/mo vs 2 separate children   ║
+  ║  New Total: $14.99/mo                           ║
   ║                                                  ║
-  ║  [Upgrade to Family Plan] [Not Now]             ║
+  ║  ✓ Each additional child is $5/month            ║
+  ║  ✓ Prorated charge today: ~$2.50                ║
+  ║  ✓ Cancel anytime                               ║
+  ║                                                  ║
+  ║  [Add Child - $5/mo] [Cancel]                   ║
   ╚══════════════════════════════════════════════════╝
    ↓
-If "Upgrade":
-  → Call Stripe API: Update subscription
-  → Prorated charge/credit applied automatically
-  → Webhook: customer.subscription.updated
-  → WordPress updates plan to 'family_monthly'
-  → User can now add up to 4 children
+If "Add Child":
+  1. User enters child's name, info
+  2. System assigns color automatically (e.g., Teal 🟡)
+  
+  3. Call Stripe API: Update subscription quantity
+     → Add add-on line item or increase quantity
+     → Prorated charge applied automatically
+     
+  4. Webhook: customer.subscription.updated
+     → WordPress updates addon_quantity: 1
+     → New price: $14.99/mo
+     
+  5. Child is added to account
+     → Color assigned
+     → Events will show in child's color
+     → Parent sees confirmation
+
+Additional children work the same way:
+  - 3rd child: +$5 = $19.99/mo total
+  - 4th child: +$5 = $24.99/mo total
+  - 5th child: +$5 = $29.99/mo total
+  - No limits, scales infinitely
+```
+
+### **Flow 2b: Child Gets Their Own Color**
+
+```
+After child is added:
+   ↓
+System auto-assigns from palette:
+  1st child: 🔴 Red (#FF6B6B)
+  2nd child: 🟡 Teal (#4ECDC4)
+  3rd child: 🟨 Yellow (#FFD93D)
+  ... and so on
+   ↓
+Parent's calendar now shows:
+  - Emma's events in Red
+  - Lily's events in Teal
+  - Legend with toggle switches
+   ↓
+Parent can:
+  - Toggle each child on/off
+  - Change colors (optional)
+  - See at a glance who has what
 ```
 
 ### **Flow 3: Trial Ending (Day 14)**
@@ -729,32 +1173,24 @@ class FTT_Billing_Limits {
      * Get suggested upgrade plan
      */
     public static function get_upgrade_suggestion($user_id) {
-        $current_plan = get_user_meta($user_id, 'ftt_subscription_plan', true);
+        $addon_quantity = (int) get_user_meta($user_id, 'ftt_addon_quantity', true);
         $children_count = (int) get_user_meta($user_id, 'ftt_children_count', true);
+        $is_annual = get_user_meta($user_id, 'ftt_billing_period', true) === 'annual';
         
-        // Single -> Family if adding 2nd child
-        if ($current_plan === 'single_monthly' && $children_count === 1) {
-            return [
-                'plan' => 'family_monthly',
-                'name' => 'Family Plan',
-                'price' => '$24.99/mo',
-                'savings' => 'Save $4.99/mo vs 2 separate children',
-                'new_limit' => 4,
-            ];
-        }
+        // Calculate new price when adding another child
+        $new_addon_qty = $addon_quantity + 1;
+        $base_price = $is_annual ? 89.99 : 9.99;
+        $addon_price = $is_annual ? 50.00 : 5.00;
+        $new_total = $base_price + ($new_addon_qty * $addon_price);
         
-        // Family -> Add-ons if adding 5th child
-        if ($current_plan === 'family_monthly' && $children_count === 4) {
-            return [
-                'plan' => 'family_with_addon',
-                'name' => 'Family Plan + 1 Additional Child',
-                'price' => '$29.99/mo',
-                'note' => '$5/month per additional child',
-                'new_limit' => 5,
-            ];
-        }
-        
-        return null;
+        return [
+            'addon_quantity' => $new_addon_qty,
+            'name' => 'Additional Child Add-On',
+            'price' => '$' . number_format($new_total, 2) . ($is_annual ? '/yr' : '/mo'),
+            'addon_cost' => '$' . number_format($addon_price, 2) . ($is_annual ? '/yr' : '/mo'),
+            'children_total' => $children_count + 1,
+            'note' => 'Each additional child is ' . ($is_annual ? '$50/year' : '$5/month'),
+        ];
     }
 }
 ```
@@ -864,15 +1300,15 @@ Use any future expiration date and any 3-digit CVC.
 - [ ] Status changes to 'active'
 - [ ] Access continues uninterrupted
 
-**2. Upgrade Flow**
-- [ ] Start with Single Child plan
-- [ ] Add one child
-- [ ] Try to add second child
-- [ ] See upgrade prompt
-- [ ] Upgrade to Family Plan
-- [ ] Verify prorated charge
-- [ ] Add second child successfully
-- [ ] Can add up to 4 children total
+**2. Add-On Flow**
+- [ ] Start with Base Subscription
+- [ ] Add first child (included in base)
+- [ ] Add second child
+- [ ] See add-on confirmation ($5/mo more)
+- [ ] Confirm and add child
+- [ ] Verify prorated charge (~$2.50 mid-month)
+- [ ] Second child appears with color assigned
+- [ ] Can add unlimited children at $5 each
 
 **3. Cancellation**
 - [ ] User cancels during trial
@@ -1106,11 +1542,10 @@ WordPress Admin → Family Travel Tracker → Billing Settings
 ├─────────────────────────────────────────────────────────┤
 │                                                         │
 │ Single Child Monthly: price_xxxxx                       │
-│ Single Child Yearly: price_xxxxx                        │
-│ Family Plan Monthly: price_xxxxx                        │
-│ Family Plan Yearly: price_xxxxx                         │
-│ Additional Child Monthly: price_xxxxx                   │
-│ Additional Child Yearly: price_xxxxx                    │
+│ Base Subscription Monthly: price_xxxxx                  │
+│ Base Subscription Yearly: price_xxxxx                   │
+│ Additional Child Monthly: price_xxxxx ($5)              │
+│ Additional Child Yearly: price_xxxxx ($50)              │
 │                                                         │
 ├─────────────────────────────────────────────────────────┤
 │ TRIAL & LIMITS                                          │
@@ -1119,7 +1554,6 @@ WordPress Admin → Family Travel Tracker → Billing Settings
 │ Trial Period (days): [14]                              │
 │ Grace Period for Failed Payments (days): [7]           │
 │ Max Parents per Child: [4]                             │
-│ Family Plan Child Limit: [4]                           │
 │                                                         │
 │ [Save Settings]                                         │
 └─────────────────────────────────────────────────────────┘
@@ -1245,7 +1679,7 @@ A: We'll email you immediately. You have 7 days to update your payment method be
 A: Yes! Upgrade anytime. We'll prorate your current plan and charge the difference.
 
 **Q: How do I add more children?**
-A: If you're on the Single Child plan, upgrade to Family Plan to add up to 4 children. Need more? $5/month per additional child.
+A: Click "Add Child" anytime. Your first child is included in your $9.99/mo base subscription. Each additional child is just $5/month or $50/year. No limits!
 
 **Q: Can both divorced parents access the same child's calendar?**
 A: Yes! That's what we're built for. Up to 4 parents/guardians can link to each child's account and see their schedule.
