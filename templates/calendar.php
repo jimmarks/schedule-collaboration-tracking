@@ -164,6 +164,33 @@ if (!defined('ABSPATH')) {
         </script>
     <?php endif; ?>
     
+    <?php
+    // Child color filter (for parents with multiple children)
+    if (!empty($children) && count($children) > 1 && class_exists('FTT_Child_Colors')) :
+        $children_with_colors = FTT_Child_Colors::get_children_with_colors($current_user_id);
+        ?>
+        <div class="ftt-child-filter">
+            <h3><?php esc_html_e('Show Children', 'schedule-collaboration-tracking'); ?></h3>
+            <div class="ftt-filter-list">
+                <?php foreach ($children_with_colors as $child) : ?>
+                    <label class="ftt-filter-item">
+                        <input 
+                            type="checkbox" 
+                            class="ftt-child-toggle" 
+                            data-child-id="<?php echo esc_attr($child['id']); ?>"
+                            checked 
+                        />
+                        <span 
+                            class="ftt-color-indicator" 
+                            style="background-color: <?php echo esc_attr($child['color']['hex']); ?>;"
+                        ></span>
+                        <span class="ftt-child-name"><?php echo esc_html($child['name']); ?></span>
+                    </label>
+                <?php endforeach; ?>
+            </div>
+        </div>
+    <?php endif; ?>
+    
     <div id="srt-calendar"></div>
     
     <div class="srt-calendar-legend">

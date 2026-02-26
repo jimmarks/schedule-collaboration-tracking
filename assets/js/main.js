@@ -73,7 +73,18 @@
                 events: function(info, successCallback, failureCallback) {
                     SRT.fetchEvents(info.startStr, info.endStr)
                         .then(events => {
-                            const calendarEvents = events.map(event => {
+                            // Filter events based on visible children
+                            let filteredEvents = events;
+                            if (SRT.visibleChildren && SRT.visibleChildren.size > 0) {
+                                filteredEvents = events.filter(event => {
+                                    // If no member_id, show the event
+                                    if (!event.member_id) return true;
+                                    // Show if this child is visible
+                                    return SRT.visibleChildren.has(String(event.member_id));
+                                });
+                            }
+                            
+                            const calendarEvents = filteredEvents.map(event => {
                                 // Use title as-is, formatting handled in eventDidMount
                                 return {
                                     id: event.id,
@@ -98,6 +109,22 @@
                     const eventType = info.event.extendedProps.event_type;
                     info.el.classList.add('srt-event-type-' + eventType);
                     
+                    // Add child color if present
+                    const childColor = info.event.extendedProps.color;
+                    const textColor = info.event.extendedProps.textColor;
+                    const className = info.event.extendedProps.className;
+                    
+                    if (childColor) {
+                        info.el.style.backgroundColor = childColor;
+                        info.el.style.borderColor = childColor;
+                        if (textColor) {
+                            info.el.style.color = textColor;
+                        }
+                        if (className) {
+                            info.el.classList.add(className);
+                        }
+                    }
+                    
                     // Add member name on separate line if present
                     if (info.event.extendedProps.member_name) {
                         const titleEl = info.el.querySelector('.fc-event-title');
@@ -115,6 +142,28 @@
             
             // Store calendar instance for re-rendering
             this.calendar = calendar;
+            
+            // Child filter functionality
+            const childToggles = document.querySelectorAll('.ftt-child-toggle');
+            if (childToggles.length > 0) {
+                // Track which children are visible
+                this.visibleChildren = new Set();
+                childToggles.forEach(toggle => {
+                    if (toggle.checked) {
+                        this.visibleChildren.add(toggle.dataset.childId);
+                    }
+                    
+                    toggle.addEventListener('change', (e) => {
+                        const childId = e.target.dataset.childId;
+                        if (e.target.checked) {
+                            this.visibleChildren.add(childId);
+                        } else {
+                            this.visibleChildren.delete(childId);
+                        }
+                        calendar.refetchEvents();
+                    });
+                });
+            }
             
             // Handle member selector change
             const memberSelector = document.getElementById('srt-calendar-member');

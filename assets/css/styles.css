@@ -48,6 +48,78 @@
     cursor: pointer;
 }
 
+/* ==================== Child Color Filter ==================== */
+
+.ftt-child-filter {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 15px;
+    margin: 20px 0;
+}
+
+.ftt-child-filter h3 {
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #495057;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.ftt-filter-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.ftt-filter-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    background: #ffffff;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.ftt-filter-item:hover {
+    background: #f1f3f5;
+    border-color: #adb5bd;
+}
+
+.ftt-filter-item input[type="checkbox"] {
+    margin: 0;
+    cursor: pointer;
+}
+
+.ftt-color-indicator {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1);
+    flex-shrink: 0;
+}
+
+.ftt-child-name {
+    font-size: 14px;
+    color: #212529;
+    font-weight: 500;
+}
+
+.ftt-filter-item input[type="checkbox"]:not(:checked) ~ .ftt-child-name {
+    color: #adb5bd;
+    text-decoration: line-through;
+}
+
+/* Child-specific event colors (dynamically applied) */
+.fc-event.child-color {
+    border-width: 2px;
+}
+
 /* Event type colors */
 .srt-event-type-move_in {
     background-color: #4CAF50;

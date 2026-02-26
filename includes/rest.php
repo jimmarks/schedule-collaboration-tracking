@@ -1280,6 +1280,16 @@ class SRT_REST {
             if ($member) {
                 $event['member_id'] = $member_id;
                 $event['member_name'] = $member->display_name;
+                
+                // Add color information for calendar display
+                if (class_exists('FTT_Child_Colors')) {
+                    $color = FTT_Child_Colors::get_child_color($member_id);
+                    if ($color) {
+                        $event['color'] = $color['hex'];
+                        $event['textColor'] = $color['text'];
+                        $event['className'] = 'child-' . $member_id;
+                    }
+                }
             } else {
                 $event['member_id'] = $member_id;
                 $event['member_name'] = null;

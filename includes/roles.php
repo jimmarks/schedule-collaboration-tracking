@@ -70,7 +70,9 @@ class SRT_Roles {
      */
     public static function add_parent_child($parent_id, $child_id) {
         $children = self::get_children($parent_id);
-        if (!in_array($child_id, $children)) {
+        $is_new_child = !in_array($child_id, $children);
+        
+        if ($is_new_child) {
             $children[] = $child_id;
             update_user_meta($parent_id, 'srt_parent_of', $children);
         }
@@ -80,6 +82,11 @@ class SRT_Roles {
         if (!in_array($parent_id, $parents)) {
             $parents[] = $parent_id;
             update_user_meta($child_id, 'srt_parents', $parents);
+        }
+        
+        // Auto-assign color to child when first added to a parent
+        if ($is_new_child && class_exists('FTT_Child_Colors')) {
+            FTT_Child_Colors::assign_color($child_id, $parent_id);
         }
     }
     
