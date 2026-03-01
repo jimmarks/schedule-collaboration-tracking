@@ -5,6 +5,12 @@ download/
 # WordPress
 *.zip
 
+# Dependencies
+vendor/
+lib/stripe-php/
+node_modules/
+.venv/
+
 # OS files
 .DS_Store
 Thumbs.db
@@ -23,3 +29,6 @@ npm-debug.log*
 # Environment
 .env
 .env.local
+
+# Security - Private keys
+*.pem
