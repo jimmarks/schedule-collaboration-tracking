@@ -7,7 +7,7 @@
 (function($) {
     'use strict';
     
-    const SRT = {
+    const FTT = {
         
         // Airport data loaded from JSON
         airportData: {},
@@ -52,7 +52,7 @@
          * Initialize calendar
          */
         initCalendar: function() {
-            const calendarEl = document.getElementById('srt-calendar');
+            const calendarEl = document.getElementById('ftt-calendar');
             if (!calendarEl) return;
             
             // Check if FullCalendar is available
@@ -71,16 +71,16 @@
                     right: 'dayGridMonth,timeGridWeek'
                 },
                 events: function(info, successCallback, failureCallback) {
-                    SRT.fetchEvents(info.startStr, info.endStr)
+                    FTT.fetchEvents(info.startStr, info.endStr)
                         .then(events => {
                             // Filter events based on visible children
                             let filteredEvents = events;
-                            if (SRT.visibleChildren && SRT.visibleChildren.size > 0) {
+                            if (FTT.visibleChildren && FTT.visibleChildren.size > 0) {
                                 filteredEvents = events.filter(event => {
                                     // If no member_id, show the event
                                     if (!event.member_id) return true;
                                     // Show if this child is visible
-                                    return SRT.visibleChildren.has(String(event.member_id));
+                                    return FTT.visibleChildren.has(String(event.member_id));
                                 });
                             }
                             
@@ -102,12 +102,12 @@
                         });
                 },
                 eventClick: function(info) {
-                    SRT.showEventModal(info.event.extendedProps);
+                    FTT.showEventModal(info.event.extendedProps);
                 },
                 eventDidMount: function(info) {
                     // Add color coding based on event type
                     const eventType = info.event.extendedProps.event_type;
-                    info.el.classList.add('srt-event-type-' + eventType);
+                    info.el.classList.add('ftt-event-type-' + eventType);
                     
                     // Add child color if present
                     const childColor = info.event.extendedProps.color;
@@ -130,7 +130,7 @@
                         const titleEl = info.el.querySelector('.fc-event-title');
                         if (titleEl) {
                             const memberName = document.createElement('div');
-                            memberName.className = 'srt-calendar-member-name';
+                            memberName.className = 'ftt-calendar-member-name';
                             memberName.textContent = info.event.extendedProps.member_name;
                             titleEl.insertBefore(memberName, titleEl.firstChild);
                         }
@@ -166,7 +166,7 @@
             }
             
             // Handle member selector change
-            const memberSelector = document.getElementById('srt-calendar-member');
+            const memberSelector = document.getElementById('ftt-calendar-member');
             if (memberSelector) {
                 memberSelector.addEventListener('change', () => {
                     calendar.refetchEvents();
@@ -193,7 +193,7 @@
          * Initialize event form
          */
         initEventForm: function() {
-            const form = document.getElementById('srt-event-form');
+            const form = document.getElementById('ftt-event-form');
             if (!form) return;
             
             // Get event ID from URL if editing
@@ -205,32 +205,32 @@
             }
             
             // Add time block button
-            $('#srt-add-time-block').on('click', function(e) {
+            $('#ftt-add-time-block').on('click', function(e) {
                 e.preventDefault();
-                SRT.addTimeBlock();
+                FTT.addTimeBlock();
             });
             
             // Add travel leg button
-            $('#srt-add-travel-leg').on('click', function(e) {
+            $('#ftt-add-travel-leg').on('click', function(e) {
                 e.preventDefault();
-                SRT.addTravelLeg();
+                FTT.addTravelLeg();
             });
             
             // Auto-expand travel section for flight_only events
             $('#event_type').on('change', function() {
                 const isFlight = $(this).val() === 'flight_only';
                 if (isFlight) {
-                    $('#srt-travel-section').show();
+                    $('#ftt-travel-section').show();
                     // Add a travel leg if none exist
-                    if ($('#srt-travel-legs-container .srt-travel-leg').length === 0) {
-                        SRT.addTravelLeg({ mode: 'fly' });
+                    if ($('#ftt-travel-legs-container .ftt-travel-leg').length === 0) {
+                        FTT.addTravelLeg({ mode: 'fly' });
                     }
                 }
             });
             
             // Travel needed checkbox
             $('#travel_needed').on('change', function() {
-                $('.srt-travel-section').toggle(this.checked);
+                $('.ftt-travel-section').toggle(this.checked);
             });
             
             // All day checkbox
@@ -267,20 +267,20 @@
             
             // Flight needed checkbox
             $('#flight_needed').on('change', function() {
-                $('.srt-flight-section').toggle(this.checked);
+                $('.ftt-flight-section').toggle(this.checked);
             });
             
             // Form submission
             form.addEventListener('submit', function(e) {
                 e.preventDefault();
-                SRT.submitEventForm(eventId);
+                FTT.submitEventForm(eventId);
             });
             
             // Delete button
-            $('#srt-delete-event').on('click', function(e) {
+            $('#ftt-delete-event').on('click', function(e) {
                 e.preventDefault();
                 if (confirm('Are you sure you want to delete this event?')) {
-                    SRT.deleteEvent(eventId);
+                    FTT.deleteEvent(eventId);
                 }
             });
         },
@@ -289,7 +289,7 @@
          * Initialize dashboard
          */
         initDashboard: function() {
-            const dashboard = document.getElementById('srt-dashboard');
+            const dashboard = document.getElementById('ftt-dashboard');
             if (!dashboard) return;
             
             this.loadDashboardData();
@@ -299,15 +299,15 @@
          * Initialize event list
          */
         initEventList: function() {
-            const eventList = document.getElementById('srt-event-list');
+            const eventList = document.getElementById('ftt-event-list');
             if (!eventList) return;
             
             // Event list is rendered server-side, but we can add interactivity here
-            $('.srt-event-item').on('click', function() {
+            $('.ftt-event-item').on('click', function() {
                 const eventId = $(this).data('event-id');
                 if (eventId) {
-                    SRT.fetchEvent(eventId).then(event => {
-                        SRT.showEventModal(event);
+                    FTT.fetchEvent(eventId).then(event => {
+                        FTT.showEventModal(event);
                     });
                 }
             });
@@ -322,7 +322,7 @@
             if (endDate) params.append('end_date', endDate);
             
             // Add member filter if selector exists and has value
-            const memberSelector = document.getElementById('srt-calendar-member');
+            const memberSelector = document.getElementById('ftt-calendar-member');
             if (memberSelector && memberSelector.value) {
                 params.append('member_id', memberSelector.value);
             }
@@ -388,7 +388,7 @@
                             .attr('id', 'location_latitude')
                             .attr('name', 'location_latitude')
                             .val(event.location_latitude)
-                            .appendTo('#srt-event-form');
+                            .appendTo('#ftt-event-form');
                     }
                     if (event.location_longitude) {
                         $('<input>')
@@ -396,7 +396,7 @@
                             .attr('id', 'location_longitude')
                             .attr('name', 'location_longitude')
                             .val(event.location_longitude)
-                            .appendTo('#srt-event-form');
+                            .appendTo('#ftt-event-form');
                     }
                 }
                 
@@ -420,7 +420,7 @@
                 }
                 
                 // Show delete button
-                $('#srt-delete-event').show();
+                $('#ftt-delete-event').show();
             }).catch(error => {
                 console.error('Error loading event:', error);
                 alert('Error loading event for editing.');
@@ -471,9 +471,9 @@
                     alert('Event saved successfully!');
                     // Redirect or reset form
                     if (!eventId) {
-                        document.getElementById('srt-event-form').reset();
-                        $('#srt-time-blocks-container').empty();
-                        $('#srt-travel-legs-container').empty();
+                        document.getElementById('ftt-event-form').reset();
+                        $('#ftt-time-blocks-container').empty();
+                        $('#ftt-travel-legs-container').empty();
                     }
                 } else {
                     alert('Error saving event.');
@@ -514,14 +514,14 @@
          * Add time block
          */
         addTimeBlock: function(data) {
-            const container = $('#srt-time-blocks-container');
+            const container = $('#ftt-time-blocks-container');
             const index = container.children().length;
             
             const html = `
-                <div class="srt-time-block" data-index="${index}">
-                    <h4>Time Block ${index + 1} <button type="button" class="srt-remove-block" data-target="time-block">Remove</button></h4>
-                    <div class="srt-form-row">
-                        <div class="srt-form-field">
+                <div class="ftt-time-block" data-index="${index}">
+                    <h4>Time Block ${index + 1} <button type="button" class="ftt-remove-block" data-target="time-block">Remove</button></h4>
+                    <div class="ftt-form-row">
+                        <div class="ftt-form-field">
                             <label>Block Type</label>
                             <select name="time_blocks[${index}][block_type]" required>
                                 <option value="">Select type...</option>
@@ -534,22 +534,22 @@
                                 <option value="other" ${data && data.block_type === 'other' ? 'selected' : ''}>Other</option>
                             </select>
                         </div>
-                        <div class="srt-form-field">
+                        <div class="ftt-form-field">
                             <label>Title</label>
                             <input type="text" name="time_blocks[${index}][title]" value="${data ? data.title : ''}" required>
                         </div>
                     </div>
-                    <div class="srt-form-row">
-                        <div class="srt-form-field">
+                    <div class="ftt-form-row">
+                        <div class="ftt-form-field">
                             <label>Start Time</label>
                             <input type="datetime-local" name="time_blocks[${index}][start_datetime]" value="${data ? data.start_datetime.slice(0, 16) : ''}" required>
                         </div>
-                        <div class="srt-form-field">
+                        <div class="ftt-form-field">
                             <label>End Time</label>
                             <input type="datetime-local" name="time_blocks[${index}][end_datetime]" value="${data ? data.end_datetime.slice(0, 16) : ''}" required>
                         </div>
                     </div>
-                    <div class="srt-form-field">
+                    <div class="ftt-form-field">
                         <label>Notes</label>
                         <textarea name="time_blocks[${index}][notes]" rows="2">${data ? data.notes : ''}</textarea>
                     </div>
@@ -559,8 +559,8 @@
             container.append(html);
             
             // Add remove handler
-            container.find('.srt-remove-block').last().on('click', function() {
-                $(this).closest('.srt-time-block').remove();
+            container.find('.ftt-remove-block').last().on('click', function() {
+                $(this).closest('.ftt-time-block').remove();
             });
         },
         
@@ -568,21 +568,21 @@
          * Add travel leg
          */
         addTravelLeg: function(data) {
-            const container = $('#srt-travel-legs-container');
+            const container = $('#ftt-travel-legs-container');
             const index = container.children().length;
             const self = this;
             
             const html = `
-                <div class="srt-travel-leg" data-index="${index}">
-                    <div class="srt-leg-header">
+                <div class="ftt-travel-leg" data-index="${index}">
+                    <div class="ftt-leg-header">
                         <h4>Travel Leg ${index + 1}</h4>
-                        <button type="button" class="srt-remove-block" data-target="travel-leg">✕ Remove</button>
+                        <button type="button" class="ftt-remove-block" data-target="travel-leg">✕ Remove</button>
                     </div>
                     
-                    <div class="srt-form-row">
-                        <div class="srt-form-field">
+                    <div class="ftt-form-row">
+                        <div class="ftt-form-field">
                             <label>Leg Type</label>
-                            <select name="travel_legs[${index}][mode]" class="srt-leg-mode">
+                            <select name="travel_legs[${index}][mode]" class="ftt-leg-mode">
                                 <option value="fly" ${data && data.mode === 'fly' ? 'selected' : ''}>✈️ Flight</option>
                                 <option value="drive" ${data && data.mode === 'drive' ? 'selected' : ''}>🚗 Drive</option>
                                 <option value="bus" ${data && data.mode === 'bus' ? 'selected' : ''}>🚌 Bus</option>
@@ -590,42 +590,42 @@
                                 <option value="other" ${data && data.mode === 'other' ? 'selected' : ''}>Other</option>
                             </select>
                         </div>
-                        <div class="srt-form-field srt-flight-only">
+                        <div class="ftt-form-field ftt-flight-only">
                             <label>
-                                <input type="checkbox" name="travel_legs[${index}][is_round_trip]" class="srt-round-trip-toggle" value="1" ${data && data.is_round_trip ? 'checked' : ''}>
+                                <input type="checkbox" name="travel_legs[${index}][is_round_trip]" class="ftt-round-trip-toggle" value="1" ${data && data.is_round_trip ? 'checked' : ''}>
                                 Round-Trip Flight
                             </label>
                             <small class="description">Automatically creates return flight</small>
                         </div>
                     </div>
                     
-                    <div class="srt-form-row">
-                        <div class="srt-form-field srt-flight-only">
+                    <div class="ftt-form-row">
+                        <div class="ftt-form-field ftt-flight-only">
                             <label>From Airport (IATA Code) *</label>
-                            <input type="text" name="travel_legs[${index}][depart_airport]" class="srt-airport-code" value="${data ? data.depart_airport : ''}" maxlength="3" placeholder="e.g., BDL" style="text-transform: uppercase;">
-                            <small class="srt-airport-name"></small>
+                            <input type="text" name="travel_legs[${index}][depart_airport]" class="ftt-airport-code" value="${data ? data.depart_airport : ''}" maxlength="3" placeholder="e.g., BDL" style="text-transform: uppercase;">
+                            <small class="ftt-airport-name"></small>
                         </div>
-                        <div class="srt-form-field srt-non-flight">
+                        <div class="ftt-form-field ftt-non-flight">
                             <label>From Location</label>
                             <input type="text" name="travel_legs[${index}][depart_location]" value="${data ? data.depart_location : ''}" placeholder="e.g., Hartford, CT">
                         </div>
-                        <div class="srt-form-field srt-flight-only">
+                        <div class="ftt-form-field ftt-flight-only">
                             <label>To Airport (IATA Code) *</label>
-                            <input type="text" name="travel_legs[${index}][arrive_airport]" class="srt-airport-code" value="${data ? data.arrive_airport : ''}" maxlength="3" placeholder="e.g., BWI" style="text-transform: uppercase;">
-                            <small class="srt-airport-name"></small>
+                            <input type="text" name="travel_legs[${index}][arrive_airport]" class="ftt-airport-code" value="${data ? data.arrive_airport : ''}" maxlength="3" placeholder="e.g., BWI" style="text-transform: uppercase;">
+                            <small class="ftt-airport-name"></small>
                         </div>
-                        <div class="srt-form-field srt-non-flight">
+                        <div class="ftt-form-field ftt-non-flight">
                             <label>To Location</label>
                             <input type="text" name="travel_legs[${index}][arrive_location]" value="${data ? data.arrive_location : ''}" placeholder="e.g., Baltimore, MD">
                         </div>
                     </div>
                     
-                    <div class="srt-form-row">
-                        <div class="srt-form-field">
+                    <div class="ftt-form-row">
+                        <div class="ftt-form-field">
                             <label>Date *</label>
                             <input type="date" name="travel_legs[${index}][depart_date]" value="${data && data.depart_date ? data.depart_date : ''}" required>
                         </div>
-                        <div class="srt-form-field">
+                        <div class="ftt-form-field">
                             <label>Time of Day</label>
                             <select name="travel_legs[${index}][depart_time_of_day]">
                                 <option value="">Any Time</option>
@@ -635,11 +635,11 @@
                                 <option value="night" ${data && data.depart_time_of_day === 'night' ? 'selected' : ''}>Night</option>
                             </select>
                         </div>
-                        <div class="srt-form-field srt-round-trip-return" style="display: none;">
+                        <div class="ftt-form-field ftt-round-trip-return" style="display: none;">
                             <label>Return Date *</label>
                             <input type="date" name="travel_legs[${index}][return_date]" value="${data && data.return_date ? data.return_date : ''}">
                         </div>
-                        <div class="srt-form-field srt-round-trip-return" style="display: none;">
+                        <div class="ftt-form-field ftt-round-trip-return" style="display: none;">
                             <label>Return Time of Day</label>
                             <select name="travel_legs[${index}][return_time_of_day]">
                                 <option value="">Any Time</option>
@@ -651,25 +651,25 @@
                         </div>
                     </div>
                     
-                    <div class="srt-booking-section srt-flight-only">
-                        <div class="srt-form-field">
-                            <label class="srt-booking-toggle">
-                                <input type="checkbox" name="travel_legs[${index}][booked]" value="1" class="srt-booked-checkbox" ${data && data.booked ? 'checked' : ''}>
+                    <div class="ftt-booking-section ftt-flight-only">
+                        <div class="ftt-form-field">
+                            <label class="ftt-booking-toggle">
+                                <input type="checkbox" name="travel_legs[${index}][booked]" value="1" class="ftt-booked-checkbox" ${data && data.booked ? 'checked' : ''}>
                                 ✓ Already Booked
                             </label>
                         </div>
                         
-                        <div class="srt-booking-details" style="display: ${data && data.booked ? 'block' : 'none'};">
-                            <div class="srt-form-row">
-                                <div class="srt-form-field">
+                        <div class="ftt-booking-details" style="display: ${data && data.booked ? 'block' : 'none'};">
+                            <div class="ftt-form-row">
+                                <div class="ftt-form-field">
                                     <label>Airline</label>
                                     <input type="text" name="travel_legs[${index}][airline]" value="${data ? data.airline : ''}" placeholder="Southwest">
                                 </div>
-                                <div class="srt-form-field">
+                                <div class="ftt-form-field">
                                     <label>Flight Number</label>
                                     <input type="text" name="travel_legs[${index}][flight_number]" value="${data ? data.flight_number : ''}" placeholder="WN 420">
                                 </div>
-                                <div class="srt-form-field">
+                                <div class="ftt-form-field">
                                     <label>Confirmation #</label>
                                     <input type="text" name="travel_legs[${index}][confirmation]" value="${data ? data.confirmation : ''}" placeholder="ABC123">
                                 </div>
@@ -677,9 +677,9 @@
                         </div>
                     </div>
                     
-                    <div class="srt-form-field srt-flight-only">
+                    <div class="ftt-form-field ftt-flight-only">
                         <label>Baggage (select all that apply)</label>
-                        <div class="srt-checkbox-group">
+                        <div class="ftt-checkbox-group">
                             <label><input type="checkbox" name="travel_legs[${index}][baggage][]" value="carry_on" ${data && data.baggage && data.baggage.includes('carry_on') ? 'checked' : ''}> Carry-On</label>
                             <label><input type="checkbox" name="travel_legs[${index}][baggage][]" value="checked" ${data && data.baggage && data.baggage.includes('checked') ? 'checked' : ''}> Checked Bag</label>
                             <label><input type="checkbox" name="travel_legs[${index}][baggage][]" value="instrument" ${data && data.baggage && data.baggage.includes('instrument') ? 'checked' : ''}> Instrument</label>
@@ -688,7 +688,7 @@
                         </div>
                     </div>
                     
-                    <div class="srt-form-field">
+                    <div class="ftt-form-field">
                         <label>Notes</label>
                         <textarea name="travel_legs[${index}][notes]" rows="2">${data && data.notes ? data.notes : ''}</textarea>
                     </div>
@@ -697,29 +697,29 @@
             
             container.append(html);
             
-            const $newLeg = container.find('.srt-travel-leg').last();
+            const $newLeg = container.find('.ftt-travel-leg').last();
             
             // Add remove handler
-            $newLeg.find('.srt-remove-block').on('click', function() {
-                $(this).closest('.srt-travel-leg').remove();
+            $newLeg.find('.ftt-remove-block').on('click', function() {
+                $(this).closest('.ftt-travel-leg').remove();
             });
             
             // Toggle flight-specific vs non-flight fields
-            $newLeg.find('.srt-leg-mode').on('change', function() {
+            $newLeg.find('.ftt-leg-mode').on('change', function() {
                 const isFlight = $(this).val() === 'fly';
-                $newLeg.find('.srt-flight-only').toggle(isFlight);
-                $newLeg.find('.srt-non-flight').toggle(!isFlight);
+                $newLeg.find('.ftt-flight-only').toggle(isFlight);
+                $newLeg.find('.ftt-non-flight').toggle(!isFlight);
             }).trigger('change');
             
             // Toggle booking details
-            $newLeg.find('.srt-booked-checkbox').on('change', function() {
-                $newLeg.find('.srt-booking-details').toggle(this.checked);
+            $newLeg.find('.ftt-booked-checkbox').on('change', function() {
+                $newLeg.find('.ftt-booking-details').toggle(this.checked);
             });
             
             // Toggle round-trip fields and auto-create return leg
-            $newLeg.find('.srt-round-trip-toggle').on('change', function() {
+            $newLeg.find('.ftt-round-trip-toggle').on('change', function() {
                 const isRoundTrip = this.checked;
-                $newLeg.find('.srt-round-trip-return').toggle(isRoundTrip);
+                $newLeg.find('.ftt-round-trip-return').toggle(isRoundTrip);
                 
                 if (isRoundTrip) {
                     // Auto-create return leg
@@ -733,19 +733,19 @@
                     };
                     
                     // Check if return leg already exists
-                    const nextLeg = $newLeg.next('.srt-travel-leg');
+                    const nextLeg = $newLeg.next('.ftt-travel-leg');
                     if (nextLeg.length === 0 || !nextLeg.data('is-return')) {
-                        const $returnLeg = $(SRT.addTravelLeg(outbound));
+                        const $returnLeg = $(FTT.addTravelLeg(outbound));
                         $returnLeg.data('is-return', true);
-                        $returnLeg.find('.srt-leg-header h4').append(' <span style="color:#666;">(Return)</span>');
+                        $returnLeg.find('.ftt-leg-header h4').append(' <span style="color:#666;">(Return)</span>');
                     }
                 }
             }).trigger('change');
             
             // Airport code lookup
-            $newLeg.find('.srt-airport-code').on('input', function() {
+            $newLeg.find('.ftt-airport-code').on('input', function() {
                 const code = $(this).val().toUpperCase();
-                const $nameField = $(this).siblings('.srt-airport-name');
+                const $nameField = $(this).siblings('.ftt-airport-name');
                 if (self.airportData[code]) {
                     $nameField.text(self.airportData[code]).css('color', '#666');
                 } else if (code.length === 3) {
@@ -761,7 +761,7 @@
          */
         collectTimeBlocks: function() {
             const blocks = [];
-            $('.srt-time-block').each(function() {
+            $('.ftt-time-block').each(function() {
                 const $block = $(this);
                 const index = $block.data('index');
                 blocks.push({
@@ -780,7 +780,7 @@
          */
         collectTravelLegs: function() {
             const legs = [];
-            $('.srt-travel-leg').each(function() {
+            $('.ftt-travel-leg').each(function() {
                 const $leg = $(this);
                 const index = $leg.data('index');
                 
@@ -830,17 +830,17 @@
          */
         loadDashboardData: function() {
             // Load user preferences
-            if (document.getElementById('srt-user-preferences-form')) {
+            if (document.getElementById('ftt-user-preferences-form')) {
                 this.loadUserPreferences();
             }
             
             // Load price alerts
-            if (document.getElementById('srt-user-alerts')) {
+            if (document.getElementById('ftt-user-alerts')) {
                 this.loadUserAlerts();
             }
             
             // Load linked flights
-            if (document.getElementById('srt-linked-flights')) {
+            if (document.getElementById('ftt-linked-flights')) {
                 this.loadLinkedFlights();
             }
             
@@ -864,16 +864,16 @@
                 this.renderDashboardSection('upcoming-travel', data.upcoming_travel || []);
                 
                 // Load price alerts for members
-                if ($('#srt-user-alerts').length) {
+                if ($('#ftt-user-alerts').length) {
                     this.loadUserAlerts();
                 }
             })
             .catch(error => {
                 console.error('Error loading dashboard:', error);
                 // Clear loading spinners on error
-                $('#srt-flights-needed').html('<p class="srt-error">Error loading data. Please refresh the page.</p>');
-                $('#srt-not-booked').html('<p class="srt-error">Error loading data. Please refresh the page.</p>');
-                $('#srt-upcoming-travel').html('<p class="srt-error">Error loading data. Please refresh the page.</p>');
+                $('#ftt-flights-needed').html('<p class="ftt-error">Error loading data. Please refresh the page.</p>');
+                $('#ftt-not-booked').html('<p class="ftt-error">Error loading data. Please refresh the page.</p>');
+                $('#ftt-upcoming-travel').html('<p class="ftt-error">Error loading data. Please refresh the page.</p>');
             });
         },
         
@@ -900,7 +900,7 @@
             });
             
             // Handle form submission
-            $('#srt-user-preferences-form').on('submit', function(e) {
+            $('#ftt-user-preferences-form').on('submit', function(e) {
                 e.preventDefault();
                 
                 const preferences = {
@@ -920,7 +920,7 @@
                     contentType: 'application/json',
                     success: function(response) {
                         console.log('✅ Preferences saved:', response);
-                        $('#srt-preferences-message')
+                        $('#ftt-preferences-message')
                             .removeClass('error')
                             .addClass('success')
                             .text('✓ Preferences saved!')
@@ -930,7 +930,7 @@
                     },
                     error: function(xhr) {
                         console.error('❌ Failed to save preferences:', xhr);
-                        $('#srt-preferences-message')
+                        $('#ftt-preferences-message')
                             .removeClass('success')
                             .addClass('error')
                             .text('✗ Failed to save preferences')
@@ -944,7 +944,7 @@
          * Load user alerts
          */
         loadUserAlerts: function() {
-            const container = $('#srt-user-alerts');
+            const container = $('#ftt-user-alerts');
             
             $.ajax({
                 url: srtData.restUrl + 'my-alerts',
@@ -974,12 +974,12 @@
                         const statusColor = alert.is_active ? 'green' : '#999';
                         
                         html += '<tr>';
-                        html += '<td>' + SRT.escapeHtml(alert.event_title) + '</td>';
-                        html += '<td>' + SRT.escapeHtml(alert.route) + '</td>';
+                        html += '<td>' + FTT.escapeHtml(alert.event_title) + '</td>';
+                        html += '<td>' + FTT.escapeHtml(alert.route) + '</td>';
                         html += '<td>' + (alert.depart_date || 'Flexible') + '</td>';
                         html += '<td>' + alertTypeLabel + '</td>';
                         html += '<td style="color: ' + statusColor + ';">' + statusIcon + '</td>';
-                        html += '<td><button class="button button-small srt-delete-alert" data-alert-id="' + alert.id + '">Delete</button></td>';
+                        html += '<td><button class="button button-small ftt-delete-alert" data-alert-id="' + alert.id + '">Delete</button></td>';
                         html += '</tr>';
                     });
                     
@@ -987,10 +987,10 @@
                     container.html(html);
                     
                     // Attach delete handlers
-                    $('.srt-delete-alert').on('click', function() {
+                    $('.ftt-delete-alert').on('click', function() {
                         const alertId = $(this).data('alert-id');
                         if (confirm('Delete this price alert?')) {
-                            SRT.deleteAlert(alertId);
+                            FTT.deleteAlert(alertId);
                         }
                     });
                 },
@@ -1012,7 +1012,7 @@
                 },
                 success: function() {
                     // Reload alerts
-                    SRT.loadUserAlerts();
+                    FTT.loadUserAlerts();
                 },
                 error: function(xhr) {
                     alert('Failed to delete alert: ' + (xhr.responseJSON?.message || 'Unknown error'));
@@ -1024,19 +1024,19 @@
          * Render dashboard section
          */
         renderDashboardSection: function(sectionId, events) {
-            const container = $(`#srt-${sectionId}`);
+            const container = $(`#ftt-${sectionId}`);
             container.empty();
             
             if (events.length === 0) {
-                container.append('<p class="srt-no-events">No events to display.</p>');
+                container.append('<p class="ftt-no-events">No events to display.</p>');
                 return;
             }
             
-            const list = $('<div class="srt-dashboard-list"></div>');
+            const list = $('<div class="ftt-dashboard-list"></div>');
             events.forEach(event => {
-                const memberInfo = event.member_name ? `<div class="srt-member-name">${this.escapeHtml(event.member_name)}</div>` : '';
+                const memberInfo = event.member_name ? `<div class="ftt-member-name">${this.escapeHtml(event.member_name)}</div>` : '';
                 const item = $(`
-                    <div class="srt-dashboard-item" data-event-id="${event.id}">
+                    <div class="ftt-dashboard-item" data-event-id="${event.id}">
                         ${memberInfo}
                         <h4>${this.escapeHtml(event.title)}</h4>
                         <p><strong>Date:</strong> ${this.formatDate(event.start_datetime)}</p>
@@ -1059,13 +1059,13 @@
          * Show event modal
          */
         showEventModal: function(event) {
-            const modal = $('<div class="srt-modal"><div class="srt-modal-content"></div></div>');
+            const modal = $('<div class="ftt-modal"><div class="ftt-modal-content"></div></div>');
             
             // Get pretty event type name
             const eventTypePretty = this.getEventTypePrettyName(event.event_type);
             
             let html = `
-                <span class="srt-modal-close">&times;</span>
+                <span class="ftt-modal-close">&times;</span>
                 <h2>${this.escapeHtml(event.title)}</h2>
                 <p><strong>Type:</strong> ${this.escapeHtml(eventTypePretty)}</p>
                 <p><strong>Start:</strong> ${this.formatDate(event.start_datetime)}</p>
@@ -1085,7 +1085,7 @@
             
             if (event.travel_legs && event.travel_legs.length > 0) {
                 html += '<h3>Travel</h3>';
-                html += '<p class="srt-help-text" style="font-size: 13px; color: #666; margin-bottom: 15px;">💡 Click flight search buttons below to compare prices and set up price alerts</p>';
+                html += '<p class="ftt-help-text" style="font-size: 13px; color: #666; margin-bottom: 15px;">💡 Click flight search buttons below to compare prices and set up price alerts</p>';
                 event.travel_legs.forEach((leg, legIndex) => {
                     // Backward compatibility: handle both old datetime and new date fields
                     let departInfo = 'TBD';
@@ -1124,7 +1124,7 @@
                     });
                     
                     html += `
-                        <div class="srt-travel-leg-details">
+                        <div class="ftt-travel-leg-details">
                             <h4>${this.escapeHtml(leg.leg_name || 'Travel Leg')}</h4>
                             <p><strong>Mode:</strong> ${leg.mode}</p>
                             <p><strong>Depart:</strong> ${departInfo}</p>
@@ -1132,10 +1132,10 @@
                             <p><strong>Arrive:</strong> ${arriveInfo}</p>
                             <p><strong>To:</strong> ${this.escapeHtml(leg.arrive_location || 'TBD')} ${leg.arrive_airport ? '(' + leg.arrive_airport + ')' : ''}</p>
                             ${leg.airline ? '<p><strong>Airline:</strong> ' + this.escapeHtml(leg.airline) + ' ' + this.escapeHtml(leg.flight_number) + '</p>' : ''}
-                            ${leg.booked ? '<p class="srt-booked">✓ Booked</p>' : '<p class="srt-not-booked">✗ Not Booked</p>'}
-                            ${needsAirports ? '<div class="srt-missing-airports" style="background: #fff3cd; border: 1px solid #ffc107; padding: 10px; margin: 10px 0; border-radius: 4px;"><p style="margin: 0; color: #856404;"><strong>⚠️ Missing Airport Codes</strong><br>Add 3-letter airport codes (e.g., BDL, BWI) to search flights and track prices. <a href="' + (srtData.eventFormUrl ? srtData.eventFormUrl + (srtData.eventFormUrl.includes('?') ? '&' : '?') + 'event_id=' + event.id : '#') + '" style="color: #0073aa;">Edit Event</a></p></div>' : ''}
+                            ${leg.booked ? '<p class="ftt-booked">✓ Booked</p>' : '<p class="ftt-not-booked">✗ Not Booked</p>'}
+                            ${needsAirports ? '<div class="ftt-missing-airports" style="background: #fff3cd; border: 1px solid #ffc107; padding: 10px; margin: 10px 0; border-radius: 4px;"><p style="margin: 0; color: #856404;"><strong>⚠️ Missing Airport Codes</strong><br>Add 3-letter airport codes (e.g., BDL, BWI) to search flights and track prices. <a href="' + (srtData.eventFormUrl ? srtData.eventFormUrl + (srtData.eventFormUrl.includes('?') ? '&' : '?') + 'event_id=' + event.id : '#') + '" style="color: #0073aa;">Edit Event</a></p></div>' : ''}
                             ${canSearch ? this.generateFlightSearchLinks(leg, event, departDate, legIndex) : ''}
-                            ${canSearch ? '<div class="srt-price-info" id="srt-price-info-' + legIndex + '"></div>' : ''}
+                            ${canSearch ? '<div class="ftt-price-info" id="ftt-price-info-' + legIndex + '"></div>' : ''}
                         </div>
                     `;
                 });
@@ -1149,11 +1149,11 @@
                 }
             }
             
-            modal.find('.srt-modal-content').html(html);
+            modal.find('.ftt-modal-content').html(html);
             $('body').append(modal);
             modal.fadeIn();
             
-            modal.find('.srt-modal-close').on('click', function() {
+            modal.find('.ftt-modal-close').on('click', function() {
                 modal.fadeOut(function() {
                     modal.remove();
                 });
@@ -1168,7 +1168,7 @@
             });
             
             // Handle track price button
-            modal.find('.srt-track-price').on('click', function() {
+            modal.find('.ftt-track-price').on('click', function() {
                 const $btn = $(this);
                 const eventId = $btn.data('event-id');
                 const legIndex = $btn.data('leg-index');
@@ -1176,23 +1176,23 @@
                 const destination = $btn.data('destination');
                 const date = $btn.data('date');
                 
-                SRT.showPriceTrackingModal(eventId, legIndex, origin, destination, date);
+                FTT.showPriceTrackingModal(eventId, legIndex, origin, destination, date);
             });
             
             // Handle check price now button
-            modal.find('.srt-check-price-now').on('click', function() {
+            modal.find('.ftt-check-price-now').on('click', function() {
                 const $btn = $(this);
                 const eventId = $btn.data('event-id');
                 const legIndex = $btn.data('leg-index');
                 
-                SRT.checkPriceNow(eventId, legIndex, modal);
+                FTT.checkPriceNow(eventId, legIndex, modal);
             });
             
             // Load price history for each flight leg
-            modal.find('.srt-check-price-now').each(function() {
+            modal.find('.ftt-check-price-now').each(function() {
                 const eventId = $(this).data('event-id');
                 const legIndex = $(this).data('leg-index');
-                SRT.loadPriceHistory(eventId, legIndex, modal);
+                FTT.loadPriceHistory(eventId, legIndex, modal);
             });
         },
         
@@ -1229,17 +1229,17 @@
          * Show price tracking modal
          */
         showPriceTrackingModal: function(eventId, legIndex, origin, destination, date) {
-            const modal = $('<div class="srt-modal"><div class="srt-modal-content"></div></div>');
+            const modal = $('<div class="ftt-modal"><div class="ftt-modal-content"></div></div>');
             
             const dateNote = date ? ` on ${date}` : ' (flexible dates)';
             
             const html = `
-                <span class="srt-modal-close">&times;</span>
+                <span class="ftt-modal-close">&times;</span>
                 <h2>Track Flight Prices</h2>
                 <p><strong>Route:</strong> ${origin} → ${destination}${dateNote}</p>
                 
-                <form id="srt-price-alert-form">
-                    <div class="srt-form-field">
+                <form id="ftt-price-alert-form">
+                    <div class="ftt-form-field">
                         <label>Alert Type</label>
                         <select name="alert_type" id="alert_type" required>
                             <option value="">Select alert type...</option>
@@ -1250,28 +1250,28 @@
                         </select>
                     </div>
                     
-                    <div class="srt-form-field" id="threshold_price_field" style="display: none;">
+                    <div class="ftt-form-field" id="threshold_price_field" style="display: none;">
                         <label>Target Price ($)</label>
                         <input type="number" name="threshold_price" id="threshold_price" min="0" step="0.01" placeholder="e.g., 250.00">
                         <p class="description">Alert me when price drops to this amount or below</p>
                     </div>
                     
-                    <div class="srt-form-field" id="threshold_percent_field" style="display: none;">
+                    <div class="ftt-form-field" id="threshold_percent_field" style="display: none;">
                         <label>Percentage Drop (%)</label>
                         <input type="number" name="threshold_percent" id="threshold_percent" min="1" max="100" placeholder="e.g., 20">
                         <p class="description">Alert me when price drops by this percentage</p>
                     </div>
                     
-                    <div class="srt-form-actions">
+                    <div class="ftt-form-actions">
                         <button type="submit" class="button button-primary">Create Alert</button>
-                        <button type="button" class="button srt-modal-close">Cancel</button>
+                        <button type="button" class="button ftt-modal-close">Cancel</button>
                     </div>
                 </form>
                 
-                <div id="srt-alert-message" style="display: none; margin-top: 15px;"></div>
+                <div id="ftt-alert-message" style="display: none; margin-top: 15px;"></div>
             `;
             
-            modal.find('.srt-modal-content').html(html);
+            modal.find('.ftt-modal-content').html(html);
             $('body').append(modal);
             modal.fadeIn();
             
@@ -1289,7 +1289,7 @@
             });
             
             // Handle form submission
-            modal.find('#srt-price-alert-form').on('submit', function(e) {
+            modal.find('#ftt-price-alert-form').on('submit', function(e) {
                 e.preventDefault();
                 
                 const alertType = modal.find('#alert_type').val();
@@ -1339,7 +1339,7 @@
                                 ${subjectLine}
                             </div>
                         `;
-                        modal.find('#srt-alert-message').html(message).show();
+                        modal.find('#ftt-alert-message').html(message).show();
                         
                         setTimeout(function() {
                             modal.fadeOut(function() {
@@ -1352,7 +1352,7 @@
                         if (xhr.responseJSON && xhr.responseJSON.message) {
                             errorMsg = xhr.responseJSON.message;
                         }
-                        modal.find('#srt-alert-message')
+                        modal.find('#ftt-alert-message')
                             .html('<p style="color: red;">✗ ' + errorMsg + '</p>')
                             .show();
                     }
@@ -1360,7 +1360,7 @@
             });
             
             // Close handlers
-            modal.find('.srt-modal-close').on('click', function() {
+            modal.find('.ftt-modal-close').on('click', function() {
                 modal.fadeOut(function() {
                     modal.remove();
                 });
@@ -1425,7 +1425,7 @@
             let resultsContainer;
             
             // Create results container with proper positioning
-            resultsContainer = $('<div class="srt-autocomplete-results"></div>');
+            resultsContainer = $('<div class="ftt-autocomplete-results"></div>');
             $(locationInput).parent().css('position', 'relative');
             $(locationInput).after(resultsContainer);
             
@@ -1441,13 +1441,13 @@
                 }
                 
                 debounceTimer = setTimeout(() => {
-                    SRT.searchMapboxPlaces(query, resultsContainer);
+                    FTT.searchMapboxPlaces(query, resultsContainer);
                 }, 300);
             });
             
             // Hide results when clicking outside
             $(document).on('click', function(e) {
-                if (!$(e.target).closest('#location_name, .srt-autocomplete-results').length) {
+                if (!$(e.target).closest('#location_name, .ftt-autocomplete-results').length) {
                     resultsContainer.hide();
                 }
             });
@@ -1466,7 +1466,7 @@
                 document.head.appendChild(script);
                 
                 window.initGoogleAutocomplete = () => {
-                    SRT.setupGoogleAutocomplete(locationInput);
+                    FTT.setupGoogleAutocomplete(locationInput);
                 };
             } else {
                 this.setupGoogleAutocomplete(locationInput);
@@ -1505,14 +1505,14 @@
                         .attr('id', 'location_latitude')
                         .attr('name', 'location_latitude')
                         .val(place.geometry.location.lat())
-                        .appendTo('#srt-event-form');
+                        .appendTo('#ftt-event-form');
                     
                     $('<input>')
                         .attr('type', 'hidden')
                         .attr('id', 'location_longitude')
                         .attr('name', 'location_longitude')
                         .val(place.geometry.location.lng())
-                        .appendTo('#srt-event-form');
+                        .appendTo('#ftt-event-form');
                 }
             });
         },
@@ -1532,11 +1532,11 @@
                 method: 'GET',
                 success: function(data) {
                     console.log('Mapbox results:', data.features.length, 'found');
-                    SRT.displayMapboxResults(data.features, resultsContainer);
+                    FTT.displayMapboxResults(data.features, resultsContainer);
                 },
                 error: function(xhr, status, error) {
                     console.error('Mapbox API error:', error, xhr.responseText);
-                    resultsContainer.html('<div class="srt-autocomplete-item" style="color: #dc3232;">Search error. Check API key.</div>').show();
+                    resultsContainer.html('<div class="ftt-autocomplete-item" style="color: #dc3232;">Search error. Check API key.</div>').show();
                 }
             });
         },
@@ -1553,7 +1553,7 @@
             }
             
             features.forEach(feature => {
-                const item = $('<div class="srt-autocomplete-item"></div>');
+                const item = $('<div class="ftt-autocomplete-item"></div>');
                 item.text(feature.place_name);
                 
                 item.on('click', function() {
@@ -1572,14 +1572,14 @@
                             .attr('id', 'location_longitude')
                             .attr('name', 'location_longitude')
                             .val(feature.geometry.coordinates[0])
-                            .appendTo('#srt-event-form');
+                            .appendTo('#ftt-event-form');
                         
                         $('<input>')
                             .attr('type', 'hidden')
                             .attr('id', 'location_latitude')
                             .attr('name', 'location_latitude')
                             .val(feature.geometry.coordinates[1])
-                            .appendTo('#srt-event-form');
+                            .appendTo('#ftt-event-form');
                     }
                     
                     resultsContainer.hide();
@@ -1654,25 +1654,25 @@
             
             let baggageInfoHtml = '';
             if (baggageCount > 0) {
-                baggageInfoHtml = `<p class="srt-baggage-note" style="font-size: 12px; color: #666; margin: 5px 0;">Baggage: ${baggageCount} checked bag(s)${baggageNote}</p>`;
+                baggageInfoHtml = `<p class="ftt-baggage-note" style="font-size: 12px; color: #666; margin: 5px 0;">Baggage: ${baggageCount} checked bag(s)${baggageNote}</p>`;
             }
             
             return `
-                <div class="srt-flight-search-links">
+                <div class="ftt-flight-search-links">
                     <p><strong>Search Flights:</strong></p>
                     ${baggageInfoHtml}
-                    <div class="srt-flight-buttons">
+                    <div class="ftt-flight-buttons">
                         <a href="${googleFlightsUrl}" target="_blank" rel="noopener" class="button button-small">Google Flights</a>
                         <a href="${kayakUrl}" target="_blank" rel="noopener" class="button button-small">Kayak</a>
                         <a href="${southwestUrl}" target="_blank" rel="noopener" class="button button-small">Southwest</a>
-                        <button class="button button-small button-primary srt-check-price-now" data-event-id="${event.id}" data-leg-index="${legIndex}">
+                        <button class="button button-small button-primary ftt-check-price-now" data-event-id="${event.id}" data-leg-index="${legIndex}">
                             💰 Check Price Now
                         </button>
-                        <button class="button button-small button-secondary srt-track-price" data-event-id="${event.id}" data-leg-index="${legIndex}" data-origin="${origin}" data-destination="${destination}" data-date="${date || ''}">
+                        <button class="button button-small button-secondary ftt-track-price" data-event-id="${event.id}" data-leg-index="${legIndex}" data-origin="${origin}" data-destination="${destination}" data-date="${date || ''}">
                             <span class="dashicons dashicons-bell" style="font-size: 14px; margin-top: 2px;"></span> Track Price
                         </button>
                     </div>
-                    <div class="srt-price-info" id="srt-price-info-${legIndex}"></div>
+                    <div class="ftt-price-info" id="ftt-price-info-${legIndex}"></div>
                 </div>
             `;
         },
@@ -1681,7 +1681,7 @@
          * Check price now
          */
         checkPriceNow: function(eventId, legIndex, modal) {
-            const $container = modal.find('#srt-price-info-' + legIndex);
+            const $container = modal.find('#ftt-price-info-' + legIndex);
             $container.html('<p style="color: #666;">⏳ Checking current prices...</p>');
             
             const requestData = {
@@ -1789,7 +1789,7 @@
                     $container.html(html);
                     
                     // Reload price history
-                    SRT.loadPriceHistory(eventId, legIndex, modal);
+                    FTT.loadPriceHistory(eventId, legIndex, modal);
                 },
                 error: function(xhr) {
                     console.error('❌ SRT Price Check Error:', {
@@ -1841,10 +1841,10 @@
                         // If data is older than 4 hours, trigger auto-refresh
                         if (hoursSinceCheck > 4) {
                             console.log('🔄 Data is stale (>4 hours), auto-refreshing...');
-                            const $button = modal.find('#srt-check-price-' + legIndex);
+                            const $button = modal.find('#ftt-check-price-' + legIndex);
                             if ($button.length) {
                                 // Show message that we're auto-updating
-                                const $container = modal.find('#srt-price-info-' + legIndex);
+                                const $container = modal.find('#ftt-price-info-' + legIndex);
                                 $container.html('<div style="padding: 20px; text-align: center; color: #666;"><div style="margin-bottom: 10px;">🔄 Refreshing price data...</div><div style="font-size: 12px;">Last checked ' + hoursSinceCheck.toFixed(1) + ' hours ago</div></div>');
                                 
                                 // Trigger price check
@@ -1855,7 +1855,7 @@
                             }
                         }
                         
-                        SRT.renderPriceHistory(eventId, legIndex, response, modal);
+                        FTT.renderPriceHistory(eventId, legIndex, response, modal);
                     } else {
                         console.warn('⚠️ No price history found for event:', eventId, 'leg:', legIndex);
                     }
@@ -1870,7 +1870,7 @@
          * Render price history
          */
         renderPriceHistory: function(eventId, legIndex, data, modal) {
-            const $container = modal.find('#srt-price-info-' + legIndex);
+            const $container = modal.find('#ftt-price-info-' + legIndex);
             const stats = data.stats;
             
             if (!stats || !data.prices.length) {
@@ -1974,19 +1974,19 @@
             
             // Add mini chart
             if (data.prices.length > 1) {
-                html += '<div style="margin-top: 10px;">' + SRT.renderMiniChart(data.prices, stats) + '</div>';
+                html += '<div style="margin-top: 10px;">' + FTT.renderMiniChart(data.prices, stats) + '</div>';
             }
             
             html += '</div>';
             
             // Check if there's already a price history section
-            const existingHistory = $container.find('.srt-price-history');
+            const existingHistory = $container.find('.ftt-price-history');
             if (existingHistory.length) {
                 // Replace existing price history only
-                existingHistory.replaceWith('<div class="srt-price-history">' + html + '</div>');
+                existingHistory.replaceWith('<div class="ftt-price-history">' + html + '</div>');
             } else {
                 // Append new price history (after current price info if it exists)
-                $container.append('<div class="srt-price-history">' + html + '</div>');
+                $container.append('<div class="ftt-price-history">' + html + '</div>');
             }
         },
         
@@ -2040,7 +2040,7 @@
                 },
                 error: function(xhr) {
                     console.error('Failed to load linked flights:', xhr);
-                    $('#srt-linked-flights').html('<p>Unable to load flight groups.</p>');
+                    $('#ftt-linked-flights').html('<p>Unable to load flight groups.</p>');
                 }
             });
         },
@@ -2049,7 +2049,7 @@
          * Render linked flights with pricing comparison
          */
         renderLinkedFlights: function(groups) {
-            const $container = $('#srt-linked-flights');
+            const $container = $('#ftt-linked-flights');
             
             if (!groups || groups.length === 0) {
                 $container.html('<p>No linked flights yet. Link outbound and return flights to compare pricing!</p>');
@@ -2070,51 +2070,51 @@
                 const bestOption = pricing.best_option || 'individual';
                 
                 html += `
-                    <div class="srt-linked-flight-group">
-                        <div class="srt-linked-flight-header">
-                            <div class="srt-linked-flight-title">
+                    <div class="ftt-linked-flight-group">
+                        <div class="ftt-linked-flight-header">
+                            <div class="ftt-linked-flight-title">
                                 ${legs[0].leg.depart_airport} ↔️ ${legs[0].leg.arrive_airport}
-                                <span class="srt-flight-group-badge">Group ${group.group_id.substring(3, 8)}</span>
+                                <span class="ftt-flight-group-badge">Group ${group.group_id.substring(3, 8)}</span>
                             </div>
                         </div>
                         
-                        <div class="srt-flight-legs">
+                        <div class="ftt-flight-legs">
                             ${legs.map((legData, idx) => `
-                                <div class="srt-flight-leg-badge">
+                                <div class="ftt-flight-leg-badge">
                                     ${idx === 0 ? '✈️ Outbound' : '🔄 Return'}: ${legData.leg.depart_date}
                                     <small>(${legData.event_title})</small>
                                 </div>
                             `).join('')}
                         </div>
                         
-                        <div class="srt-price-comparison">
-                            <div class="srt-price-row">
-                                <span class="srt-price-label">Individual One-Ways:</span>
-                                <span class="srt-price-value">
+                        <div class="ftt-price-comparison">
+                            <div class="ftt-price-row">
+                                <span class="ftt-price-label">Individual One-Ways:</span>
+                                <span class="ftt-price-value">
                                     $${individualTotal.toFixed(2)}
-                                    ${bestOption === 'individual' ? '<span class="srt-price-better">✓ Best Deal</span>' : ''}
+                                    ${bestOption === 'individual' ? '<span class="ftt-price-better">✓ Best Deal</span>' : ''}
                                 </span>
                             </div>
                             ${roundTripPrice > 0 ? `
-                                <div class="srt-price-row">
-                                    <span class="srt-price-label">Round-Trip:</span>
-                                    <span class="srt-price-value">
+                                <div class="ftt-price-row">
+                                    <span class="ftt-price-label">Round-Trip:</span>
+                                    <span class="ftt-price-value">
                                         $${roundTripPrice.toFixed(2)}
-                                        ${bestOption === 'roundtrip' ? '<span class="srt-price-better">✓ Best Deal</span>' : ''}
+                                        ${bestOption === 'roundtrip' ? '<span class="ftt-price-better">✓ Best Deal</span>' : ''}
                                     </span>
                                 </div>
                             ` : ''}
                             ${savings > 0 ? `
-                                <div class="srt-price-row">
-                                    <span class="srt-price-label">Potential Savings:</span>
-                                    <span class="srt-price-value srt-price-savings">
+                                <div class="ftt-price-row">
+                                    <span class="ftt-price-label">Potential Savings:</span>
+                                    <span class="ftt-price-value ftt-price-savings">
                                         💰 $${savings.toFixed(2)}
                                     </span>
                                 </div>
                             ` : ''}
                         </div>
                         
-                        <button class="srt-unlink-flight-btn" data-group-id="${group.group_id}">
+                        <button class="ftt-unlink-flight-btn" data-group-id="${group.group_id}">
                             Unlink Flights
                         </button>
                     </div>
@@ -2124,10 +2124,10 @@
             $container.html(html);
             
             // Attach unlink handlers
-            $container.find('.srt-unlink-flight-btn').on('click', function() {
+            $container.find('.ftt-unlink-flight-btn').on('click', function() {
                 const groupId = $(this).data('group-id');
                 if (confirm('Are you sure you want to unlink these flights?')) {
-                    SRT.unlinkFlightGroup(groupId);
+                    FTT.unlinkFlightGroup(groupId);
                 }
             });
         },
@@ -2211,8 +2211,8 @@
          * Load invitations (for members)
          */
         loadInvitations: function() {
-            const container = document.getElementById('srt-invitations-list');
-            const memberCodeEl = document.getElementById('srt-member-code');
+            const container = document.getElementById('ftt-invitations-list');
+            const memberCodeEl = document.getElementById('ftt-member-code');
             if (!container) return;
             
             $.ajax({
@@ -2231,23 +2231,23 @@
                     
                     // Render invitations list
                     if (Object.keys(data.invitations).length === 0) {
-                        container.innerHTML = '<p class="srt-no-invitations">No invitations yet. Generate a code to invite your parents.</p>';
+                        container.innerHTML = '<p class="ftt-no-invitations">No invitations yet. Generate a code to invite your parents.</p>';
                     } else {
-                        let html = '<h4>Your Invitations</h4><div class="srt-invitations-grid">';
+                        let html = '<h4>Your Invitations</h4><div class="ftt-invitations-grid">';
                         
                         for (const [code, invite] of Object.entries(data.invitations)) {
-                            const statusClass = 'srt-invite-' + invite.status;
+                            const statusClass = 'ftt-invite-' + invite.status;
                             const statusIcon = invite.status === 'accepted' ? '✓' : 
                                              invite.status === 'pending' ? '⏳' : 
                                              invite.status === 'revoked' ? '🚫' : '❌';
                             
                             html += `
-                                <div class="srt-invitation-card ${statusClass}">
-                                    <div class="srt-invitation-header">
-                                        <span class="srt-invitation-status">${statusIcon} ${invite.status.toUpperCase()}</span>
-                                        <code class="srt-invitation-code">${code}</code>
+                                <div class="ftt-invitation-card ${statusClass}">
+                                    <div class="ftt-invitation-header">
+                                        <span class="ftt-invitation-status">${statusIcon} ${invite.status.toUpperCase()}</span>
+                                        <code class="ftt-invitation-code">${code}</code>
                                     </div>
-                                    <div class="srt-invitation-details">
+                                    <div class="ftt-invitation-details">
                                         <p><strong>Created:</strong> ${new Date(invite.created_at).toLocaleDateString()}</p>
                             `;
                             
@@ -2258,10 +2258,10 @@
                             
                             if (invite.status === 'pending') {
                                 html += `
-                                    <button class="button button-small srt-revoke-invite" data-code="${code}">
+                                    <button class="button button-small ftt-revoke-invite" data-code="${code}">
                                         Revoke
                                     </button>
-                                    <button class="button button-small srt-copy-code" data-code-value="${code}">
+                                    <button class="button button-small ftt-copy-code" data-code-value="${code}">
                                         <span class="dashicons dashicons-clipboard"></span> Copy
                                     </button>
                                 `;
@@ -2274,17 +2274,17 @@
                         container.innerHTML = html;
                         
                         // Attach event handlers
-                        $('.srt-revoke-invite').on('click', function() {
-                            SRT.revokeInvitation($(this).data('code'));
+                        $('.ftt-revoke-invite').on('click', function() {
+                            FTT.revokeInvitation($(this).data('code'));
                         });
-                        $('.srt-copy-code[data-code-value]').on('click', function() {
-                            SRT.copyToClipboard($(this).data('code-value'));
+                        $('.ftt-copy-code[data-code-value]').on('click', function() {
+                            FTT.copyToClipboard($(this).data('code-value'));
                         });
                     }
                 },
                 error: function(xhr) {
                     console.error('Failed to load invitations:', xhr);
-                    container.innerHTML = '<p class="srt-error">Failed to load invitations.</p>';
+                    container.innerHTML = '<p class="ftt-error">Failed to load invitations.</p>';
                 }
             });
         },
@@ -2293,7 +2293,7 @@
          * Generate new invitation
          */
         generateInvitation: function() {
-            const button = $('#srt-generate-invite');
+            const button = $('#ftt-generate-invite');
             button.prop('disabled', true).text('Generating...');
             
             $.ajax({
@@ -2312,7 +2312,7 @@
                         success: function(urlResponse) {
                             const code = response.invitation.code;
                             const registrationUrl = urlResponse.url + '?invite=' + code;
-                            SRT.showInvitationModal(code, registrationUrl);
+                            FTT.showInvitationModal(code, registrationUrl);
                             button.prop('disabled', false).html('<span class="dashicons dashicons-email"></span> Generate One-Time Invite Code');
                         },
                         error: function(xhr) {
@@ -2320,7 +2320,7 @@
                             // Fallback to current domain
                             const code = response.invitation.code;
                             const registrationUrl = window.location.origin + '/sc-register/?invite=' + code;
-                            SRT.showInvitationModal(code, registrationUrl);
+                            FTT.showInvitationModal(code, registrationUrl);
                             button.prop('disabled', false).html('<span class="dashicons dashicons-email"></span> Generate One-Time Invite Code');
                         }
                     });
@@ -2339,19 +2339,19 @@
         showInvitationModal: function(code, registrationUrl) {
             // Create modal HTML
             const modalHtml = `
-                <div id="srt-invite-modal" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 999999;">
+                <div id="ftt-invite-modal" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 999999;">
                     <div style="background: white; padding: 30px; border-radius: 12px; max-width: 600px; width: 90%; box-shadow: 0 10px 40px rgba(0,0,0,0.3);">
                         <h2 style="margin-top: 0; color: #1e3a8a;">✓ Invitation Code Generated!</h2>
                         <p style="color: #666; margin-bottom: 20px;">Share this link or code with your parent to register and link to your account.</p>
                         
                         <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
                             <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #374151;">Invitation Link:</label>
-                            <input type="text" id="srt-invite-url" value="${registrationUrl}" readonly style="width: 100%; padding: 10px; border: 2px solid #e5e7eb; border-radius: 6px; font-family: monospace; font-size: 14px;">
+                            <input type="text" id="ftt-invite-url" value="${registrationUrl}" readonly style="width: 100%; padding: 10px; border: 2px solid #e5e7eb; border-radius: 6px; font-family: monospace; font-size: 14px;">
                         </div>
                         
                         <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
                             <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #374151;">Code Only:</label>
-                            <input type="text" id="srt-invite-code" value="${code}" readonly style="width: 100%; padding: 10px; border: 2px solid #e5e7eb; border-radius: 6px; font-family: monospace; font-size: 18px; text-align: center; font-weight: 700;">
+                            <input type="text" id="ftt-invite-code" value="${code}" readonly style="width: 100%; padding: 10px; border: 2px solid #e5e7eb; border-radius: 6px; font-family: monospace; font-size: 18px; text-align: center; font-weight: 700;">
                         </div>
                         
                         <div style="background: #dbeafe; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #3b82f6;">
@@ -2361,13 +2361,13 @@
                         </div>
                         
                         <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                            <button id="srt-copy-link" class="button button-primary" style="flex: 1;">
+                            <button id="ftt-copy-link" class="button button-primary" style="flex: 1;">
                                 <span class="dashicons dashicons-clipboard"></span> Copy Link
                             </button>
-                            <button id="srt-copy-code-only" class="button button-secondary" style="flex: 1;">
+                            <button id="ftt-copy-code-only" class="button button-secondary" style="flex: 1;">
                                 <span class="dashicons dashicons-clipboard"></span> Copy Code
                             </button>
-                            <button id="srt-close-modal" class="button" style="flex: 1;">
+                            <button id="ftt-close-modal" class="button" style="flex: 1;">
                                 Close
                             </button>
                         </div>
@@ -2379,8 +2379,8 @@
             $('body').append(modalHtml);
             
             // Copy link button
-            $('#srt-copy-link').on('click', function() {
-                const input = document.getElementById('srt-invite-url');
+            $('#ftt-copy-link').on('click', function() {
+                const input = document.getElementById('ftt-invite-url');
                 input.select();
                 document.execCommand('copy');
                 $(this).html('<span class="dashicons dashicons-yes"></span> Copied!').prop('disabled', true);
@@ -2390,8 +2390,8 @@
             });
             
             // Copy code button
-            $('#srt-copy-code-only').on('click', function() {
-                const input = document.getElementById('srt-invite-code');
+            $('#ftt-copy-code-only').on('click', function() {
+                const input = document.getElementById('ftt-invite-code');
                 input.select();
                 document.execCommand('copy');
                 $(this).html('<span class="dashicons dashicons-yes"></span> Copied!').prop('disabled', true);
@@ -2401,13 +2401,13 @@
             });
             
             // Close modal
-            $('#srt-close-modal, #srt-invite-modal').on('click', function(e) {
+            $('#ftt-close-modal, #ftt-invite-modal').on('click', function(e) {
                 if (e.target === this) {
-                    $('#srt-invite-modal').remove();
+                    $('#ftt-invite-modal').remove();
                 }
             });
             
-            SRT.loadInvitations(); // Reload list
+            FTT.loadInvitations(); // Reload list
         },
         
         /**
@@ -2426,7 +2426,7 @@
                 },
                 success: function(response) {
                     console.log('Invitation revoked:', response);
-                    SRT.loadInvitations(); // Reload list
+                    FTT.loadInvitations(); // Reload list
                 },
                 error: function(xhr) {
                     console.error('Failed to revoke invitation:', xhr);
@@ -2439,7 +2439,7 @@
          * Submit parent code (for parents linking to child)
          */
         submitParentCode: function(code) {
-            const messageEl = $('#srt-code-message');
+            const messageEl = $('#ftt-code-message');
             messageEl.removeClass('success error').text('Linking...').show();
             
             $.ajax({
@@ -2453,7 +2453,7 @@
                 success: function(response) {
                     console.log('Code accepted:', response);
                     messageEl.removeClass('error').addClass('success').text('✓ Successfully linked to ' + response.member.name + '!');
-                    $('#srt-parent-code-input').val('');
+                    $('#ftt-parent-code-input').val('');
                     // Reload page to show new child
                     setTimeout(function() {
                         location.reload();
@@ -2509,41 +2509,41 @@
     
     // Initialize on document ready
     $(document).ready(function() {
-        SRT.init();
+        FTT.init();
         
         // Debug: Check for invitation elements
         console.log('=== Invitation Elements Check ===');
-        console.log('srt-invitations-list exists:', $('#srt-invitations-list').length > 0);
-        console.log('srt-generate-invite button exists:', $('#srt-generate-invite').length > 0);
-        console.log('srt-member-code exists:', $('#srt-member-code').length > 0);
+        console.log('ftt-invitations-list exists:', $('#ftt-invitations-list').length > 0);
+        console.log('ftt-generate-invite button exists:', $('#ftt-generate-invite').length > 0);
+        console.log('ftt-member-code exists:', $('#ftt-member-code').length > 0);
         console.log('================================');
         
         // Initialize invitations if element exists
-        if ($('#srt-invitations-list').length) {
-            SRT.loadInvitations();
+        if ($('#ftt-invitations-list').length) {
+            FTT.loadInvitations();
         }
         
         // Generate invitation button
-        $(document).on('click', '#srt-generate-invite', function(e) {
+        $(document).on('click', '#ftt-generate-invite', function(e) {
             e.preventDefault();
-            SRT.generateInvitation();
+            FTT.generateInvitation();
         });
         
         // Parent code form
-        $(document).on('submit', '#srt-parent-code-form', function(e) {
+        $(document).on('submit', '#ftt-parent-code-form', function(e) {
             e.preventDefault();
-            const code = $('#srt-parent-code-input').val().trim().toUpperCase();
+            const code = $('#ftt-parent-code-input').val().trim().toUpperCase();
             if (code) {
-                SRT.submitParentCode(code);
+                FTT.submitParentCode(code);
             }
         });
         
         // Copy code buttons (permanent member code)
-        $(document).on('click', '.srt-copy-code[data-code-target]', function() {
+        $(document).on('click', '.ftt-copy-code[data-code-target]', function() {
             const targetId = $(this).data('code-target');
             const codeText = $('#' + targetId).text();
             if (codeText && codeText !== '---') {
-                SRT.copyToClipboard(codeText);
+                FTT.copyToClipboard(codeText);
             }
         });
     });

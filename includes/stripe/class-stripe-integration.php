@@ -18,7 +18,7 @@ if (!defined('ABSPATH')) {
 // Run: composer require stripe/stripe-php
 // Or download from: https://github.com/stripe/stripe-php
 if (!class_exists('\Stripe\Stripe')) {
-    require_once SRT_PLUGIN_DIR . 'lib/stripe-php/init.php';
+    require_once FTT_PLUGIN_DIR . 'lib/stripe-php/init.php';
 }
 
 class FTT_Stripe_Integration {
@@ -172,14 +172,20 @@ class FTT_Stripe_Integration {
             ];
         }
         
+        // Success/Cancel URLs - use domain routing for app domain
+        $app_url = class_exists('FTT_Domain_Routing') 
+            ? FTT_Domain_Routing::get_app_url() 
+            : ($settings['app_domain'] ?? home_url());
+        $app_url = rtrim($app_url, '/');
+        
         $success_url = add_query_arg(
             ['ftt_checkout' => 'success', 'session_id' => '{CHECKOUT_SESSION_ID}'],
-            home_url('/billing/success/')
+            $app_url . '/ftt-checkout-success/'
         );
         
         $cancel_url = add_query_arg(
             ['ftt_checkout' => 'cancel'],
-            home_url('/billing/pricing/')
+            $app_url . '/ftt-checkout-cancel/'
         );
         
         try {

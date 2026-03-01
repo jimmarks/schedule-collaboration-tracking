@@ -52,7 +52,7 @@ class FTT_Child_Colors {
      */
     public static function assign_color($child_id, $parent_id) {
         // Get all children for this parent
-        $children = SRT_Roles::get_children($parent_id);
+        $children = FTT_Roles::get_children($parent_id);
         
         // Find the index of this new child
         $child_index = 0;
@@ -148,7 +148,7 @@ class FTT_Child_Colors {
      * @return array Array of child data with colors
      */
     public static function get_children_with_colors($parent_id) {
-        $children = SRT_Roles::get_children($parent_id);
+        $children = FTT_Roles::get_children($parent_id);
         $result = [];
         
         foreach ($children as $child) {

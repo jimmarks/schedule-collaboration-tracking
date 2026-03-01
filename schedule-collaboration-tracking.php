@@ -3,7 +3,7 @@
  * Plugin Name: Family Travel Tracker
  * Plugin URI: https://github.com/jimmarks/schedule-collaboration-tracking
  * Description: Multi-child schedule coordination with travel planning, flight tracking, and shared calendars for families. Perfect for busy parents, co-parenting families, and children's activities.
- * Version: 1.0.23
+ * Version: 2.0.30
  * Author: Jim Marks
  * Author URI: https://github.com/jimmarks
  * License: GPL v2 or later
@@ -19,31 +19,31 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('SRT_VERSION', '1.0.23');
-define('SRT_PLUGIN_DIR', plugin_dir_path(__FILE__));
-define('SRT_PLUGIN_URL', plugin_dir_url(__FILE__));
-define('SRT_PLUGIN_BASENAME', plugin_basename(__FILE__));
+define('FTT_VERSION', '2.0.18');
+define('FTT_PLUGIN_DIR', plugin_dir_path(__FILE__));
+define('FTT_PLUGIN_URL', plugin_dir_url(__FILE__));
+define('FTT_PLUGIN_BASENAME', plugin_basename(__FILE__));
 
 // Initialize Plugin Update Checker
-require_once SRT_PLUGIN_DIR . 'lib/plugin-update-checker/plugin-update-checker.php';
+require_once FTT_PLUGIN_DIR . 'lib/plugin-update-checker/plugin-update-checker.php';
 use YahnisElsts\PluginUpdateChecker\v5\PucFactory;
 
-$srtUpdateChecker = PucFactory::buildUpdateChecker(
+$fttUpdateChecker = PucFactory::buildUpdateChecker(
     'https://github.com/jimmarks/schedule-collaboration-tracking/',
     __FILE__,
     'schedule-collaboration-tracking'
 );
 
 // Use release assets from GitHub releases
-$srtUpdateChecker->getVcsApi()->enableReleaseAssets();
+$fttUpdateChecker->getVcsApi()->enableReleaseAssets();
 
 // Set the branch to check (defaults to 'main')
-$srtUpdateChecker->setBranch('main');
+$fttUpdateChecker->setBranch('main');
 
 /**
  * Main plugin class
  */
-class Summer_Regiment_Tracker {
+class Family_Travel_Tracker {
     
     /**
      * Single instance of the class
@@ -72,27 +72,33 @@ class Summer_Regiment_Tracker {
      * Load required files
      */
     private function load_dependencies() {
-        require_once SRT_PLUGIN_DIR . 'includes/cpt.php';
-        require_once SRT_PLUGIN_DIR . 'includes/meta.php';
-        require_once SRT_PLUGIN_DIR . 'includes/rest.php';
-        require_once SRT_PLUGIN_DIR . 'includes/settings.php';
-        require_once SRT_PLUGIN_DIR . 'includes/shortcodes.php';
-        require_once SRT_PLUGIN_DIR . 'includes/pages.php';
-        require_once SRT_PLUGIN_DIR . 'includes/ical.php';
-        require_once SRT_PLUGIN_DIR . 'includes/menu.php';
-        require_once SRT_PLUGIN_DIR . 'includes/roles.php';
-        require_once SRT_PLUGIN_DIR . 'includes/registration.php';
-        require_once SRT_PLUGIN_DIR . 'includes/invitations.php';
-        require_once SRT_PLUGIN_DIR . 'includes/price-tracking.php';
-        require_once SRT_PLUGIN_DIR . 'includes/cron-setup.php';
-        require_once SRT_PLUGIN_DIR . 'includes/flight-linking.php';
-        require_once SRT_PLUGIN_DIR . 'includes/class-child-colors.php';
+        require_once FTT_PLUGIN_DIR . 'includes/cpt.php';
+        require_once FTT_PLUGIN_DIR . 'includes/meta.php';
+        require_once FTT_PLUGIN_DIR . 'includes/rest.php';
+        require_once FTT_PLUGIN_DIR . 'includes/settings.php';
+        require_once FTT_PLUGIN_DIR . 'includes/shortcodes.php';
+        require_once FTT_PLUGIN_DIR . 'includes/pages.php';
+        require_once FTT_PLUGIN_DIR . 'includes/ical.php';
+        require_once FTT_PLUGIN_DIR . 'includes/menu.php';
+        require_once FTT_PLUGIN_DIR . 'includes/roles.php';
+        require_once FTT_PLUGIN_DIR . 'includes/registration.php';
+        require_once FTT_PLUGIN_DIR . 'includes/invitations.php';
+        require_once FTT_PLUGIN_DIR . 'includes/price-tracking.php';
+        require_once FTT_PLUGIN_DIR . 'includes/cron-setup.php';
+        require_once FTT_PLUGIN_DIR . 'includes/flight-linking.php';
+        require_once FTT_PLUGIN_DIR . 'includes/class-child-colors.php';
+        require_once FTT_PLUGIN_DIR . 'includes/cors.php';
+        // Domain routing removed - single domain setup (www.familytraveltracker.app only)
+        // require_once FTT_PLUGIN_DIR . 'includes/domain-routing.php';
         
-        // Stripe & Billing (only if Stripe library is available)
-        if (file_exists(SRT_PLUGIN_DIR . 'lib/stripe-php/init.php')) {
-            require_once SRT_PLUGIN_DIR . 'includes/stripe/class-stripe-integration.php';
-            require_once SRT_PLUGIN_DIR . 'includes/stripe/class-stripe-webhooks.php';
-            require_once SRT_PLUGIN_DIR . 'includes/billing/class-billing-manager.php';
+        // Stripe Settings (always load - needed to configure API keys)
+        require_once FTT_PLUGIN_DIR . 'includes/stripe/class-stripe-settings.php';
+        
+        // Stripe Integration & Billing (only if Stripe library is available)
+        if (file_exists(FTT_PLUGIN_DIR . 'lib/stripe-php/init.php')) {
+            require_once FTT_PLUGIN_DIR . 'includes/stripe/class-stripe-integration.php';
+            require_once FTT_PLUGIN_DIR . 'includes/stripe/class-stripe-webhooks.php';
+            require_once FTT_PLUGIN_DIR . 'includes/billing/class-billing-manager.php';
         }
     }
     
@@ -106,23 +112,25 @@ class Summer_Regiment_Tracker {
         add_action('plugins_loaded', array($this, 'load_textdomain'));
         add_action('plugins_loaded', array($this, 'check_pages'));
         add_action('wp_enqueue_scripts', array($this, 'enqueue_scripts'));
-        add_action('admin_notices', array('SRT_Pages', 'get_missing_pages_notice'));
-        add_action('admin_init', array('SRT_Pages', 'handle_recreate_pages'));
+        add_action('admin_notices', array('FTT_Pages', 'get_missing_pages_notice'));
+        add_action('admin_init', array('FTT_Pages', 'handle_recreate_pages'));
         
         // Initialize all component classes
-        SRT_CPT::init();
-        SRT_Meta::init();
-        SRT_REST::init();
-        SRT_Settings::init();
-        SRT_Shortcodes::init();
-        SRT_iCal::init();
-        SRT_Menu::init();
-        SRT_Roles::init();
-        SRT_Registration::init();
-        SRT_Invitations::init();
-        SRT_Price_Tracking::init();
-        SRT_Cron_Setup::init();
-        SRT_Flight_Linking::init();
+        FTT_CPT::init();
+        FTT_Meta::init();
+        FTT_REST::init();
+        FTT_Settings::init();
+        FTT_Shortcodes::init();
+        FTT_iCal::init();
+        FTT_Menu::init();
+        FTT_Roles::init();
+        FTT_Registration::init();
+        FTT_Invitations::init();
+        FTT_Price_Tracking::init();
+        FTT_Cron_Setup::init();
+        FTT_Flight_Linking::init();
+        FTT_CORS::init();
+        // FTT_Domain_Routing::init(); // Disabled - single domain setup
     }
     
     /**
@@ -130,7 +138,7 @@ class Summer_Regiment_Tracker {
      */
     public function activate() {
         // Register CPT
-        SRT_CPT::register_post_type();
+        FTT_CPT::register_post_type();
         
         // Flush rewrite rules
         flush_rewrite_rules();
@@ -138,17 +146,16 @@ class Summer_Regiment_Tracker {
         // Set default options
         $defaults = array(
             'require_login' => false,
-            'default_home_airport' => '',
             'default_timezone' => wp_timezone_string(),
-            'event_types' => SRT_Settings::get_default_event_types(),
+            'event_types' => FTT_Settings::get_default_event_types(),
         );
         
-        if (!get_option('srt_settings')) {
-            add_option('srt_settings', $defaults);
+        if (!get_option('ftt_settings')) {
+            add_option('ftt_settings', $defaults);
         }
         
         // Create plugin pages
-        SRT_Pages::create_pages();
+        FTT_Pages::create_pages();
     }
     
     /**
@@ -168,8 +175,8 @@ class Summer_Regiment_Tracker {
         }
         
         // Check if we need to create any missing pages
-        if (!SRT_Pages::pages_exist()) {
-            SRT_Pages::create_pages();
+        if (!FTT_Pages::pages_exist()) {
+            FTT_Pages::create_pages();
             flush_rewrite_rules();
         }
         
@@ -185,13 +192,13 @@ class Summer_Regiment_Tracker {
      */
     private function migrate_member_ids() {
         // Check if migration already done
-        if (get_option('srt_member_id_migration_done')) {
+        if (get_option('ftt_member_id_migration_done')) {
             return;
         }
         
         // Get all events without member_id
         $events = get_posts(array(
-            'post_type' => 'srt_event',
+            'post_type' => 'ftt_event',
             'posts_per_page' => -1,
             'post_status' => 'any',
             'meta_query' => array(
@@ -208,7 +215,7 @@ class Summer_Regiment_Tracker {
         }
         
         // Mark migration as done
-        update_option('srt_member_id_migration_done', true);
+        update_option('ftt_member_id_migration_done', true);
     }
     
     /**
@@ -217,13 +224,13 @@ class Summer_Regiment_Tracker {
      */
     private function upgrade_member_capabilities() {
         // Check if upgrade already done
-        if (get_option('srt_member_caps_upgraded_v1_0_8')) {
+        if (get_option('ftt_member_caps_upgraded_v1_0_8')) {
             return;
         }
         
         // Get all members
         $members = get_users(array(
-            'meta_key' => 'srt_is_member',
+            'meta_key' => 'ftt_is_member',
             'meta_value' => '1',
         ));
         
@@ -239,14 +246,14 @@ class Summer_Regiment_Tracker {
         }
         
         // Mark upgrade as done
-        update_option('srt_member_caps_upgraded_v1_0_8', true);
+        update_option('ftt_member_caps_upgraded_v1_0_8', true);
     }
     
     /**
      * Load plugin textdomain
      */
     public function load_textdomain() {
-        load_plugin_textdomain('schedule-collaboration-tracking', false, dirname(SRT_PLUGIN_BASENAME) . '/languages');
+        load_plugin_textdomain('schedule-collaboration-tracking', false, dirname(FTT_PLUGIN_BASENAME) . '/languages');
     }
     
     /**
@@ -260,7 +267,7 @@ class Summer_Regiment_Tracker {
         }
         
         $has_shortcode = false;
-        $shortcodes = array('srt_calendar', 'srt_event_form', 'srt_dashboard', 'srt_event_list');
+        $shortcodes = array('ftt_calendar', 'ftt_event_form', 'ftt_dashboard', 'ftt_event_list');
         
         foreach ($shortcodes as $shortcode) {
             if (has_shortcode($post->post_content, $shortcode)) {
@@ -275,36 +282,44 @@ class Summer_Regiment_Tracker {
         
         // Enqueue styles
         wp_enqueue_style(
-            'srt-styles',
-            SRT_PLUGIN_URL . 'assets/css/styles.css',
+            'ftt-styles',
+            FTT_PLUGIN_URL . 'assets/css/styles.css',
             array(),
-            SRT_VERSION
+            FTT_VERSION
+        );
+        
+        // Enqueue Astra theme color overrides
+        wp_enqueue_style(
+            'ftt-astra-colors',
+            FTT_PLUGIN_URL . 'assets/css/ftt-astra-colors.css',
+            array('ftt-styles'),
+            FTT_VERSION
         );
         
         // Add dynamic event type colors
-        $settings = get_option('srt_settings', array());
+        $settings = get_option('ftt_settings', array());
         $event_types = $settings['event_types'] ?? array();
         
         if (!empty($event_types)) {
             $custom_css = '';
             foreach ($event_types as $key => $type) {
                 $color = $type['color'] ?? '#2196F3';
-                $custom_css .= ".srt-event-type-{$key} { background-color: {$color}; border-color: {$color}; }\n";
-                $custom_css .= ".srt-legend-color.srt-event-type-{$key} { background-color: {$color}; }\n";
+                $custom_css .= ".ftt-event-type-{$key} { background-color: {$color}; border-color: {$color}; }\n";
+                $custom_css .= ".ftt-legend-color.ftt-event-type-{$key} { background-color: {$color}; }\n";
             }
-            wp_add_inline_style('srt-styles', $custom_css);
+            wp_add_inline_style('ftt-styles', $custom_css);
         }
         
         // Enqueue FullCalendar from CDN
         wp_enqueue_style(
-            'srt-fullcalendar',
+            'ftt-fullcalendar',
             'https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.css',
             array(),
             '6.1.10'
         );
         
         wp_enqueue_script(
-            'srt-fullcalendar',
+            'ftt-fullcalendar',
             'https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js',
             array(),
             '6.1.10',
@@ -313,22 +328,22 @@ class Summer_Regiment_Tracker {
         
         // Enqueue main script
         wp_enqueue_script(
-            'srt-main',
-            SRT_PLUGIN_URL . 'assets/js/main.js',
-            array('jquery', 'srt-fullcalendar'),
-            SRT_VERSION,
+            'ftt-main',
+            FTT_PLUGIN_URL . 'assets/js/main.js',
+            array('jquery', 'ftt-fullcalendar'),
+            FTT_VERSION,
             true
         );
         
         // Localize script
-        $settings = get_option('srt_settings', array());
-        wp_localize_script('srt-main', 'srtData', array(
-            'pluginUrl' => SRT_PLUGIN_URL,
-            'restUrl' => rest_url('srt/v1/'),
+        $settings = get_option('ftt_settings', array());
+        wp_localize_script('ftt-main', 'fttData', array(
+            'pluginUrl' => FTT_PLUGIN_URL,
+            'restUrl' => rest_url('ftt/v1/'),
             'nonce' => wp_create_nonce('wp_rest'),
             'isAdmin' => current_user_can('edit_posts'),
             'timezone' => wp_timezone_string(),
-            'eventFormUrl' => SRT_Pages::get_page_url('event_form'),
+            'eventFormUrl' => FTT_Pages::get_page_url('event_form'),
             'geocodingProvider' => $settings['geocoding_provider'] ?? 'none',
             'mapboxApiKey' => $settings['mapbox_api_key'] ?? '',
             'googlePlacesApiKey' => $settings['google_places_api_key'] ?? '',
@@ -339,9 +354,9 @@ class Summer_Regiment_Tracker {
 /**
  * Initialize the plugin
  */
-function srt_init() {
-    return Summer_Regiment_Tracker::get_instance();
+function ftt_init() {
+    return Family_Travel_Tracker::get_instance();
 }
 
 // Start the plugin
-srt_init();
+ftt_init();

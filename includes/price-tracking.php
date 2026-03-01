@@ -13,13 +13,13 @@ if (!defined('ABSPATH')) {
 /**
  * SRT Price Tracking Class
  */
-class SRT_Price_Tracking {
+class FTT_Price_Tracking {
     
     /**
      * Get notification email address from settings
      */
     public static function get_notification_email() {
-        $settings = get_option('srt_settings', array());
+        $settings = get_option('ftt_settings', array());
         $email = $settings['notification_from_email'] ?? '';
         return !empty($email) ? $email : get_option('admin_email');
     }
@@ -28,7 +28,7 @@ class SRT_Price_Tracking {
      * Get notification sender name from settings  
      */
     public static function get_notification_from_name() {
-        $settings = get_option('srt_settings', array());
+        $settings = get_option('ftt_settings', array());
         $name = $settings['notification_from_name'] ?? '';
         return !empty($name) ? $name : get_bloginfo('name');
     }
@@ -60,12 +60,12 @@ class SRT_Price_Tracking {
      * Upgrade database schema for existing installations
      */
     public static function upgrade_schema() {
-        if (get_option('srt_price_tracking_schema_v2')) {
+        if (get_option('ftt_price_tracking_schema_v2')) {
             return;
         }
         
         global $wpdb;
-        $table_name = $wpdb->prefix . 'srt_price_history';
+        $table_name = $wpdb->prefix . 'ftt_price_history';
         
         // Check if table exists
         $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table_name'");
@@ -82,7 +82,7 @@ class SRT_Price_Tracking {
             error_log('SRT: Added google_insights column to price_history table');
         }
         
-        update_option('srt_price_tracking_schema_v2', true);
+        update_option('ftt_price_tracking_schema_v2', true);
     }
     
     /**
@@ -107,7 +107,7 @@ class SRT_Price_Tracking {
         
         // Deactivate alert
         global $wpdb;
-        $alerts_table = $wpdb->prefix . 'srt_price_alerts';
+        $alerts_table = $wpdb->prefix . 'ftt_price_alerts';
         $result = $wpdb->update(
             $alerts_table,
             array('is_active' => 0),
@@ -157,7 +157,7 @@ class SRT_Price_Tracking {
         $charset_collate = $wpdb->get_charset_collate();
         
         // Price history table
-        $table_name = $wpdb->prefix . 'srt_price_history';
+        $table_name = $wpdb->prefix . 'ftt_price_history';
         
         $sql = "CREATE TABLE IF NOT EXISTS $table_name (
             id bigint(20) NOT NULL AUTO_INCREMENT,
@@ -179,7 +179,7 @@ class SRT_Price_Tracking {
         dbDelta($sql);
         
         // Price alerts table
-        $alerts_table = $wpdb->prefix . 'srt_price_alerts';
+        $alerts_table = $wpdb->prefix . 'ftt_price_alerts';
         
         $sql_alerts = "CREATE TABLE IF NOT EXISTS $alerts_table (
             id bigint(20) NOT NULL AUTO_INCREMENT,
@@ -206,7 +206,7 @@ class SRT_Price_Tracking {
      */
     public static function get_price_history($origin, $destination, $depart_date, $days = 30) {
         global $wpdb;
-        $table_name = $wpdb->prefix . 'srt_price_history';
+        $table_name = $wpdb->prefix . 'ftt_price_history';
         
         $since = date('Y-m-d H:i:s', strtotime("-{$days} days"));
         
@@ -231,7 +231,7 @@ class SRT_Price_Tracking {
      */
     public static function get_price_stats($origin, $destination, $depart_date) {
         global $wpdb;
-        $table_name = $wpdb->prefix . 'srt_price_history';
+        $table_name = $wpdb->prefix . 'ftt_price_history';
         
         $stats = $wpdb->get_row($wpdb->prepare(
             "SELECT 
@@ -258,7 +258,7 @@ class SRT_Price_Tracking {
      */
     public static function record_price($event_id, $leg_index, $origin, $destination, $depart_date, $price, $source = 'manual', $raw_data = null) {
         global $wpdb;
-        $table_name = $wpdb->prefix . 'srt_price_history';
+        $table_name = $wpdb->prefix . 'ftt_price_history';
         
         // Don't record invalid prices (0 or negative = API error/glitch)
         if (!$price || $price <= 0) {
@@ -320,7 +320,7 @@ class SRT_Price_Tracking {
      */
     public static function check_linked_flight_prices($group_id, $api_key) {
         // Get all legs in this group
-        $legs = SRT_Flight_Linking::get_flight_group_legs($group_id);
+        $legs = FTT_Flight_Linking::get_flight_group_legs($group_id);
         
         if (count($legs) < 2) {
             return null;
@@ -418,7 +418,7 @@ class SRT_Price_Tracking {
         $prices_recorded = 0;
         
         // Get API credentials
-        $settings = get_option('srt_settings', array());
+        $settings = get_option('ftt_settings', array());
         $api_key = $settings['serpapi_api_key'] ?? '';
         
         if (empty($api_key)) {
@@ -431,7 +431,7 @@ class SRT_Price_Tracking {
         
         // Base query arguments - get all future flight events
         $args = array(
-            'post_type'      => 'srt_event',
+            'post_type'      => 'ftt_event',
             'posts_per_page' => -1,
             'post_status'    => 'publish',
             'meta_query'     => array(
@@ -452,11 +452,11 @@ class SRT_Price_Tracking {
         // Get current user for filtering (if manual check from parent)
         if ($source === 'manual' && is_user_logged_in()) {
             $current_user_id = get_current_user_id();
-            $is_parent = SRT_Roles::is_parent($current_user_id);
+            $is_parent = FTT_Roles::is_parent($current_user_id);
             
             if ($is_parent) {
                 // Include events for all children
-                $children = SRT_Roles::get_children($current_user_id);
+                $children = FTT_Roles::get_children($current_user_id);
                 
                 if (!empty($children)) {
                     // Include events for children, parent, empty, or unassigned
@@ -600,7 +600,7 @@ class SRT_Price_Tracking {
      * Fetch flight price from SerpAPI (Google Flights) - Public method
      */
     public static function fetch_flight_price_serpapi($origin, $destination, $date, $return_date = null) {
-        $settings = get_option('srt_settings', array());
+        $settings = get_option('ftt_settings', array());
         $api_key = $settings['serpapi_api_key'] ?? '';
         
         if (empty($api_key)) {
@@ -703,7 +703,7 @@ class SRT_Price_Tracking {
      */
     public static function check_price_alerts($event_id, $leg_index, $current_price) {
         global $wpdb;
-        $alerts_table = $wpdb->prefix . 'srt_price_alerts';
+        $alerts_table = $wpdb->prefix . 'ftt_price_alerts';
         
         // Get active alerts for this flight
         $alerts = $wpdb->get_results($wpdb->prepare(
@@ -782,7 +782,7 @@ class SRT_Price_Tracking {
      */
     private static function get_previous_price($event_id, $leg_index) {
         global $wpdb;
-        $table_name = $wpdb->prefix . 'srt_price_history';
+        $table_name = $wpdb->prefix . 'ftt_price_history';
         
         $result = $wpdb->get_var($wpdb->prepare(
             "SELECT price FROM $table_name 
@@ -819,7 +819,7 @@ class SRT_Price_Tracking {
         
         // Get latest price record to check for Google insights
         global $wpdb;
-        $table_name = $wpdb->prefix . 'srt_price_history';
+        $table_name = $wpdb->prefix . 'ftt_price_history';
         $latest_record = $wpdb->get_row($wpdb->prepare(
             "SELECT google_insights FROM $table_name 
             WHERE event_id = %d AND leg_index = %d 
@@ -854,7 +854,7 @@ class SRT_Price_Tracking {
         $result = wp_mail($user->user_email, $subject, $message, $headers);
         error_log("SRT: Email send result: " . ($result ? 'success' : 'failed'));
         
-        do_action('srt_price_alert_sent', $alert, $current_price, $user, $event);
+        do_action('ftt_price_alert_sent', $alert, $current_price, $user, $event);
     }
     
     /**
@@ -958,7 +958,7 @@ class SRT_Price_Tracking {
      */
     public static function create_alert($user_id, $event_id, $leg_index, $alert_type, $threshold_price = null, $threshold_percent = null) {
         global $wpdb;
-        $alerts_table = $wpdb->prefix . 'srt_price_alerts';
+        $alerts_table = $wpdb->prefix . 'ftt_price_alerts';
         
         $wpdb->insert(
             $alerts_table,
@@ -983,7 +983,7 @@ class SRT_Price_Tracking {
      */
     public static function get_user_alerts($user_id, $active_only = true) {
         global $wpdb;
-        $alerts_table = $wpdb->prefix . 'srt_price_alerts';
+        $alerts_table = $wpdb->prefix . 'ftt_price_alerts';
         
         $where = $wpdb->prepare("WHERE user_id = %d", $user_id);
         if ($active_only) {
@@ -1005,7 +1005,7 @@ class SRT_Price_Tracking {
      */
     public static function validate_alert_token($alert_id, $token) {
         global $wpdb;
-        $alerts_table = $wpdb->prefix . 'srt_price_alerts';
+        $alerts_table = $wpdb->prefix . 'ftt_price_alerts';
         
         $alert = $wpdb->get_row($wpdb->prepare(
             "SELECT * FROM $alerts_table WHERE id = %d",
@@ -1025,7 +1025,7 @@ class SRT_Price_Tracking {
      */
     public static function send_alert_confirmation($alert_id) {
         global $wpdb;
-        $alerts_table = $wpdb->prefix . 'srt_price_alerts';
+        $alerts_table = $wpdb->prefix . 'ftt_price_alerts';
         
         $alert = $wpdb->get_row($wpdb->prepare(
             "SELECT * FROM $alerts_table WHERE id = %d",
@@ -1205,7 +1205,7 @@ class SRT_Price_Tracking {
      */
     public static function process_daily_digests() {
         global $wpdb;
-        $alerts_table = $wpdb->prefix . 'srt_price_alerts';
+        $alerts_table = $wpdb->prefix . 'ftt_price_alerts';
         
         // FIRST: Run price check to ensure we have fresh data with Google insights
         error_log('[SRT Daily Digest] Running price check before sending emails...');
@@ -1588,4 +1588,4 @@ class SRT_Price_Tracking {
 }
 
 // Initialize
-SRT_Price_Tracking::init();
+FTT_Price_Tracking::init();

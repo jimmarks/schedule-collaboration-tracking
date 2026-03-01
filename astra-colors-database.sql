@@ -1,0 +1,24 @@
+-- Astra Theme Color Settings for Family Travel Tracker
+-- SAFER OPTION: Use the PHP script (apply-astra-colors.php) instead of direct SQL
+-- Or use WP-CLI commands below:
+
+-- WP-CLI Commands (Recommended - Run these in terminal):
+-- wp theme mod set theme-color "#6A3E8E"
+-- wp theme mod set link-color "#6A3E8E"
+-- wp theme mod set text-color "#333333"
+-- wp theme mod set theme-color-hover "#5B347A"
+-- wp theme mod set link-h-color "#5B347A"
+-- wp theme mod set heading-base-color "#6A3E8E"
+-- wp theme mod set button-color "#FFFFFF"
+-- wp theme mod set button-h-color "#FFFFFF"
+-- wp theme mod set button-bg-color "#F05A5A"
+-- wp theme mod set button-bg-h-color "#E84E4E"
+-- wp theme mod set secondary-button-color "#FFFFFF"
+-- wp theme mod set secondary-button-h-color "#FFFFFF"
+-- wp theme mod set secondary-button-bg-color "#6A3E8E"
+-- wp theme mod set secondary-button-bg-h-color "#5B347A"
+-- wp theme mod set border-color "#E9E3F2"
+
+-- Manual Customizer Path (if you prefer clicking):
+-- Appearance → Customize → Global → Colors
+-- Set each color value manually using the hex codes above

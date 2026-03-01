@@ -10,7 +10,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class SRT_Cron_Setup {
+class FTT_Cron_Setup {
     
     /**
      * Initialize hooks
@@ -27,21 +27,21 @@ class SRT_Cron_Setup {
      */
     public static function add_admin_page() {
         add_submenu_page(
-            'edit.php?post_type=srt_event',
+            'edit.php?post_type=ftt_event',
             'Cron Setup',
             'Cron Setup',
             'manage_options',
-            'srt-cron-setup',
+            'ftt-cron-setup',
             array(__CLASS__, 'render_page')
         );
         
         // Add documentation page
         add_submenu_page(
-            'edit.php?post_type=srt_event',
+            'edit.php?post_type=ftt_event',
             'Cron Documentation',
             'Cron Docs',
             'manage_options',
-            'srt-cron-docs',
+            'ftt-cron-docs',
             array(__CLASS__, 'render_docs_page')
         );
     }
@@ -75,7 +75,7 @@ class SRT_Cron_Setup {
         $status['digest_next_run'] = $digest_timestamp;
         
         // Check if SerpAPI key is configured
-        $settings = get_option('srt_settings', array());
+        $settings = get_option('ftt_settings', array());
         $status['price_tracking_enabled'] = !empty($settings['serpapi_api_key']);
         
         return $status;
@@ -87,19 +87,19 @@ class SRT_Cron_Setup {
      * Handle manual price check
      */
     public static function handle_manual_price_check() {
-        check_admin_referer('srt_manual_check', 'srt_check_nonce');
+        check_admin_referer('ftt_manual_check', 'srt_check_nonce');
         
         if (!current_user_can('manage_options')) {
             wp_die('Unauthorized');
         }
         
         // Trigger the price check with manual flag
-        SRT_Price_Tracking::check_all_prices('manual');
+        FTT_Price_Tracking::check_all_prices('manual');
         
         wp_redirect(add_query_arg(array(
-            'page' => 'srt-cron-setup',
+            'page' => 'ftt-cron-setup',
             'manual_check' => 'success',
-        ), admin_url('edit.php?post_type=srt_event')));
+        ), admin_url('edit.php?post_type=ftt_event')));
         exit;
     }
     
@@ -108,7 +108,7 @@ class SRT_Cron_Setup {
      */
     public static function cron_status_notice() {
         $screen = get_current_screen();
-        if ($screen->post_type !== 'srt_event' && $screen->id !== 'srt_event_page_srt-cron-setup') {
+        if ($screen->post_type !== 'ftt_event' && $screen->id !== 'ftt_event_page_ftt-cron-setup') {
             return;
         }
         
@@ -121,7 +121,7 @@ class SRT_Cron_Setup {
                 <p>
                     <strong>Price Tracking Setup:</strong> 
                     For reliable automated price checking, we recommend setting up server cron. 
-                    <a href="<?php echo admin_url('edit.php?post_type=srt_event&page=srt-cron-setup'); ?>">
+                    <a href="<?php echo admin_url('edit.php?post_type=ftt_event&page=ftt-cron-setup'); ?>">
                         Click here to set up server cron
                     </a>
                 </p>
@@ -135,7 +135,7 @@ class SRT_Cron_Setup {
      */
     public static function render_page() {
         $status = self::get_cron_status();
-        $script_path = SRT_PLUGIN_DIR . 'setup-cron.sh';
+        $script_path = FTT_PLUGIN_DIR . 'setup-cron.sh';
         $wp_path = ABSPATH;
         
         ?>
@@ -245,8 +245,8 @@ class SRT_Cron_Setup {
                 <h2>Manual Testing</h2>
                 <p>Trigger a price check right now to test the system:</p>
                 <form method="post" action="<?php echo admin_url('admin-post.php'); ?>" style="margin-top: 15px;">
-                    <?php wp_nonce_field('srt_manual_check', 'srt_check_nonce'); ?>
-                    <input type="hidden" name="action" value="srt_manual_price_check">
+                    <?php wp_nonce_field('ftt_manual_check', 'srt_check_nonce'); ?>
+                    <input type="hidden" name="action" value="ftt_manual_price_check">
                     <button type="submit" class="button button-primary button-large">
                         🔍 Run Price Check Now
                     </button>
@@ -305,8 +305,8 @@ class SRT_Cron_Setup {
                     </ul>
                     
                     <form method="post" action="<?php echo admin_url('admin-post.php'); ?>">
-                        <?php wp_nonce_field('srt_setup_cron', 'srt_cron_nonce'); ?>
-                        <input type="hidden" name="action" value="srt_setup_cron">
+                        <?php wp_nonce_field('ftt_setup_cron', 'srt_cron_nonce'); ?>
+                        <input type="hidden" name="action" value="ftt_setup_cron">
                         <button type="submit" class="button button-primary button-large">
                             🚀 Run Automated Setup
                         </button>
@@ -335,7 +335,7 @@ bash wp-content/plugins/summer-regiment-tracker/setup-cron.sh</pre>
                 <pre style="background: #f0f0f0; padding: 10px; overflow-x: auto;">wp cron event list</pre>
                 
                 <p>
-                    <a href="<?php echo admin_url('edit.php?post_type=srt_event&page=srt-cron-docs'); ?>" class="button">
+                    <a href="<?php echo admin_url('edit.php?post_type=ftt_event&page=ftt-cron-docs'); ?>" class="button">
                         📖 View Full Documentation
                     </a>
                 </p>
@@ -351,7 +351,7 @@ wp cron event run srt_check_flight_prices</pre>
                 <pre style="background: #f0f0f0; padding: 10px; overflow-x: auto;">cd <?php echo esc_html($wp_path); ?>
 wp cron event run srt_daily_digest</pre>
                 
-                <p>Check price results in the database table <code>wp_srt_price_history</code>.</p>
+                <p>Check price results in the database table <code>wp_ftt_price_history</code>.</p>
             </div>
         </div>
         <?php
@@ -362,7 +362,7 @@ wp cron event run srt_daily_digest</pre>
      */
     public static function handle_setup_cron() {
         // Verify nonce and permissions
-        if (!isset($_POST['srt_cron_nonce']) || !wp_verify_nonce($_POST['srt_cron_nonce'], 'srt_setup_cron')) {
+        if (!isset($_POST['srt_cron_nonce']) || !wp_verify_nonce($_POST['srt_cron_nonce'], 'ftt_setup_cron')) {
             wp_die('Security check failed');
         }
         
@@ -370,7 +370,7 @@ wp cron event run srt_daily_digest</pre>
             wp_die('Insufficient permissions');
         }
         
-        $script_path = SRT_PLUGIN_DIR . 'setup-cron.sh';
+        $script_path = FTT_PLUGIN_DIR . 'setup-cron.sh';
         
         if (!file_exists($script_path)) {
             wp_die('Setup script not found');
@@ -392,11 +392,11 @@ wp cron event run srt_daily_digest</pre>
         // Redirect back with result
         $redirect_url = add_query_arg(
             array(
-                'page' => 'srt-cron-setup',
+                'page' => 'ftt-cron-setup',
                 'setup_result' => $return_var === 0 ? 'success' : 'error',
                 'output' => urlencode(implode("\n", $output))
             ),
-            admin_url('edit.php?post_type=srt_event')
+            admin_url('edit.php?post_type=ftt_event')
         );
         
         wp_redirect($redirect_url);
@@ -625,14 +625,14 @@ define('WP_DEBUG_DISPLAY', false);</pre>
                 <p>Shows all scheduled WordPress events including <code>srt_check_flight_prices</code> and <code>srt_daily_digest</code>.</p>
                 
                 <h3>View Price History</h3>
-                <p>Check database table <code>wp_srt_price_history</code>:</p>
-                <pre style="background: #f0f0f0; padding: 10px;">SELECT * FROM wp_srt_price_history 
+                <p>Check database table <code>wp_ftt_price_history</code>:</p>
+                <pre style="background: #f0f0f0; padding: 10px;">SELECT * FROM wp_ftt_price_history 
 ORDER BY checked_at DESC 
 LIMIT 20;</pre>
                 
                 <h3>View Active Alerts</h3>
-                <p>Check database table <code>wp_srt_price_alerts</code>:</p>
-                <pre style="background: #f0f0f0; padding: 10px;">SELECT * FROM wp_srt_price_alerts 
+                <p>Check database table <code>wp_ftt_price_alerts</code>:</p>
+                <pre style="background: #f0f0f0; padding: 10px;">SELECT * FROM wp_ftt_price_alerts 
 WHERE is_active = 1;</pre>
             </div>
             
@@ -663,7 +663,7 @@ sleep(2);</pre>
             </div>
             
             <p style="text-align: center; margin-top: 30px;">
-                <a href="<?php echo admin_url('edit.php?post_type=srt_event&page=srt-cron-setup'); ?>" class="button button-primary">
+                <a href="<?php echo admin_url('edit.php?post_type=ftt_event&page=ftt-cron-setup'); ?>" class="button button-primary">
                     ← Back to Cron Setup
                 </a>
             </p>

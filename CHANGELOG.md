@@ -5,6 +5,232 @@ All notable changes to the Summer Regiment Tracker plugin will be documented in 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.18] - 2026-02-27
+
+### 🎯 Database Tables Rebrand
+
+**Final rebrand step**: Renamed database tables and related identifiers from SRT to FTT prefix.
+
+### Changed - Database Schema
+- **Table Names**: 
+  - `wp_srt_price_history` → `wp_ftt_price_history`
+  - `wp_srt_price_alerts` → `wp_ftt_price_alerts`
+- **Option Names**: `srt_price_tracking_schema_v2` → `ftt_price_tracking_schema_v2`
+- **WordPress Hooks**: `srt_price_alert_sent` → `ftt_price_alert_sent`
+
+### Changed - Documentation
+- Updated all SQL examples in cron documentation to reference new table names
+- Updated inline code comments to reference FTT tables
+- Updated CSS class examples in README documentation
+
+### Changed - Templates (Additional)
+- **CSS Classes**: Fixed remaining template CSS classes:
+  - `srt-alerts-container` → `ftt-alerts-container` (2 occurrences in dashboard.php)
+  - `srt-setting-action` → `ftt-setting-action` (3 occurrences in dashboard.php)
+  - `srt-copy-code` → `ftt-copy-code` (dashboard.php)
+  - `srt-member-code` → `ftt-member-code` (dashboard.php)
+- **JavaScript Functions**: 
+  - `srtCopyUrl()` → `fttCopyUrl()` and its onclick handler (calendar-subscribe.php)
+
+### Migration Notes
+**New Installations Only**: This version is for NEW deployments only. The table names are set during initial activation. No migration script needed since this is a new rollout with no existing data.
+
+### Files Updated
+- `includes/price-tracking.php` - Table creation and all queries
+- `includes/rest.php` - API endpoints that query price data
+- `includes/flight-linking.php` - Flight price lookups
+- `includes/cron-setup.php` - Documentation examples
+- `test-digest.php` - Daily digest test script
+
+### Technical Impact
+- Fresh installs: Tables created with `ftt_` prefix automatically
+- Zero backward compatibility concerns (new rollout)
+- All price tracking functionality preserved
+- Database queries unchanged except for table names
+
+---
+
+## [2.0.17] - 2026-02-27
+
+### 🎯 Complete Rebrand: All User-Facing Elements
+
+**Critical Update**: This completes the rebrand started in v2.0.12. All user-facing elements now use FTT (Family Travel Tracker) prefix instead of SRT (Schedule Regiment Tracker).
+
+### Changed - User Interface
+- **CSS Classes**: All `.srt-*` classes → `.ftt-*` (16 classes in JavaScript, multiple in templates)
+- **CSS Animation**: `@keyframes srt-spin` → `@keyframes ftt-spin`
+- **Form Fields**: All `srt_*` form field names → `ftt_*`
+- **Shortcode**: `[srt_register]` → `[ftt_register]`
+- **Menu Items**: Menu IDs and CSS classes from `srt-` → `ftt-`
+
+### Changed - Admin Interface  
+- **Nonce Names**: All security nonces updated (e.g., `srt_manage_users` → `ftt_manage_users`)
+- **Admin Pages**: Page slugs from `srt-*` → `ftt-*` (manage-users, settings, etc.)
+- **Screen IDs**: `edit-srt_event` → `edit-ftt_event`
+- **Form Actions**: POST action names from `srt_*` → `ftt_*`
+- **Transients**: Error/message transients from `srt_*` → `ftt_*`
+
+### Preserved for Compatibility
+**These were NOT changed to maintain backward compatibility with existing databases:**
+- ✅ Database Tables: `wp_srt_price_history`, `wp_srt_price_alerts` (unchanged)
+- ✅ User Meta Keys: `srt_children`, `srt_parents`, `srt_instrument`, etc. (unchanged)
+- ✅ WordPress Options: `srt_page_ids`, `srt_cron_log`, etc. (unchanged)
+- ✅ WP Hooks: `srt_check_flight_prices`, `srt_daily_digest`, etc. (unchanged)
+
+### Files Updated
+- **Assets**: `assets/css/styles.css`, `assets/js/main.js`
+- **Templates**: All 8 template files (login, registration, dashboard, calendar, etc.)
+- **Includes**: `roles.php`, `registration.php`, `pages.php`, `menu.php`, `cron-setup.php`, `cpt.php`, `shortcodes.php`
+
+### Migration from v2.0.16
+- Existing users: Plugin auto-updates, no database migration needed
+- Custom templates: Update any custom code using old `.srt-*` CSS classes
+- Shortcodes: Replace `[srt_register]` with `[ftt_register]` in pages/posts
+
+### Impact
+- **Users**: Seamless - all functionality preserved, visual consistency improved
+- **Developers**: CSS classes and form fields now match FTT branding
+- **Database**: Zero impact - all data structures backward compatible
+
+---
+
+## [2.0.16] - 2026-02-27
+
+### 🐛 Critical Bug Fix: Settings Not Persisting
+
+**Issue**: Settings pages failed to save - all configuration changes were lost on submit
+
+### Fixed
+- **Settings Form Fields**: Changed all `srt_settings` input names to `ftt_settings` in [includes/settings.php](includes/settings.php)
+- **Settings Group**: Changed `srt_settings_group` to `ftt_settings_group`
+- **Section IDs**: Changed all `srt_*_section` to `ftt_*_section` (general, api, events, calendar)
+- **Page Slugs**: Changed `srt-settings` to `ftt-settings` throughout
+- **JavaScript Functions**: Renamed `srtRemoveEventType` → `fttRemoveEventType`, `srtDeleteToken` → `fttDeleteToken`
+- **Geocoding Provider ID**: Changed `srt_geocoding_provider` to `ftt_geocoding_provider`
+- **Stripe Settings Hook**: Fixed page hook from `srt_event_page_ftt-billing-settings` to `ftt_event_page_ftt-billing-settings`
+- **Cron Setup Pages**: Changed menu slugs from `srt-cron-setup`/`srt-cron-docs` to `ftt-cron-setup`/`ftt-cron-docs`
+- **Event Migration**: Changed form action from `srt_migrate_events` to `ftt_migrate_events` and nonce field
+- **Bulk Assign**: Changed field name from `srt_bulk_assign_member` to `ftt_bulk_assign_member`
+
+### Root Cause
+During the v2.0.12 rebrand from "Schedule Regiment Tracker" to "Family Travel Tracker", the WordPress option name was correctly changed to `ftt_settings`, but:
+1. The HTML form fields still used `name="srt_settings[...]"`
+2. WordPress expected POST data with `$_POST['ftt_settings']`
+3. Received POST data had `$_POST['srt_settings']`
+4. Settings were silently ignored - no data saved
+
+### Impact
+- **v2.0.12-2.0.15 users**: All settings pages (General, API, Events, Calendar, Billing, Cron) non-functional
+- **Affected settings**: Mapbox/Google API keys, Stripe keys, timezone, login menu, event types, iCal, etc.
+- **Workaround**: None - settings could not be saved at all
+- **Upgrade required**: All users on v2.0.12-2.0.15 must upgrade to v2.0.16 immediately
+
+### Technical Note
+Database table names and option keys preserve `srt_` prefix for backward compatibility with existing installations. Only form fields, menu slugs, and admin page identifiers were rebranded to `ftt_`.
+
+---
+
+## [2.0.15] - 2026-02-27
+
+### 🐛 Critical Bug Fix
+
+**Issue**: Plugin failed to load with fatal error "Class 'SRT_ICal' not found"
+
+### Fixed
+- **Class Name References**: Updated `SRT_ICal::init()` to `FTT_ICal::init()` in [includes/ical.php](includes/ical.php#L498)
+- **Migration Class**: Updated `SRT_Event_Migration::init()` to `FTT_Event_Migration::init()` in [includes/event-migration.php](includes/event-migration.php#L302)
+
+These were missed during the v2.0.12 rebrand from "Schedule Regiment Tracker" to "Family Travel Tracker". The classes were correctly renamed, but the initialization calls still referenced the old `SRT_` prefix, causing fatal errors on plugin activation.
+
+### Impact
+- **v2.0.14 users**: Plugin completely broken, unable to load
+- **New installs**: Plugin failed to activate
+- **Upgrade required**: All v2.0.14 users must update to v2.0.15 immediately
+
+### Technical Details
+- Class definitions were correct (`FTT_ICal`, `FTT_Event_Migration`)
+- Only the static `::init()` method calls needed correction
+- No database or configuration changes required
+
+---
+
+## [2.0.14] - 2026-02-27
+
+### 🎯 Major Feature: Single WordPress Dual-Domain Support
+
+This release enables running both marketing (www) and app (my) sites from a **single WordPress installation** with automatic domain-based routing.
+
+### Added
+- **Domain Routing System**: New `FTT_Domain_Routing` class handles automatic page routing
+- **Automatic Redirects**: Marketing pages stay on www, app pages redirect to my subdomain
+- **Domain Detection**: Helper functions to detect current domain (marketing vs app)
+- **Conditional Menus**: Separate navigation menus for each domain (auto-switching)
+- **Body Classes**: Domain-specific CSS classes (`ftt-marketing-domain`, `ftt-app-domain`)
+- **Cross-Domain URLs**: Helper functions to generate URLs for opposite domain
+- **Admin Bar Control**: Hide admin bar on marketing domain for non-admins
+
+### Changed
+- **Single Database**: Both domains share one WordPress database and user accounts
+- **Unified Authentication**: Users register once, login works across both domains
+- **Simplified CORS**: Updated to handle same-WordPress subdomains
+- **Stripe URLs**: Automatically use domain routing for checkout success/cancel URLs
+- **Sign-Up Page**: Updated to use relative paths (works from any domain)
+- **wp-config.php**: Requires dynamic domain handling (documented in setup guide)
+
+### Technical Details
+- `FTT_Domain_Routing::is_marketing_domain()` - Check if on www subdomain
+- `FTT_Domain_Routing::is_app_domain()` - Check if on my subdomain
+- `FTT_Domain_Routing::get_marketing_url()` - Get marketing domain URL
+- `FTT_Domain_Routing::get_app_url()` - Get app domain URL
+- `FTT_Domain_Routing::get_cross_domain_url()` - Generate cross-domain links
+- Marketing pages array filterable via `ftt_marketing_pages` hook
+- App pages array filterable via `ftt_app_pages` hook
+
+### Documentation
+- Added `SINGLE_WORDPRESS_SETUP.md` - Complete setup guide for single WordPress dual-domain
+- Includes DNS configuration, web server setup, WordPress configuration
+- User flow diagrams, testing checklist, troubleshooting guide
+- Migration guide from dual-WordPress setup
+
+### Migration Note
+**Breaking Change**: If you were using v2.0.13's separate WordPress setup, you can migrate to this single-WordPress approach. See `SINGLE_WORDPRESS_SETUP.md` for migration guide. The two-WordPress approach still works if you prefer it.
+
+### Benefits of Single WordPress Approach
+- ✅ One database, shared users
+- ✅ Consistent branding automatically
+- ✅ Single plugin installation
+- ✅ Easier updates and backups
+- ✅ Lower hosting costs
+- ✅ Shared authentication
+
+## [2.0.13] - 2026-02-27
+
+### Added
+- **Dual-Domain Architecture Support**: Full support for separate marketing (www) and app (my) domains
+- **Public Registration API**: New `/ftt/v1/register` endpoint for cross-domain sign-ups
+- **CORS Configuration**: Automatic CORS headers for cross-origin REST API calls
+- **App Domain Setting**: Configure custom app domain in Stripe settings (Advanced tab)
+- **Integrated Sign-Up Flow**: Users register and enter billing info in one seamless flow
+- **Sign-Up Page Template**: Beautiful standalone sign-up page with pricing selector
+- **Account Auto-Creation**: WordPress accounts automatically created during checkout
+- **Auto-Login After Registration**: Users automatically logged in after account creation
+
+### Changed
+- **No Guest Checkout**: Users must create account before subscribing (prevents email typos)
+- **Updated Stripe URLs**: Success/cancel URLs now use configured app domain
+- **Trial Starts After Payment**: 14-day trial begins only after payment method entered
+- **REST Endpoint Protection**: `/create-checkout` still requires login, `/register` is public
+
+### Technical
+- Added `FTT_CORS` class for cross-origin resource sharing
+- Added `register_new_user()` method in REST API
+- Updated `create_checkout_session()` to use app domain from settings
+- New setting: `app_domain` in Stripe settings (defaults to current WordPress URL)
+
+### Documentation
+- Added `DUAL_DOMAIN_ARCHITECTURE.md` - Complete dual-domain setup guide
+- Includes CORS configuration, marketing site integration, and sign-up flow diagrams
+
 ## [1.0.7] - 2026-02-04
 
 ### Added

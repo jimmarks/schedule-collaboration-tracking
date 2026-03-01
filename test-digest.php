@@ -54,7 +54,7 @@ if (isset($schedules['daily_2am'])) {
 
 // Find users with digest alerts
 global $wpdb;
-$alerts_table = $wpdb->prefix . 'srt_price_alerts';
+$alerts_table = $wpdb->prefix . 'ftt_price_alerts';
 
 $digest_users = $wpdb->get_results(
     "SELECT DISTINCT user_id, COUNT(*) as alert_count 

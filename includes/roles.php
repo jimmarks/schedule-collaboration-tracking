@@ -16,7 +16,7 @@ if (!defined('ABSPATH')) {
  * Manages children and parent relationships using user meta
  * instead of custom roles to allow flexibility (admin can also be parent, etc.)
  */
-class SRT_Roles {
+class FTT_Roles {
     
     /**
      * Initialize
@@ -33,7 +33,7 @@ class SRT_Roles {
      * Make user a child/student in the system
      */
     public static function make_member($user_id) {
-        update_user_meta($user_id, 'srt_is_member', true);
+        update_user_meta($user_id, 'ftt_is_member', true);
         update_user_meta($user_id, 'srt_member_since', current_time('mysql'));
         
         // Grant event editing capabilities
@@ -53,7 +53,7 @@ class SRT_Roles {
      * Remove member status
      */
     public static function remove_member($user_id) {
-        delete_user_meta($user_id, 'srt_is_member');
+        delete_user_meta($user_id, 'ftt_is_member');
         
         // Don't remove capabilities - user might be admin or have other reasons for them
     }
@@ -62,7 +62,7 @@ class SRT_Roles {
      * Check if user is a member
      */
     public static function is_member($user_id) {
-        return (bool) get_user_meta($user_id, 'srt_is_member', true);
+        return (bool) get_user_meta($user_id, 'ftt_is_member', true);
     }
     
     /**
@@ -74,7 +74,7 @@ class SRT_Roles {
         
         if ($is_new_child) {
             $children[] = $child_id;
-            update_user_meta($parent_id, 'srt_parent_of', $children);
+            update_user_meta($parent_id, 'ftt_parent_of', $children);
         }
         
         // Also store reverse relationship
@@ -96,7 +96,7 @@ class SRT_Roles {
     public static function remove_parent_child($parent_id, $child_id) {
         $children = self::get_children($parent_id);
         $children = array_diff($children, array($child_id));
-        update_user_meta($parent_id, 'srt_parent_of', $children);
+        update_user_meta($parent_id, 'ftt_parent_of', $children);
         
         // Remove reverse relationship
         $parents = self::get_parents($child_id);
@@ -108,7 +108,7 @@ class SRT_Roles {
      * Get children for a parent user
      */
     public static function get_children($parent_id) {
-        $children = get_user_meta($parent_id, 'srt_parent_of', true);
+        $children = get_user_meta($parent_id, 'ftt_parent_of', true);
         return is_array($children) ? $children : array();
     }
     
@@ -133,7 +133,7 @@ class SRT_Roles {
      */
     public static function get_all_members() {
         $args = array(
-            'meta_key'   => 'srt_is_member',
+            'meta_key'   => 'ftt_is_member',
             'meta_value' => '1',
             'orderby'    => 'display_name',
             'order'      => 'ASC',
@@ -146,7 +146,7 @@ class SRT_Roles {
      */
     public static function get_all_parents() {
         $args = array(
-            'meta_key'     => 'srt_parent_of',
+            'meta_key'     => 'ftt_parent_of',
             'meta_compare' => 'EXISTS',
             'orderby'      => 'display_name',
             'order'        => 'ASC',
@@ -159,11 +159,11 @@ class SRT_Roles {
      */
     public static function add_admin_menu() {
         add_submenu_page(
-            'edit.php?post_type=srt_event',
+            'edit.php?post_type=ftt_event',
             __('Manage Users', 'schedule-collaboration-tracking'),
             __('Manage Users', 'schedule-collaboration-tracking'),
             'manage_options',
-            'srt-manage-users',
+            'ftt-manage-users',
             array(__CLASS__, 'render_admin_page')
         );
     }
@@ -177,44 +177,44 @@ class SRT_Roles {
         }
         
         // Handle form submissions
-        if (isset($_POST['srt_action']) && check_admin_referer('srt_manage_users')) {
+        if (isset($_POST['ftt_action']) && check_admin_referer('srt_manage_users')) {
             self::handle_admin_actions();
         }
         
-        include SRT_PLUGIN_DIR . 'templates/admin-manage-users.php';
+        include FTT_PLUGIN_DIR . 'templates/admin-manage-users.php';
     }
     
     /**
      * Handle admin actions
      */
     private static function handle_admin_actions() {
-        $action = sanitize_text_field($_POST['srt_action']);
+        $action = sanitize_text_field($_POST['ftt_action']);
         
         switch ($action) {
             case 'make_member':
                 $user_id = intval($_POST['user_id']);
                 self::make_member($user_id);
-                add_settings_error('srt_messages', 'success', __('User marked as member.', 'schedule-collaboration-tracking'), 'updated');
+                add_settings_error('ftt_messages', 'success', __('User marked as member.', 'schedule-collaboration-tracking'), 'updated');
                 break;
                 
             case 'remove_member':
                 $user_id = intval($_POST['user_id']);
                 self::remove_member($user_id);
-                add_settings_error('srt_messages', 'success', __('Member status removed.', 'schedule-collaboration-tracking'), 'updated');
+                add_settings_error('ftt_messages', 'success', __('Member status removed.', 'schedule-collaboration-tracking'), 'updated');
                 break;
                 
             case 'add_parent':
                 $parent_id = intval($_POST['parent_id']);
                 $child_id = intval($_POST['child_id']);
                 self::add_parent_child($parent_id, $child_id);
-                add_settings_error('srt_messages', 'success', __('Parent relationship added.', 'schedule-collaboration-tracking'), 'updated');
+                add_settings_error('ftt_messages', 'success', __('Parent relationship added.', 'schedule-collaboration-tracking'), 'updated');
                 break;
                 
             case 'remove_parent':
                 $parent_id = intval($_POST['parent_id']);
                 $child_id = intval($_POST['child_id']);
                 self::remove_parent_child($parent_id, $child_id);
-                add_settings_error('srt_messages', 'success', __('Parent relationship removed.', 'schedule-collaboration-tracking'), 'updated');
+                add_settings_error('ftt_messages', 'success', __('Parent relationship removed.', 'schedule-collaboration-tracking'), 'updated');
                 break;
         }
     }
@@ -230,9 +230,9 @@ class SRT_Roles {
         <h2><?php esc_html_e('Child/Student Information', 'schedule-collaboration-tracking'); ?></h2>
         <table class="form-table">
             <tr>
-                <th><label for="srt_is_member"><?php esc_html_e('Member', 'schedule-collaboration-tracking'); ?></label></th>
+                <th><label for="ftt_is_member"><?php esc_html_e('Member', 'schedule-collaboration-tracking'); ?></label></th>
                 <td>
-                    <input type="checkbox" name="srt_is_member" id="srt_is_member" value="1" <?php checked(self::is_member($user->ID)); ?>>
+                    <input type="checkbox" name="ftt_is_member" id="ftt_is_member" value="1" <?php checked(self::is_member($user->ID)); ?>>
                     <p class="description"><?php esc_html_e('Check if this user is an active member.', 'schedule-collaboration-tracking'); ?></p>
                 </td>
             </tr>
@@ -255,6 +255,14 @@ class SRT_Roles {
                     <p class="description"><?php esc_html_e('Hold Ctrl (Cmd on Mac) to select multiple. This user will receive price alerts for selected members.', 'schedule-collaboration-tracking'); ?></p>
                 </td>
             </tr>
+            
+            <tr>
+                <th><label for="ftt_home_airport"><?php esc_html_e('Home Airport', 'schedule-collaboration-tracking'); ?></label></th>
+                <td>
+                    <input type="text" name="ftt_home_airport" id="ftt_home_airport" value="<?php echo esc_attr(get_user_meta($user->ID, 'ftt_home_airport', true)); ?>" class="regular-text" maxlength="3" placeholder="ORD" style="text-transform: uppercase;">
+                    <p class="description"><?php esc_html_e('Your primary airport (IATA code, e.g., ORD, JFK, LAX). Used as default for event forms.', 'schedule-collaboration-tracking'); ?></p>
+                </td>
+            </tr>
         </table>
         <?php
     }
@@ -267,15 +275,21 @@ class SRT_Roles {
             return;
         }
         
+        // Home airport
+        if (isset($_POST['ftt_home_airport'])) {
+            $airport = strtoupper(sanitize_text_field($_POST['ftt_home_airport']));
+            update_user_meta($user_id, 'ftt_home_airport', $airport);
+        }
+        
         // Member status
-        if (isset($_POST['srt_is_member'])) {
+        if (isset($_POST['ftt_is_member'])) {
             self::make_member($user_id);
         } else {
             self::remove_member($user_id);
         }
         
         // Parent relationships
-        $new_children = isset($_POST['srt_parent_of']) ? array_map('intval', $_POST['srt_parent_of']) : array();
+        $new_children = isset($_POST['ftt_parent_of']) ? array_map('intval', $_POST['ftt_parent_of']) : array();
         $old_children = self::get_children($user_id);
         
         // Add new relationships
@@ -332,7 +346,39 @@ class SRT_Roles {
         
         return array_unique($recipients);
     }
+    
+    /**
+     * Get user's home airport
+     *
+     * @param int $user_id User ID (defaults to current user)
+     * @return string Airport code (e.g., 'ORD') or empty string
+     */
+    public static function get_user_airport($user_id = null) {
+        if (!$user_id) {
+            $user_id = get_current_user_id();
+        }
+        
+        return get_user_meta($user_id, 'ftt_home_airport', true);
+    }
+    
+    /**
+     * Set user's home airport
+     *
+     * @param int $user_id User ID
+     * @param string $airport_code IATA airport code
+     * @return bool Success
+     */
+    public static function set_user_airport($user_id, $airport_code) {
+        $airport_code = strtoupper(sanitize_text_field($airport_code));
+        
+        // Basic validation - 3 letters
+        if (strlen($airport_code) !== 3 || !ctype_alpha($airport_code)) {
+            return false;
+        }
+        
+        return update_user_meta($user_id, 'ftt_home_airport', $airport_code);
+    }
 }
 
 // Initialize
-SRT_Roles::init();
+FTT_Roles::init();

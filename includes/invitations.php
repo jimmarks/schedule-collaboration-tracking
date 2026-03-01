@@ -15,7 +15,7 @@ if (!defined('ABSPATH')) {
  * 
  * Manages member-to-parent invitations with unique codes
  */
-class SRT_Invitations {
+class FTT_Invitations {
     
     /**
      * Initialize
@@ -29,7 +29,7 @@ class SRT_Invitations {
      */
     public static function register_routes() {
         // Generate new invite code
-        register_rest_route('srt/v1', '/invite/generate', array(
+        register_rest_route('ftt/v1', '/invite/generate', array(
             'methods' => 'POST',
             'callback' => array(__CLASS__, 'generate_invite_code'),
             'permission_callback' => function() {
@@ -46,17 +46,17 @@ class SRT_Invitations {
                     return true;
                 }
                 
-                if (!class_exists('SRT_Roles')) {
-                    error_log('Invite generate: SRT_Roles class not found');
+                if (!class_exists('FTT_Roles')) {
+                    error_log('Invite generate: FTT_Roles class not found');
                     return false;
                 }
                 
-                $is_member = SRT_Roles::is_member($user_id);
+                $is_member = FTT_Roles::is_member($user_id);
                 
                 // If not marked as member, auto-promote if they have the right capability
                 if (!$is_member && current_user_can('edit_posts')) {
                     error_log('Invite generate: User ' . $user_id . ' has edit_posts cap but not member flag, auto-promoting');
-                    SRT_Roles::make_member($user_id);
+                    FTT_Roles::make_member($user_id);
                     $is_member = true;
                 }
                 
@@ -67,28 +67,28 @@ class SRT_Invitations {
         ));
         
         // Get member's invitations
-        register_rest_route('srt/v1', '/invitations', array(
+        register_rest_route('ftt/v1', '/invitations', array(
             'methods' => 'GET',
             'callback' => array(__CLASS__, 'get_invitations'),
             'permission_callback' => 'is_user_logged_in'
         ));
         
         // Revoke/delete invitation
-        register_rest_route('srt/v1', '/invite/(?P<code>[a-zA-Z0-9\-]+)/revoke', array(
+        register_rest_route('ftt/v1', '/invite/(?P<code>[a-zA-Z0-9\-]+)/revoke', array(
             'methods' => 'POST',
             'callback' => array(__CLASS__, 'revoke_invitation'),
             'permission_callback' => 'is_user_logged_in'
         ));
         
         // Parent accepts invitation by code
-        register_rest_route('srt/v1', '/invite/accept', array(
+        register_rest_route('ftt/v1', '/invite/accept', array(
             'methods' => 'POST',
             'callback' => array(__CLASS__, 'accept_invitation_by_code'),
             'permission_callback' => 'is_user_logged_in'
         ));
         
         // Validate invite code (for registration page)
-        register_rest_route('srt/v1', '/invite/(?P<code>[a-zA-Z0-9\-]+)/validate', array(
+        register_rest_route('ftt/v1', '/invite/(?P<code>[a-zA-Z0-9\-]+)/validate', array(
             'methods' => 'GET',
             'callback' => array(__CLASS__, 'validate_invite_code'),
             'permission_callback' => '__return_true'
@@ -272,7 +272,7 @@ class SRT_Invitations {
         
         foreach ($users as $parent) {
             // Link them
-            SRT_Roles::add_parent_child($parent->ID, $member_id);
+            FTT_Roles::add_parent_child($parent->ID, $member_id);
             
             // Clear pending status
             delete_user_meta($parent->ID, 'srt_pending_child_email');
@@ -305,7 +305,7 @@ class SRT_Invitations {
      */
     public static function get_invitations($request) {
         $user_id = get_current_user_id();
-        $is_member = SRT_Roles::is_member($user_id);
+        $is_member = FTT_Roles::is_member($user_id);
         
         if ($is_member) {
             // Return member's sent invitations
@@ -345,8 +345,8 @@ class SRT_Invitations {
         }
         
         // If not found, check if current user is a parent of the member who created it
-        if (SRT_Roles::is_parent($current_user_id)) {
-            $children = SRT_Roles::get_children($current_user_id);
+        if (FTT_Roles::is_parent($current_user_id)) {
+            $children = FTT_Roles::get_children($current_user_id);
             
             foreach ($children as $child) {
                 $child_invitations = get_user_meta($child->ID, 'srt_invitations', true);
@@ -384,13 +384,13 @@ class SRT_Invitations {
             }
             
             // Check if already linked
-            $children = SRT_Roles::get_children($parent_id);
+            $children = FTT_Roles::get_children($parent_id);
             if (in_array($member_id, $children)) {
                 return new WP_Error('already_linked', 'You are already linked to this member', array('status' => 400));
             }
             
             // Link them
-            SRT_Roles::add_parent_child($parent_id, $member_id);
+            FTT_Roles::add_parent_child($parent_id, $member_id);
             
             $member = get_userdata($member_id);
             
@@ -418,13 +418,13 @@ class SRT_Invitations {
             $member_id = $invitation['member_id'];
             
             // Check if already linked
-            $children = SRT_Roles::get_children($parent_id);
+            $children = FTT_Roles::get_children($parent_id);
             if (in_array($member_id, $children)) {
                 return new WP_Error('already_linked', 'You are already linked to this member', array('status' => 400));
             }
             
             // Link them
-            SRT_Roles::add_parent_child($parent_id, $member_id);
+            FTT_Roles::add_parent_child($parent_id, $member_id);
             
             // Update invitation status
             self::update_invitation_status($code, 'accepted', $parent_id);
@@ -489,4 +489,4 @@ class SRT_Invitations {
 }
 
 // Initialize
-SRT_Invitations::init();
+FTT_Invitations::init();

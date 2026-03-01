@@ -10,12 +10,22 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+// Debug logging (comment out after testing)
+if (isset($_GET['debug'])) {
+    $user_id = get_current_user_id();
+    echo "<!-- DEBUG: User ID: $user_id -->";
+    if ($user_id) {
+        $subscription_status = get_user_meta($user_id, 'ftt_subscription_status', true);
+        echo "<!-- DEBUG: Subscription Status: " . ($subscription_status ?: 'none') . " -->";
+    }
+}
+
 // Redirect if already has subscription
 $user_id = get_current_user_id();
 if ($user_id) {
     $subscription_status = get_user_meta($user_id, 'ftt_subscription_status', true);
-    if (in_array($subscription_status, ['active', 'trialing'])) {
-        wp_redirect(home_url('/billing/manage/'));
+    if (!empty($subscription_status) && in_array($subscription_status, ['active', 'trialing'])) {
+        wp_redirect(home_url('/manage-subscription/'));
         exit;
     }
 }
@@ -68,17 +78,30 @@ $trial_days = $settings['trial_days'] ?? 14;
                 </ul>
             </div>
             
+            <?php if ($user_id) : ?>
             <div class="ftt-addon-info">
                 <p><strong><?php esc_html_e('Additional children?', 'schedule-collaboration-tracking'); ?></strong></p>
-                <p><?php esc_html_e('Add more children anytime for just $5/month each.', 'schedule-collaboration-tracking'); ?></p>
+                <p><?php esc_html_e('Add more children for just $5/month each.', 'schedule-collaboration-tracking'); ?></p>
+                
+                <div class="ftt-addon-selector">
+                    <label for="addon-qty-month"><?php esc_html_e('Additional children:', 'schedule-collaboration-tracking'); ?></label>
+                    <div class="ftt-quantity-control">
+                        <button type="button" class="ftt-qty-btn ftt-qty-minus" data-target="addon-qty-month">-</button>
+                        <input type="number" id="addon-qty-month" class="ftt-addon-qty" min="0" max="20" value="0" readonly>
+                        <button type="button" class="ftt-qty-btn ftt-qty-plus" data-target="addon-qty-month">+</button>
+                    </div>
+                    <span class="ftt-addon-total">+$0/month</span>
+                </div>
             </div>
+            
+            <?php endif; ?>
             
             <?php if ($user_id) : ?>
                 <button class="ftt-cta-button" data-interval="month">
                     <?php esc_html_e('Start Free Trial', 'schedule-collaboration-tracking'); ?>
                 </button>
             <?php else : ?>
-                <a href="<?php echo esc_url(wp_registration_url()); ?>" class="ftt-cta-button">
+                <a href="<?php echo esc_url(home_url('/ftt-register/')); ?>" class="ftt-cta-button">
                     <?php esc_html_e('Sign Up Free', 'schedule-collaboration-tracking'); ?>
                 </a>
             <?php endif; ?>
@@ -112,17 +135,30 @@ $trial_days = $settings['trial_days'] ?? 14;
                 </ul>
             </div>
             
+            <?php if ($user_id) : ?>
             <div class="ftt-addon-info">
                 <p><strong><?php esc_html_e('Additional children?', 'schedule-collaboration-tracking'); ?></strong></p>
-                <p><?php esc_html_e('Add more children anytime for just $50/year each.', 'schedule-collaboration-tracking'); ?></p>
+                <p><?php esc_html_e('Add more children for just $50/year each.', 'schedule-collaboration-tracking'); ?></p>
+                
+                <div class="ftt-addon-selector">
+                    <label for="addon-qty-year"><?php esc_html_e('Additional children:', 'schedule-collaboration-tracking'); ?></label>
+                    <div class="ftt-quantity-control">
+                        <button type="button" class="ftt-qty-btn ftt-qty-minus" data-target="addon-qty-year">-</button>
+                        <input type="number" id="addon-qty-year" class="ftt-addon-qty" min="0" max="20" value="0" readonly>
+                        <button type="button" class="ftt-qty-btn ftt-qty-plus" data-target="addon-qty-year">+</button>
+                    </div>
+                    <span class="ftt-addon-total">+$0/year</span>
+                </div>
             </div>
+            
+            <?php endif; ?>
             
             <?php if ($user_id) : ?>
                 <button class="ftt-cta-button" data-interval="year">
                     <?php esc_html_e('Start Free Trial', 'schedule-collaboration-tracking'); ?>
                 </button>
             <?php else : ?>
-                <a href="<?php echo esc_url(wp_registration_url()); ?>" class="ftt-cta-button">
+                <a href="<?php echo esc_url(home_url('/ftt-register/')); ?>" class="ftt-cta-button">
                     <?php esc_html_e('Sign Up Free', 'schedule-collaboration-tracking'); ?>
                 </a>
             <?php endif; ?>
@@ -308,6 +344,67 @@ $trial_days = $settings['trial_days'] ?? 14;
     font-size: 14px;
 }
 
+.ftt-addon-selector {
+    margin-top: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.ftt-addon-selector label {
+    font-weight: 600;
+    font-size: 14px;
+    color: #2c3e50;
+}
+
+.ftt-quantity-control {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.ftt-qty-btn {
+    width: 36px;
+    height: 36px;
+    border: 2px solid #2196F3;
+    background: white;
+    color: #2196F3;
+    border-radius: 6px;
+    font-size: 20px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s;
+    padding: 0;
+    line-height: 1;
+}
+
+.ftt-qty-btn:hover {
+    background: #2196F3;
+    color: white;
+}
+
+.ftt-qty-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.ftt-addon-qty {
+    width: 60px;
+    height: 36px;
+    text-align: center;
+    border: 2px solid #e0e0e0;
+    border-radius: 6px;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.ftt-addon-total {
+    font-size: 18px;
+    font-weight: bold;
+    color: #2196F3;
+    margin-left: 10px;
+}
+
 .ftt-cta-button {
     display: block;
     width: 100%;
@@ -354,49 +451,3 @@ $trial_days = $settings['trial_days'] ?? 14;
     line-height: 1.6;
 }
 </style>
-
-<script>
-jQuery(document).ready(function($) {
-    // Toggle between monthly and yearly
-    $('input[name="billing_interval"]').on('change', function() {
-        const interval = $(this).val();
-        $('.ftt-pricing-card').hide();
-        $(`.ftt-pricing-card[data-interval="${interval}"]`).show();
-    });
-    
-    // Handle checkout button
-    $('.ftt-cta-button[data-interval]').on('click', function(e) {
-        e.preventDefault();
-        const interval = $(this).data('interval');
-        const $button = $(this);
-        
-        $button.prop('disabled', true).text('<?php esc_html_e('Creating checkout...', 'schedule-collaboration-tracking'); ?>');
-        
-        // Call REST API to create checkout session
-        $.ajax({
-            url: '<?php echo esc_url(rest_url('ftt/v1/create-checkout')); ?>',
-            method: 'POST',
-            headers: {
-                'X-WP-Nonce': '<?php echo wp_create_nonce('wp_rest'); ?>'
-            },
-            data: JSON.stringify({
-                interval: interval,
-                addon_quantity: 0
-            }),
-            contentType: 'application/json',
-            success: function(response) {
-                if (response.url) {
-                    window.location.href = response.url;
-                } else {
-                    alert('<?php esc_html_e('Error creating checkout session', 'schedule-collaboration-tracking'); ?>');
-                    $button.prop('disabled', false).text('<?php esc_html_e('Start Free Trial', 'schedule-collaboration-tracking'); ?>');
-                }
-            },
-            error: function() {
-                alert('<?php esc_html_e('Error creating checkout session', 'schedule-collaboration-tracking'); ?>');
-                $button.prop('disabled', false).text('<?php esc_html_e('Start Free Trial', 'schedule-collaboration-tracking'); ?>');
-            }
-        });
-    });
-});
-</script>

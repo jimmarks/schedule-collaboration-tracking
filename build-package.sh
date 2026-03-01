@@ -90,8 +90,28 @@ for file in includes/*.php; do
     fi
 done
 
+# Check includes subdirectories (stripe, billing)
+find includes -type f -name "*.php" | while read file; do
+    if php -l "$file" > /dev/null 2>&1; then
+        echo -e "${GREEN}✓ $file${NC}"
+    else
+        echo -e "${RED}✗ $file - SYNTAX ERROR${NC}"
+        LINT_FAILED=1
+    fi
+done
+
 # Check templates
 for file in templates/*.php; do
+    if php -l "$file" > /dev/null 2>&1; then
+        echo -e "${GREEN}✓ $file${NC}"
+    else
+        echo -e "${RED}✗ $file - SYNTAX ERROR${NC}"
+        LINT_FAILED=1
+    fi
+done
+
+# Check templates subdirectories (billing)
+find templates -type f -name "*.php" | while read file; do
     if php -l "$file" > /dev/null 2>&1; then
         echo -e "${GREEN}✓ $file${NC}"
     else

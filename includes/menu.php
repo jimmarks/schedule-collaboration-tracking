@@ -13,7 +13,7 @@ if (!defined('ABSPATH')) {
 /**
  * Class for managing login/logout menu items
  */
-class SRT_Menu {
+class FTT_Menu {
     
     /**
      * Initialize hooks
@@ -21,6 +21,7 @@ class SRT_Menu {
     public static function init() {
         add_action('admin_init', array(__CLASS__, 'add_menu_meta_box'));
         add_filter('wp_nav_menu_items', array(__CLASS__, 'add_login_logout_link'), 10, 2);
+        add_filter('wp_nav_menu_items', array(__CLASS__, 'add_billing_links'), 20, 2);
         add_filter('wp_setup_nav_menu_item', array(__CLASS__, 'setup_nav_menu_item'));
     }
     
@@ -29,7 +30,7 @@ class SRT_Menu {
      */
     public static function add_menu_meta_box() {
         add_meta_box(
-            'srt-login-logout-menu',
+            'ftt-login-logout-menu',
             __('Schedule Login/Logout', 'schedule-collaboration-tracking'),
             array(__CLASS__, 'render_menu_meta_box'),
             'nav-menus',
@@ -42,13 +43,13 @@ class SRT_Menu {
      * Render menu meta box
      */
     public static function render_menu_meta_box() {
-        $settings = get_option('srt_settings', array());
+        $settings = get_option('ftt_settings', array());
         $enabled = $settings['enable_login_menu'] ?? false;
         
         if (!$enabled) {
             ?>
             <p><?php esc_html_e('Login/Logout menu is disabled.', 'schedule-collaboration-tracking'); ?></p>
-            <p><a href="<?php echo admin_url('edit.php?post_type=srt_event&page=srt-settings'); ?>"><?php esc_html_e('Enable in Settings', 'schedule-collaboration-tracking'); ?></a></p>
+            <p><a href="<?php echo admin_url('edit.php?post_type=ftt_event&page=srt-settings'); ?>"><?php esc_html_e('Enable in Settings', 'schedule-collaboration-tracking'); ?></a></p>
             <?php
             return;
         }
@@ -56,9 +57,9 @@ class SRT_Menu {
         global $_nav_menu_placeholder, $nav_menu_selected_id;
         $_nav_menu_placeholder = 0 > $_nav_menu_placeholder ? $_nav_menu_placeholder - 1 : -1;
         ?>
-        <div id="srt-login-logout" class="posttypediv">
-            <div id="tabs-panel-srt-login-logout" class="tabs-panel tabs-panel-active">
-                <ul id="srt-login-logout-checklist" class="categorychecklist form-no-clear">
+        <div id="ftt-login-logout" class="posttypediv">
+            <div id="tabs-panel-ftt-login-logout" class="tabs-panel tabs-panel-active">
+                <ul id="ftt-login-logout-checklist" class="categorychecklist form-no-clear">
                     <li>
                         <label class="menu-item-title">
                             <input type="checkbox" class="menu-item-checkbox" name="menu-item[<?php echo $_nav_menu_placeholder; ?>][menu-item-object-id]" value="-1" /> 
@@ -66,14 +67,14 @@ class SRT_Menu {
                         </label>
                         <input type="hidden" class="menu-item-type" name="menu-item[<?php echo $_nav_menu_placeholder; ?>][menu-item-type]" value="custom" />
                         <input type="hidden" class="menu-item-title" name="menu-item[<?php echo $_nav_menu_placeholder; ?>][menu-item-title]" value="<?php esc_attr_e('Login', 'schedule-collaboration-tracking'); ?>" />
-                        <input type="hidden" class="menu-item-url" name="menu-item[<?php echo $_nav_menu_placeholder; ?>][menu-item-url]" value="#srt-login-logout" />
-                        <input type="hidden" class="menu-item-classes" name="menu-item[<?php echo $_nav_menu_placeholder; ?>][menu-item-classes]" value="srt-login-logout-item" />
+                        <input type="hidden" class="menu-item-url" name="menu-item[<?php echo $_nav_menu_placeholder; ?>][menu-item-url]" value="#ftt-login-logout" />
+                        <input type="hidden" class="menu-item-classes" name="menu-item[<?php echo $_nav_menu_placeholder; ?>][menu-item-classes]" value="ftt-login-logout-item" />
                     </li>
                 </ul>
             </div>
             <p class="button-controls">
                 <span class="add-to-menu">
-                    <input type="submit"<?php wp_nav_menu_disabled_check($nav_menu_selected_id); ?> class="button-secondary submit-add-to-menu right" value="<?php esc_attr_e('Add to Menu', 'schedule-collaboration-tracking'); ?>" name="add-srt-login-logout-menu-item" id="submit-srt-login-logout" />
+                    <input type="submit"<?php wp_nav_menu_disabled_check($nav_menu_selected_id); ?> class="button-secondary submit-add-to-menu right" value="<?php esc_attr_e('Add to Menu', 'schedule-collaboration-tracking'); ?>" name="add-srt-login-logout-menu-item" id="submit-ftt-login-logout" />
                     <span class="spinner"></span>
                 </span>
             </p>
@@ -89,7 +90,7 @@ class SRT_Menu {
      */
     public static function setup_nav_menu_item($menu_item) {
         // Mark our custom menu items
-        if (isset($menu_item->classes) && is_array($menu_item->classes) && in_array('srt-login-logout-item', $menu_item->classes)) {
+        if (isset($menu_item->classes) && is_array($menu_item->classes) && in_array('ftt-login-logout-item', $menu_item->classes)) {
             $menu_item->srt_login_logout = true;
         }
         
@@ -100,7 +101,7 @@ class SRT_Menu {
      * Add login/logout link to menu
      */
     public static function add_login_logout_link($items, $args) {
-        $settings = get_option('srt_settings', array());
+        $settings = get_option('ftt_settings', array());
         $enabled = $settings['enable_login_menu'] ?? false;
         
         if (!$enabled) {
@@ -120,7 +121,7 @@ class SRT_Menu {
             }
             
             // Check if this is our login/logout item
-            if (strpos($item, 'srt-login-logout-item') !== false) {
+            if (strpos($item, 'ftt-login-logout-item') !== false) {
                 // Determine what to show
                 if ($mode === 'login_only') {
                     // Only show if NOT logged in
@@ -150,18 +151,18 @@ class SRT_Menu {
      */
     private static function generate_login_item() {
         // Use custom login page instead of wp-login.php
-        $login_url = home_url('/sc-login/');
+        $login_url = home_url('/ftt-login/');
         
         // Preserve current URL for redirect after login
         $current_url = self::get_current_url();
-        if ($current_url && $current_url !== home_url('/sc-login/')) {
+        if ($current_url && $current_url !== home_url('/ftt-login/')) {
             $login_url = add_query_arg('redirect_to', urlencode($current_url), $login_url);
         }
         
         $login_text = __('Login', 'schedule-collaboration-tracking');
         
         return sprintf(
-            '<li class="menu-item srt-login-logout-item srt-login-item"><a href="%s">%s</a></li>',
+            '<li class="menu-item ftt-login-logout-item ftt-login-item"><a href="%s">%s</a></li>',
             esc_url($login_url),
             esc_html($login_text)
         );
@@ -186,7 +187,7 @@ class SRT_Menu {
         }
         
         return sprintf(
-            '<li class="menu-item srt-login-logout-item srt-logout-item"><a href="%s">%s</a></li>',
+            '<li class="menu-item ftt-login-logout-item ftt-logout-item"><a href="%s">%s</a></li>',
             esc_url($logout_url),
             esc_html($logout_text)
         );
@@ -199,7 +200,59 @@ class SRT_Menu {
         global $wp;
         return home_url(add_query_arg(array(), $wp->request));
     }
+    
+    /**
+     * Add billing page links to navigation menu
+     */
+    public static function add_billing_links($items, $args) {
+        // Only add to primary menu (you can customize this)
+        if (!isset($args->theme_location) || $args->theme_location !== 'primary') {
+            return $items;
+        }
+        
+        // Only for logged-in users
+        if (!is_user_logged_in()) {
+            return $items;
+        }
+        
+        $billing_links = '';
+        
+        // Check if Stripe is configured
+        $stripe_settings = get_option('ftt_stripe_settings', array());
+        $is_configured = !empty($stripe_settings['test_publishable_key']) || !empty($stripe_settings['live_publishable_key']);
+        
+        if ($is_configured) {
+            // Add "Manage Subscription" link
+            $manage_url = home_url('/manage-subscription/');
+            $billing_links .= sprintf(
+                '<li class="menu-item ftt-billing-item"><a href="%s">%s</a></li>',
+                esc_url($manage_url),
+                esc_html__('My Subscription', 'schedule-collaboration-tracking')
+            );
+        } else {
+            // Add "Pricing" link if not configured yet
+            $pricing_url = home_url('/pricing/');
+            $billing_links .= sprintf(
+                '<li class="menu-item ftt-pricing-item"><a href="%s">%s</a></li>',
+                esc_url($pricing_url),
+                esc_html__('Pricing', 'schedule-collaboration-tracking')
+            );
+        }
+        
+        // Insert before logout link if it exists, otherwise append
+        if (strpos($items, 'ftt-logout-item') !== false) {
+            $items = str_replace(
+                '<li class="menu-item ftt-login-logout-item ftt-logout-item">',
+                $billing_links . '<li class="menu-item ftt-login-logout-item ftt-logout-item">',
+                $items
+            );
+        } else {
+            $items .= $billing_links;
+        }
+        
+        return $items;
+    }
 }
 
 // Initialize
-SRT_Menu::init();
+FTT_Menu::init();

@@ -1,0 +1,254 @@
+/**
+ * Billing Settings Admin Styles
+ */
+
+.ftt-billing-settings {
+    max-width: 1200px;
+}
+
+/* Header with mode indicator */
+.ftt-settings-header {
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    border-radius: 4px;
+    padding: 20px;
+    margin: 20px 0;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.ftt-mode-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.ftt-mode-test {
+    background: #f0f6fc;
+    color: #0969da;
+    border: 1px solid #0969da;
+}
+
+.ftt-mode-live {
+    background: #dafbe1;
+    color: #1a7f37;
+   border: 1px solid #1a7f37;
+}
+
+.ftt-mode-indicator .dashicons {
+    font-size: 18px;
+}
+
+/* Tabs */
+.ftt-settings-tabs {
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    margin-top: 20px;
+}
+
+.nav-tab-wrapper {
+    border-bottom: 1px solid #ccd0d4;
+    margin: 0;
+}
+
+.tab-content {
+    display: none;
+    padding: 20px;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* Test connection */
+.ftt-test-connection {
+    margin-top: 20px;
+    padding: 20px;
+    background: #f6f7f7;
+    border-radius: 4px;
+}
+
+.ftt-test-connection .spinner {
+    float: none;
+    margin: 0 10px;
+}
+
+#ftt-connection-result {
+    margin-top: 15px;
+}
+
+.ftt-connection-success {
+    padding: 12px;
+    background: #dafbe1;
+    border-left: 4px solid #1a7f37;
+    border-radius: 4px;
+}
+
+.ftt-connection-error {
+    padding: 12px;
+    background: #ffebee;
+    border-left: 4px solid #d32f2f;
+    border-radius: 4px;
+}
+
+/* Pricing help */
+.ftt-pricing-help {
+    background: #f0f6fc;
+    border: 1px solid #0969da;
+    border-radius: 4px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.ftt-pricing-help h3 {
+    margin-top: 0;
+}
+
+.ftt-pricing-help ul {
+    margin-left: 20px;
+}
+
+.ftt-pricing-help code {
+    background: #fff;
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
+#ftt-prices-result {
+    margin-top: 15px;
+}
+
+.ftt-prices-found {
+    padding: 12px;
+    background: #dafbe1;
+    border-left: 4px solid #1a7f37;
+    border-radius: 4px;
+}
+
+.ftt-prices-found ul {
+    margin: 10px 0 0 20px;
+}
+
+/* Webhook setup */
+.ftt-webhook-setup {
+    background: #fff;
+}
+
+.ftt-webhook-url {
+    background: #f6f7f7;
+    padding: 15px;
+    border-radius: 4px;
+    margin: 20px 0;
+}
+
+.ftt-url-display {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.ftt-url-display code {
+    flex: 1;
+    padding: 10px;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 13px;
+    word-break: break-all;
+}
+
+.ftt-webhook-setup ol {
+    counter-reset: item;
+    list-style-type: none;
+    padding-left: 0;
+}
+
+.ftt-webhook-setup ol > li {
+    counter-increment: item;
+    margin-bottom: 15px;
+    padding-left: 35px;
+    position: relative;
+}
+
+.ftt-webhook-setup ol > li::before {
+    content: counter(item);
+    background: #2271b1;
+    color: #fff;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    left: 0;
+    top: 0;
+    font-weight: 600;
+    font-size: 12px;
+}
+
+.ftt-webhook-setup ul {
+    margin-left: 20px;
+}
+
+.ftt-webhook-setup code {
+    background: #f6f7f7;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 12px;
+}
+
+/* Form table enhancements */
+.form-table input.code {
+    font-family: monospace;
+    font-size: 13px;
+}
+
+.form-table h3 {
+    margin-top: 30px;
+    margin-bottom: 10px;
+    padding-top: 20px;
+    border-top: 1px solid #ddd;
+}
+
+.form-table h3:first-child {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
+}
+
+/* Color palette preview */
+.ftt-color-palette {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+}
+
+.ftt-color-swatch {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: #fff;
+}
+
+.ftt-color-box {
+    width: 20px;
+    height: 20px;
+    border-radius: 3px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.ftt-color-name {
+    font-size: 13px;
+    color: #666;
+}

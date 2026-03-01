@@ -13,7 +13,7 @@ if (!defined('ABSPATH')) {
 /**
  * Class for generating iCalendar feeds
  */
-class SRT_ICal {
+class FTT_ICal {
     
     /**
      * Initialize hooks
@@ -28,7 +28,7 @@ class SRT_ICal {
      */
     public static function handle_calendar_request() {
         // Check if this is a calendar feed request
-        if (!isset($_GET['srt_calendar']) || $_GET['srt_calendar'] != '1') {
+        if (!isset($_GET['ftt_calendar']) || $_GET['ftt_calendar'] != '1') {
             return;
         }
         
@@ -57,7 +57,7 @@ class SRT_ICal {
         
         // Get events for this user
         $args = array(
-            'post_type' => 'srt_event',
+            'post_type' => 'ftt_event',
             'post_status' => 'publish',
             'posts_per_page' => -1,
             'orderby' => 'meta_value',
@@ -115,14 +115,14 @@ class SRT_ICal {
      */
     public static function register_routes() {
         // Public calendar feed
-        register_rest_route('srt/v1', '/calendar.ics', array(
+        register_rest_route('ftt/v1', '/calendar.ics', array(
             'methods' => 'GET',
             'callback' => array(__CLASS__, 'get_calendar_feed'),
             'permission_callback' => array(__CLASS__, 'check_calendar_permission'),
         ));
         
         // Generate new calendar token (admin only)
-        register_rest_route('srt/v1', '/calendar/token', array(
+        register_rest_route('ftt/v1', '/calendar/token', array(
             'methods' => 'POST',
             'callback' => array(__CLASS__, 'generate_calendar_token'),
             'permission_callback' => function() {
@@ -135,7 +135,7 @@ class SRT_ICal {
      * Check calendar permission
      */
     public static function check_calendar_permission($request) {
-        $settings = get_option('srt_settings', array());
+        $settings = get_option('ftt_settings', array());
         
         // Check if calendar feed is enabled
         if (empty($settings['enable_ical_feed'])) {
@@ -166,7 +166,7 @@ class SRT_ICal {
     public static function get_calendar_feed($request) {
         // Get all published events
         $args = array(
-            'post_type' => 'srt_event',
+            'post_type' => 'ftt_event',
             'post_status' => 'publish',
             'posts_per_page' => -1,
             'orderby' => 'meta_value',
@@ -191,7 +191,7 @@ class SRT_ICal {
      * Generate iCalendar content
      */
     public static function generate_ical($events) {
-        $settings = get_option('srt_settings', array());
+        $settings = get_option('ftt_settings', array());
         $timezone = $settings['default_timezone'] ?? wp_timezone_string();
         $site_name = get_bloginfo('name');
         
@@ -292,7 +292,7 @@ class SRT_ICal {
         $uid = $post_id . '@' . parse_url(home_url(), PHP_URL_HOST);
         
         // Get event type label
-        $event_types = SRT_CPT::get_event_types();
+        $event_types = FTT_CPT::get_event_types();
         $type_label = $event_types[$event_type] ?? 'Event';
         
         // Build description
@@ -468,7 +468,7 @@ class SRT_ICal {
         return rest_ensure_response(array(
             'success' => true,
             'token' => $token,
-            'url' => rest_url('srt/v1/calendar.ics') . '?token=' . $token,
+            'url' => rest_url('ftt/v1/calendar.ics') . '?token=' . $token,
         ));
     }
     
@@ -495,4 +495,4 @@ class SRT_ICal {
 }
 
 // Initialize
-SRT_ICal::init();
+FTT_ICal::init();

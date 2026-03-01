@@ -34,7 +34,7 @@ if (!$billing || empty($billing['status'])) {
 <div class="ftt-billing-manage-container">
     <div class="ftt-billing-header">
         <h1><?php esc_html_e('Manage Subscription', 'schedule-collaboration-tracking'); ?></h1>
-        <a href="<?php echo esc_url(home_url('/dashboard/')); ?>" class="ftt-back-link">
+        <a href="<?php echo esc_url(home_url('/ftt-dashboard/')); ?>" class="ftt-back-link">
             ← <?php esc_html_e('Back to Dashboard', 'schedule-collaboration-tracking'); ?>
         </a>
     </div>
@@ -116,7 +116,7 @@ if (!$billing || empty($billing['status'])) {
             <div class="ftt-action-card">
                 <h3><?php esc_html_e('Add a Child', 'schedule-collaboration-tracking'); ?></h3>
                 <p><?php printf(esc_html__('You can add %d more children with your current plan.', 'schedule-collaboration-tracking'), $billing['allowed_children'] - $billing['children_count']); ?></p>
-                <a href="<?php echo esc_url(home_url('/dashboard/')); ?>" class="button button-primary">
+                <a href="<?php echo esc_url(home_url('/ftt-dashboard/')); ?>" class="button button-primary">
                     <?php esc_html_e('Go to Dashboard', 'schedule-collaboration-tracking'); ?>
                 </a>
             </div>
@@ -308,87 +308,3 @@ if (!$billing || empty($billing['status'])) {
     background: #d32f2f;
 }
 </style>
-
-<script>
-jQuery(document).ready(function($) {
-    // Add child addon
-    $('#ftt-add-child-addon').on('click', function() {
-        if (!confirm('<?php esc_html_e('Add another child slot? You will be charged a prorated amount today.', 'schedule-collaboration-tracking'); ?>')) {
-            return;
-        }
-        
-        const $button = $(this);
-        $button.prop('disabled', true).text('<?php esc_html_e('Processing...', 'schedule-collaboration-tracking'); ?>');
-        
-        $.ajax({
-            url: '<?php echo esc_url(rest_url('ftt/v1/add-child-addon')); ?>',
-            method: 'POST',
-            headers: {
-                'X-WP-Nonce': '<?php echo wp_create_nonce('wp_rest'); ?>'
-            },
-            success: function() {
-                location.reload();
-            },
-            error: function() {
-                alert('<?php esc_html_e('Error adding child addon', 'schedule-collaboration-tracking'); ?>');
-                $button.prop('disabled', false).text('<?php esc_html_e('Add Child Slot', 'schedule-collaboration-tracking'); ?>');
-            }
-        });
-    });
-    
-    // Billing portal
-    $('#ftt-billing-portal').on('click', function() {
-        const $button = $(this);
-        $button.prop('disabled', true).text('<?php esc_html_e('Loading...', 'schedule-collaboration-tracking'); ?>');
-        
-        // Create portal session (will need backend endpoint)
-window.location.href = '<?php echo esc_url(rest_url('ftt/v1/billing-portal')); ?>?_wpnonce=<?php echo wp_create_nonce('wp_rest'); ?>';
-    });
-    
-    // Cancel subscription
-    $('#ftt-cancel-subscription').on('click', function() {
-        if (!confirm('<?php esc_html_e('Are you sure you want to cancel? You\'ll keep access until the end of your billing period.', 'schedule-collaboration-tracking'); ?>')) {
-            return;
-        }
-        
-        const $button = $(this);
-        $button.prop('disabled', true).text('<?php esc_html_e('Canceling...', 'schedule-collaboration-tracking'); ?>');
-        
-        $.ajax({
-            url: '<?php echo esc_url(rest_url('ftt/v1/cancel-subscription')); ?>',
-            method: 'POST',
-            headers: {
-                'X-WP-Nonce': '<?php echo wp_create_nonce('wp_rest'); ?>'
-            },
-            success: function() {
-                location.reload();
-            },
-            error: function() {
-                alert('<?php esc_html_e('Error canceling subscription', 'schedule-collaboration-tracking'); ?>');
-                $button.prop('disabled', false).text('<?php esc_html_e('Cancel Subscription', 'schedule-collaboration-tracking'); ?>');
-            }
-        });
-    });
-    
-    // Reactivate subscription
-    $('#ftt-reactivate-subscription').on('click', function() {
-        const $button = $(this);
-        $button.prop('disabled', true).text('<?php esc_html_e('Reactivating...', 'schedule-collaboration-tracking'); ?>');
-        
-        $.ajax({
-            url: '<?php echo esc_url(rest_url('ftt/v1/reactivate-subscription')); ?>',
-            method: 'POST',
-            headers: {
-                'X-WP-Nonce': '<?php echo wp_create_nonce('wp_rest'); ?>'
-            },
-            success: function() {
-                location.reload();
-            },
-            error: function() {
-                alert('<?php esc_html_e('Error reactivating subscription', 'schedule-collaboration-tracking'); ?>');
-                $button.prop('disabled', false).text('<?php esc_html_e('Reactivate Subscription', 'schedule-collaboration-tracking'); ?>');
-            }
-        });
-    });
-});
-</script>

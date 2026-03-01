@@ -10,18 +10,25 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class SRT_Shortcodes {
+class FTT_Shortcodes {
     
     /**
      * Initialize hooks
      */
     public static function init() {
-        add_shortcode('srt_calendar', array(__CLASS__, 'render_calendar'));
-        add_shortcode('srt_event_form', array(__CLASS__, 'render_event_form'));
-        add_shortcode('srt_dashboard', array(__CLASS__, 'render_dashboard'));
-        add_shortcode('srt_event_list', array(__CLASS__, 'render_event_list'));
-        add_shortcode('srt_calendar_subscribe', array(__CLASS__, 'render_calendar_subscribe'));
-        add_shortcode('srt_login', array(__CLASS__, 'render_login'));
+        add_shortcode('ftt_calendar', array(__CLASS__, 'render_calendar'));
+        add_shortcode('ftt_event_form', array(__CLASS__, 'render_event_form'));
+        add_shortcode('ftt_dashboard', array(__CLASS__, 'render_dashboard'));
+        add_shortcode('ftt_event_list', array(__CLASS__, 'render_event_list'));
+        add_shortcode('ftt_calendar_subscribe', array(__CLASS__, 'render_calendar_subscribe'));
+        add_shortcode('ftt_login', array(__CLASS__, 'render_login'));
+        add_shortcode('ftt_homepage', array(__CLASS__, 'render_homepage'));
+        
+        // Billing shortcodes
+        add_shortcode('ftt_pricing_page', array(__CLASS__, 'render_pricing'));
+        add_shortcode('ftt_manage_subscription', array(__CLASS__, 'render_manage_subscription'));
+        add_shortcode('ftt_checkout_success', array(__CLASS__, 'render_checkout_success'));
+        add_shortcode('ftt_checkout_cancel', array(__CLASS__, 'render_checkout_cancel'));
         
         // Add login redirect filters
         add_filter('login_redirect', array(__CLASS__, 'custom_login_redirect'), 10, 3);
@@ -33,7 +40,7 @@ class SRT_Shortcodes {
      */
     public static function render_calendar($atts) {
         // Check permissions
-        $settings = get_option('srt_settings', array());
+        $settings = get_option('ftt_settings', array());
         $require_login = $settings['require_login'] ?? false;
         
         if ($require_login && !is_user_logged_in()) {
@@ -41,7 +48,7 @@ class SRT_Shortcodes {
         }
         
         ob_start();
-        include SRT_PLUGIN_DIR . 'templates/calendar.php';
+        include FTT_PLUGIN_DIR . 'templates/calendar.php';
         return ob_get_clean();
     }
     
@@ -55,7 +62,7 @@ class SRT_Shortcodes {
         }
         
         ob_start();
-        include SRT_PLUGIN_DIR . 'templates/event-form.php';
+        include FTT_PLUGIN_DIR . 'templates/event-form.php';
         return ob_get_clean();
     }
     
@@ -64,7 +71,7 @@ class SRT_Shortcodes {
      */
     public static function render_dashboard($atts) {
         // Check permissions
-        $settings = get_option('srt_settings', array());
+        $settings = get_option('ftt_settings', array());
         $require_login = $settings['require_login'] ?? false;
         
         if ($require_login && !is_user_logged_in()) {
@@ -72,7 +79,16 @@ class SRT_Shortcodes {
         }
         
         ob_start();
-        include SRT_PLUGIN_DIR . 'templates/dashboard.php';
+        include FTT_PLUGIN_DIR . 'templates/dashboard.php';
+        return ob_get_clean();
+    }
+    
+    /**
+     * Render homepage shortcode
+     */
+    public static function render_homepage($atts) {
+        ob_start();
+        include FTT_PLUGIN_DIR . 'templates/homepage.php';
         return ob_get_clean();
     }
     
@@ -81,7 +97,7 @@ class SRT_Shortcodes {
      */
     public static function render_event_list($atts) {
         // Check permissions
-        $settings = get_option('srt_settings', array());
+        $settings = get_option('ftt_settings', array());
         $require_login = $settings['require_login'] ?? false;
         
         if ($require_login && !is_user_logged_in()) {
@@ -96,7 +112,7 @@ class SRT_Shortcodes {
         
         // Query upcoming events
         $args = array(
-            'post_type'      => 'srt_event',
+            'post_type'      => 'ftt_event',
             'posts_per_page' => intval($atts['limit']),
             'post_status'    => 'publish',
             'meta_query'     => array(
@@ -156,7 +172,7 @@ class SRT_Shortcodes {
         $query = new WP_Query($args);
         
         ob_start();
-        include SRT_PLUGIN_DIR . 'templates/event-list.php';
+        include FTT_PLUGIN_DIR . 'templates/event-list.php';
         wp_reset_postdata();
         return ob_get_clean();
     }
@@ -169,7 +185,7 @@ class SRT_Shortcodes {
             'token' => '', // Optional pre-filled token
         ), $atts);
         
-        $settings = get_option('srt_settings', array());
+        $settings = get_option('ftt_settings', array());
         $enabled = $settings['enable_ical_feed'] ?? false;
         
         if (!$enabled) {
@@ -177,14 +193,14 @@ class SRT_Shortcodes {
         }
         
         $requires_auth = $settings['ical_require_auth'] ?? false;
-        $feed_url = rest_url('srt/v1/calendar.ics');
+        $feed_url = rest_url('ftt/v1/calendar.ics');
         
         if ($requires_auth && !empty($atts['token'])) {
             $feed_url .= '?token=' . urlencode($atts['token']);
         }
         
         ob_start();
-        include SRT_PLUGIN_DIR . 'templates/calendar-subscribe.php';
+        include FTT_PLUGIN_DIR . 'templates/calendar-subscribe.php';
         return ob_get_clean();
     }
     
@@ -193,7 +209,7 @@ class SRT_Shortcodes {
      */
     public static function render_login($atts) {
         ob_start();
-        include SRT_PLUGIN_DIR . 'templates/login-form.php';
+        include FTT_PLUGIN_DIR . 'templates/login-form.php';
         return ob_get_clean();
     }
     
@@ -207,13 +223,13 @@ class SRT_Shortcodes {
             if (in_array('administrator', $user->roles) || in_array('editor', $user->roles)) {
                 // But if they came from our login page, send them to dashboard
                 if (strpos($redirect_to, 'sc-dashboard') !== false) {
-                    return home_url('/sc-dashboard/');
+                    return home_url('/ftt-dashboard/');
                 }
                 return $redirect_to;
             }
             
-            // For all other users (srt_member, srt_parent), always go to dashboard
-            return home_url('/sc-dashboard/');
+            // For all other users (ftt_member, ftt_parent), always go to dashboard
+            return home_url('/ftt-dashboard/');
         }
         
         return $redirect_to;
@@ -233,7 +249,7 @@ class SRT_Shortcodes {
                 if (strpos($redirect_to, 'sc-dashboard') !== false) {
                     remove_filter('authenticate', 'wp_authenticate_username_password', 20);
                     
-                    $login_url = home_url('/sc-login/');
+                    $login_url = home_url('/ftt-login/');
                     
                     if ($user->get_error_code() === 'invalid_username' || $user->get_error_code() === 'incorrect_password') {
                         $login_url = add_query_arg('login', 'failed', $login_url);
@@ -249,7 +265,256 @@ class SRT_Shortcodes {
         
         return $user;
     }
+    
+    /**
+     * Render pricing page shortcode
+     */
+    public static function render_pricing($atts) {
+        if (!file_exists(FTT_PLUGIN_DIR . 'templates/billing/pricing.php')) {
+            return '<p>Billing template not found.</p>';
+        }
+        
+        // Enqueue jQuery
+        wp_enqueue_script('jquery');
+        
+        // Add pricing page JavaScript inline to avoid WordPress content filters mangling it
+        $pricing_js = "
+        jQuery(document).ready(function($) {
+            // Toggle between monthly and yearly
+            function updatePricingDisplay() {
+                const interval = $('input[name=\"billing_interval\"]:checked').val();
+                $('.ftt-pricing-card').hide();
+                $(`.ftt-pricing-card[data-interval=\"\${interval}\"]`).show();
+            }
+            
+            // Initialize display on page load
+            updatePricingDisplay();
+            
+            // Handle radio button changes
+            $('input[name=\"billing_interval\"]').on('change', function() {
+                updatePricingDisplay();
+            });
+            
+            // Quantity control buttons
+            $('.ftt-qty-btn').on('click', function() {
+                const \$btn = $(this);
+                const targetId = \$btn.data('target');
+                const \$input = $('#' + targetId);
+                const \$total = \$input.closest('.ftt-addon-selector').find('.ftt-addon-total');
+                let current = parseInt(\$input.val()) || 0;
+                const max = parseInt(\$input.attr('max'));
+                const min = parseInt(\$input.attr('min'));
+                
+                if (\$btn.hasClass('ftt-qty-plus') && current < max) {
+                    current++;
+                } else if (\$btn.hasClass('ftt-qty-minus') && current > min) {
+                    current--;
+                }
+                
+                \$input.val(current);
+                
+                // Update total display
+                const interval = targetId.includes('month') ? 'month' : 'year';
+                const pricePerChild = interval === 'month' ? 5 : 50;
+                const totalAddon = current * pricePerChild;
+                \$total.text('+$' + totalAddon + '/' + interval);
+                
+                // Update button states
+                \$input.closest('.ftt-quantity-control').find('.ftt-qty-minus').prop('disabled', current <= min);
+                \$input.closest('.ftt-quantity-control').find('.ftt-qty-plus').prop('disabled', current >= max);
+            });
+            
+            // Initialize button states
+            $('.ftt-addon-qty').each(function() {
+                const \$input = $(this);
+                const current = parseInt(\$input.val()) || 0;
+                const min = parseInt(\$input.attr('min'));
+                \$input.closest('.ftt-quantity-control').find('.ftt-qty-minus').prop('disabled', current <= min);
+            });
+            
+            // Handle checkout button
+            $('.ftt-cta-button[data-interval]').on('click', function(e) {
+                e.preventDefault();
+                const interval = $(this).data('interval');
+                const \$button = $(this);
+                
+                // Get addon quantity for the current interval
+                const addonQty = parseInt($('#addon-qty-' + interval).val()) || 0;
+                
+                \$button.prop('disabled', true).text('" . esc_js(__('Creating checkout...', 'schedule-collaboration-tracking')) . "');
+                
+                // Call REST API to create checkout session
+                $.ajax({
+                    url: '" . esc_url(rest_url('ftt/v1/create-checkout')) . "',
+                    method: 'POST',
+                    headers: {
+                        'X-WP-Nonce': '" . wp_create_nonce('wp_rest') . "'
+                    },
+                    data: JSON.stringify({
+                        interval: interval,
+                        addon_quantity: addonQty
+                    }),
+                    contentType: 'application/json',
+                    success: function(response) {
+                        if (response.url) {
+                            window.location.href = response.url;
+                        } else {
+                            alert('" . esc_js(__('Error creating checkout session', 'schedule-collaboration-tracking')) . "');
+                            \$button.prop('disabled', false).text('" . esc_js(__('Start Free Trial', 'schedule-collaboration-tracking')) . "');
+                        }
+                    },
+                    error: function(xhr) {
+                        let errorMsg = '" . esc_js(__('Error creating checkout session', 'schedule-collaboration-tracking')) . "';
+                        if (xhr.responseJSON && xhr.responseJSON.message) {
+                            errorMsg += ': ' + xhr.responseJSON.message;
+                        }
+                        alert(errorMsg);
+                        \$button.prop('disabled', false).text('" . esc_js(__('Start Free Trial', 'schedule-collaboration-tracking')) . "');
+                    }
+                });
+            });
+        });
+        ";
+        
+        wp_add_inline_script('jquery', $pricing_js);
+        
+        ob_start();
+        include FTT_PLUGIN_DIR . 'templates/billing/pricing.php';
+        return ob_get_clean();
+    }
+    
+    /**
+     * Render manage subscription shortcode
+     */
+    public static function render_manage_subscription($atts) {
+        if (!is_user_logged_in()) {
+            return '<p>' . esc_html__('Please log in to manage your subscription.', 'schedule-collaboration-tracking') . '</p>';
+        }
+        
+        if (!file_exists(FTT_PLUGIN_DIR . 'templates/billing/manage-subscription.php')) {
+            return '<p>Billing template not found.</p>';
+        }
+        
+        // Enqueue jQuery
+        wp_enqueue_script('jquery');
+        
+        // Add manage subscription JavaScript inline to avoid WordPress content filters
+        $manage_js = "
+        jQuery(document).ready(function($) {
+            // Add child addon
+            $('#ftt-add-child-addon').on('click', function() {
+                if (!confirm('" . esc_js(__('Add another child slot? You will be charged a prorated amount today.', 'schedule-collaboration-tracking')) . "')) {
+                    return;
+                }
+                
+                const \$button = $(this);
+                \$button.prop('disabled', true).text('" . esc_js(__('Processing...', 'schedule-collaboration-tracking')) . "');
+                
+                $.ajax({
+                    url: '" . esc_url(rest_url('ftt/v1/add-child-addon')) . "',
+                    method: 'POST',
+                    headers: {
+                        'X-WP-Nonce': '" . wp_create_nonce('wp_rest') . "'
+                    },
+                    success: function() {
+                        location.reload();
+                    },
+                    error: function() {
+                        alert('" . esc_js(__('Error adding child addon', 'schedule-collaboration-tracking')) . "');
+                        \$button.prop('disabled', false).text('" . esc_js(__('Add Child Slot', 'schedule-collaboration-tracking')) . "');
+                    }
+                });
+            });
+            
+            // Billing portal
+            $('#ftt-billing-portal').on('click', function() {
+                const \$button = $(this);
+                \$button.prop('disabled', true).text('" . esc_js(__('Loading...', 'schedule-collaboration-tracking')) . "');
+                
+                window.location.href = '" . esc_url(rest_url('ftt/v1/billing-portal')) . "?_wpnonce=" . wp_create_nonce('wp_rest') . "';
+            });
+            
+            // Cancel subscription
+            $('#ftt-cancel-subscription').on('click', function() {
+                if (!confirm('" . esc_js(__('Are you sure you want to cancel? You will keep access until the end of your billing period.', 'schedule-collaboration-tracking')) . "')) {
+                    return;
+                }
+                
+                const \$button = $(this);
+                \$button.prop('disabled', true).text('" . esc_js(__('Canceling...', 'schedule-collaboration-tracking')) . "');
+                
+                $.ajax({
+                    url: '" . esc_url(rest_url('ftt/v1/cancel-subscription')) . "',
+                    method: 'POST',
+                    headers: {
+                        'X-WP-Nonce': '" . wp_create_nonce('wp_rest') . "'
+                    },
+                    success: function() {
+                        location.reload();
+                    },
+                    error: function() {
+                        alert('" . esc_js(__('Error canceling subscription', 'schedule-collaboration-tracking')) . "');
+                        \$button.prop('disabled', false).text('" . esc_js(__('Cancel Subscription', 'schedule-collaboration-tracking')) . "');
+                    }
+                });
+            });
+            
+            // Reactivate subscription
+            $('#ftt-reactivate-subscription').on('click', function() {
+                const \$button = $(this);
+                \$button.prop('disabled', true).text('" . esc_js(__('Reactivating...', 'schedule-collaboration-tracking')) . "');
+                
+                $.ajax({
+                    url: '" . esc_url(rest_url('ftt/v1/reactivate-subscription')) . "',
+                    method: 'POST',
+                    headers: {
+                        'X-WP-Nonce': '" . wp_create_nonce('wp_rest') . "'
+                    },
+                    success: function() {
+                        location.reload();
+                    },
+                    error: function() {
+                        alert('" . esc_js(__('Error reactivating subscription', 'schedule-collaboration-tracking')) . "');
+                        \$button.prop('disabled', false).text('" . esc_js(__('Reactivate Subscription', 'schedule-collaboration-tracking')) . "');
+                    }
+                });
+            });
+        });
+        ";
+        
+        wp_add_inline_script('jquery', $manage_js);
+        
+        ob_start();
+        include FTT_PLUGIN_DIR . 'templates/billing/manage-subscription.php';
+        return ob_get_clean();
+    }
+    
+    /**
+     * Render checkout success shortcode
+     */
+    public static function render_checkout_success($atts) {
+        if (!file_exists(FTT_PLUGIN_DIR . 'templates/billing/checkout-success.php')) {
+            return '<p>Success template not found.</p>';
+        }
+        
+        ob_start();
+        include FTT_PLUGIN_DIR . 'templates/billing/checkout-success.php';
+        return ob_get_clean();
+    }
+    
+    /**
+     * Render checkout cancel shortcode
+     */
+    public static function render_checkout_cancel($atts) {
+        if (!file_exists(FTT_PLUGIN_DIR . 'templates/billing/checkout-cancel.php')) {
+            return '<p>Cancel template not found.</p>';
+        }
+        
+        ob_start();
+        include FTT_PLUGIN_DIR . 'templates/billing/checkout-cancel.php';
+        return ob_get_clean();
+    }
 }
 
 // Initialize
-SRT_Shortcodes::init();
+FTT_Shortcodes::init();

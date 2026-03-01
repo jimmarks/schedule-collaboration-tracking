@@ -10,7 +10,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class SRT_REST {
+class FTT_REST {
     
     /**
      * Initialize hooks
@@ -24,7 +24,7 @@ class SRT_REST {
      */
     public static function register_routes() {
         // Get events list
-        register_rest_route('srt/v1', '/events', array(
+        register_rest_route('ftt/v1', '/events', array(
             'methods'             => 'GET',
             'callback'            => array(__CLASS__, 'get_events'),
             'permission_callback' => array(__CLASS__, 'check_read_permission'),
@@ -53,7 +53,7 @@ class SRT_REST {
         ));
         
         // Get single event
-        register_rest_route('srt/v1', '/events/(?P<id>\d+)', array(
+        register_rest_route('ftt/v1', '/events/(?P<id>\d+)', array(
             'methods'             => 'GET',
             'callback'            => array(__CLASS__, 'get_event'),
             'permission_callback' => array(__CLASS__, 'check_read_permission'),
@@ -67,7 +67,7 @@ class SRT_REST {
         ));
         
         // Create event
-        register_rest_route('srt/v1', '/events', array(
+        register_rest_route('ftt/v1', '/events', array(
             'methods'             => 'POST',
             'callback'            => array(__CLASS__, 'create_event'),
             'permission_callback' => array(__CLASS__, 'check_edit_permission'),
@@ -81,7 +81,7 @@ class SRT_REST {
         ));
         
         // Update event
-        register_rest_route('srt/v1', '/events/(?P<id>\d+)', array(
+        register_rest_route('ftt/v1', '/events/(?P<id>\d+)', array(
             'methods'             => 'PUT',
             'callback'            => array(__CLASS__, 'update_event'),
             'permission_callback' => array(__CLASS__, 'check_edit_permission'),
@@ -95,7 +95,7 @@ class SRT_REST {
         ));
         
         // Delete event
-        register_rest_route('srt/v1', '/events/(?P<id>\d+)', array(
+        register_rest_route('ftt/v1', '/events/(?P<id>\d+)', array(
             'methods'             => 'DELETE',
             'callback'            => array(__CLASS__, 'delete_event'),
             'permission_callback' => array(__CLASS__, 'check_delete_permission'),
@@ -109,28 +109,28 @@ class SRT_REST {
         ));
         
         // Get dashboard data
-        register_rest_route('srt/v1', '/dashboard', array(
+        register_rest_route('ftt/v1', '/dashboard', array(
             'methods'             => 'GET',
             'callback'            => array(__CLASS__, 'get_dashboard'),
             'permission_callback' => array(__CLASS__, 'check_read_permission'),
         ));
         
         // Get registration page URL
-        register_rest_route('srt/v1', '/registration-url', array(
+        register_rest_route('ftt/v1', '/registration-url', array(
             'methods'             => 'GET',
             'callback'            => array(__CLASS__, 'get_registration_url'),
             'permission_callback' => '__return_true', // Public endpoint
         ));
         
         // Get flight groups with pricing for current user
-        register_rest_route('srt/v1', '/flight-groups', array(
+        register_rest_route('ftt/v1', '/flight-groups', array(
             'methods'             => 'GET',
             'callback'            => array(__CLASS__, 'get_flight_groups'),
             'permission_callback' => array(__CLASS__, 'check_read_permission'),
         ));
         
         // Get specific flight group details
-        register_rest_route('srt/v1', '/flight-group/(?P<group_id>[a-zA-Z0-9_-]+)', array(
+        register_rest_route('ftt/v1', '/flight-group/(?P<group_id>[a-zA-Z0-9_-]+)', array(
             'methods'             => 'GET',
             'callback'            => array(__CLASS__, 'get_flight_group'),
             'permission_callback' => array(__CLASS__, 'check_read_permission'),
@@ -142,7 +142,7 @@ class SRT_REST {
         ));
         
         // Create price alert
-        register_rest_route('srt/v1', '/price-alerts', array(
+        register_rest_route('ftt/v1', '/price-alerts', array(
             'methods'             => 'POST',
             'callback'            => array(__CLASS__, 'create_price_alert'),
             'permission_callback' => '__return_true',
@@ -174,7 +174,7 @@ class SRT_REST {
         ));
         
         // Manual price check endpoint
-        register_rest_route('srt/v1', '/check-price', array(
+        register_rest_route('ftt/v1', '/check-price', array(
             'methods'             => 'POST',
             'callback'            => array(__CLASS__, 'manual_price_check'),
             'permission_callback' => '__return_true',
@@ -191,7 +191,7 @@ class SRT_REST {
         ));
         
         // Get price history endpoint
-        register_rest_route('srt/v1', '/price-history', array(
+        register_rest_route('ftt/v1', '/price-history', array(
             'methods'             => 'GET',
             'callback'            => array(__CLASS__, 'get_price_history'),
             'permission_callback' => '__return_true',
@@ -208,30 +208,37 @@ class SRT_REST {
         ));
         
         // Get user's price alerts
-        register_rest_route('srt/v1', '/my-alerts', array(
+        register_rest_route('ftt/v1', '/my-alerts', array(
             'methods'             => 'GET',
             'callback'            => array(__CLASS__, 'get_user_alerts'),
             'permission_callback' => 'is_user_logged_in',
         ));
         
         // Delete price alert
-        register_rest_route('srt/v1', '/price-alerts/(?P<id>\d+)', array(
+        register_rest_route('ftt/v1', '/price-alerts/(?P<id>\d+)', array(
             'methods'             => 'DELETE',
             'callback'            => array(__CLASS__, 'delete_price_alert'),
             'permission_callback' => 'is_user_logged_in',
         ));
         
         // Get/Update user preferences
-        register_rest_route('srt/v1', '/user-preferences', array(
+        register_rest_route('ftt/v1', '/user-preferences', array(
             'methods'             => 'GET',
             'callback'            => array(__CLASS__, 'get_user_preferences'),
             'permission_callback' => 'is_user_logged_in',
         ));
         
-        register_rest_route('srt/v1', '/user-preferences', array(
+        register_rest_route('ftt/v1', '/user-preferences', array(
             'methods'             => 'POST',
             'callback'            => array(__CLASS__, 'update_user_preferences'),
             'permission_callback' => 'is_user_logged_in',
+        ));
+        
+        // Public registration endpoint (for sign-up page on www domain)
+        register_rest_route('ftt/v1', '/register', array(
+            'methods'             => 'POST',
+            'callback'            => array(__CLASS__, 'register_new_user'),
+            'permission_callback' => '__return_true', // Public endpoint
         ));
         
         // Billing endpoints
@@ -266,7 +273,7 @@ class SRT_REST {
      * Check read permission
      */
     public static function check_read_permission() {
-        $settings = get_option('srt_settings', array());
+        $settings = get_option('ftt_settings', array());
         $require_login = $settings['require_login'] ?? false;
         
         if ($require_login && !is_user_logged_in()) {
@@ -297,7 +304,7 @@ class SRT_REST {
         $current_user_id = get_current_user_id();
         
         $args = array(
-            'post_type'      => 'srt_event',
+            'post_type'      => 'ftt_event',
             'posts_per_page' => -1,
             'post_status'    => 'publish',
             'orderby'        => 'meta_value',
@@ -319,9 +326,9 @@ class SRT_REST {
             );
         } else {
             // Auto-filter based on user role
-            if (SRT_Roles::is_parent($current_user_id)) {
+            if (FTT_Roles::is_parent($current_user_id)) {
                 // User is a parent - show all children's events
-                $children = SRT_Roles::get_children($current_user_id);
+                $children = FTT_Roles::get_children($current_user_id);
                 if (!empty($children)) {
                     // get_children() already returns an array of user IDs
                     $meta_query[] = array(
@@ -330,7 +337,7 @@ class SRT_REST {
                         'compare' => 'IN',
                     );
                 }
-            } elseif (SRT_Roles::is_member($current_user_id)) {
+            } elseif (FTT_Roles::is_member($current_user_id)) {
                 // User is a member - show only their own events
                 $meta_query[] = array(
                     'key'     => 'member_id',
@@ -387,7 +394,7 @@ class SRT_REST {
     public static function get_event($request) {
         $post = get_post($request['id']);
         
-        if (!$post || $post->post_type !== 'srt_event') {
+        if (!$post || $post->post_type !== 'ftt_event') {
             return new WP_Error('not_found', __('Event not found', 'schedule-collaboration-tracking'), array('status' => 404));
         }
         
@@ -399,7 +406,7 @@ class SRT_REST {
      */
     public static function create_event($request) {
         $post_data = array(
-            'post_type'   => 'srt_event',
+            'post_type'   => 'ftt_event',
             'post_title'  => $request->get_param('title'),
             'post_status' => 'publish',
         );
@@ -427,7 +434,7 @@ class SRT_REST {
     public static function update_event($request) {
         $post = get_post($request['id']);
         
-        if (!$post || $post->post_type !== 'srt_event') {
+        if (!$post || $post->post_type !== 'ftt_event') {
             return new WP_Error('not_found', __('Event not found', 'schedule-collaboration-tracking'), array('status' => 404));
         }
         
@@ -460,12 +467,12 @@ class SRT_REST {
         
         $post = get_post($request['id']);
         
-        if (!$post || $post->post_type !== 'srt_event') {
+        if (!$post || $post->post_type !== 'ftt_event') {
             return new WP_Error('not_found', __('Event not found', 'schedule-collaboration-tracking'), array('status' => 404));
         }
         
         // Delete all price alerts associated with this event
-        $alerts_table = $wpdb->prefix . 'srt_price_alerts';
+        $alerts_table = $wpdb->prefix . 'ftt_price_alerts';
         $deleted_alerts = $wpdb->delete(
             $alerts_table,
             array('event_id' => $post->ID),
@@ -489,12 +496,12 @@ class SRT_REST {
      * Get registration page URL
      */
     public static function get_registration_url($request) {
-        $url = SRT_Pages::get_registration_url();
+        $url = FTT_Pages::get_registration_url();
         
         if (!$url) {
             return new WP_Error(
                 'no_registration_page',
-                __('Registration page not found. Please create a page with the [srt_register] shortcode.', 'schedule-collaboration-tracking'),
+                __('Registration page not found. Please create a page with the [ftt_register] shortcode.', 'schedule-collaboration-tracking'),
                 array('status' => 404)
             );
         }
@@ -512,19 +519,19 @@ class SRT_REST {
         
         error_log('=== DASHBOARD DEBUG ===');
         error_log('Current User ID: ' . $current_user_id);
-        error_log('Is Member: ' . (SRT_Roles::is_member($current_user_id) ? 'yes' : 'no'));
-        error_log('Is Parent: ' . (SRT_Roles::is_parent($current_user_id) ? 'yes' : 'no'));
+        error_log('Is Member: ' . (FTT_Roles::is_member($current_user_id) ? 'yes' : 'no'));
+        error_log('Is Parent: ' . (FTT_Roles::is_parent($current_user_id) ? 'yes' : 'no'));
         
         // Determine which member IDs to query for
         $member_ids = array();
         
-        if (SRT_Roles::is_member($current_user_id)) {
+        if (FTT_Roles::is_member($current_user_id)) {
             // Members see only their own events
             $member_ids = array($current_user_id);
             error_log('Member mode: showing events for user ' . $current_user_id);
-        } elseif (SRT_Roles::is_parent($current_user_id)) {
+        } elseif (FTT_Roles::is_parent($current_user_id)) {
             // Parents see their children's events
-            $children = SRT_Roles::get_children($current_user_id);
+            $children = FTT_Roles::get_children($current_user_id);
             error_log('Parent mode: found ' . count($children) . ' children');
             if (!empty($children)) {
                 // get_children() already returns an array of user IDs
@@ -558,7 +565,7 @@ class SRT_REST {
         }
         
         // For parents, also include unassigned events and events they created themselves
-        if (SRT_Roles::is_parent($current_user_id)) {
+        if (FTT_Roles::is_parent($current_user_id)) {
             // Include events with no member_id set
             $member_meta_query[] = array(
                 'key'     => 'member_id',
@@ -582,7 +589,7 @@ class SRT_REST {
         
         // Flights needed (future events with flight_needed = true)
         $flights_needed = new WP_Query(array(
-            'post_type'      => 'srt_event',
+            'post_type'      => 'ftt_event',
             'posts_per_page' => -1,
             'post_status'    => 'publish',
             'meta_query'     => array(
@@ -636,7 +643,7 @@ class SRT_REST {
         
         // Upcoming travel (next 30 days with travel_needed = true)
         $upcoming_travel = new WP_Query(array(
-            'post_type'      => 'srt_event',
+            'post_type'      => 'ftt_event',
             'posts_per_page' => -1,
             'post_status'    => 'publish',
             'meta_query'     => array(
@@ -682,10 +689,10 @@ class SRT_REST {
             'upcoming_travel' => $upcoming_travel_data,
             'debug' => array(
                 'user_id' => $current_user_id,
-                'is_member' => SRT_Roles::is_member($current_user_id),
-                'is_parent' => SRT_Roles::is_parent($current_user_id),
+                'is_member' => FTT_Roles::is_member($current_user_id),
+                'is_parent' => FTT_Roles::is_parent($current_user_id),
                 'member_ids' => $member_ids,
-                'children_count' => SRT_Roles::is_parent($current_user_id) ? count(SRT_Roles::get_children($current_user_id)) : 0,
+                'children_count' => FTT_Roles::is_parent($current_user_id) ? count(FTT_Roles::get_children($current_user_id)) : 0,
                 'query_found_posts' => $flights_needed->found_posts,
             ),
         ));
@@ -704,8 +711,8 @@ class SRT_REST {
         $member_ids = array($current_user->ID);
         
         // If parent, include children
-        if (SRT_Roles::is_parent($current_user->ID)) {
-            $children = SRT_Roles::get_children($current_user->ID);
+        if (FTT_Roles::is_parent($current_user->ID)) {
+            $children = FTT_Roles::get_children($current_user->ID);
             if (!empty($children)) {
                 $member_ids = array_merge($member_ids, $children);
             }
@@ -714,7 +721,7 @@ class SRT_REST {
         // Get all flight groups for these members
         $all_groups = array();
         foreach ($member_ids as $member_id) {
-            $member_groups = SRT_Flight_Linking::get_member_flight_groups($member_id);
+            $member_groups = FTT_Flight_Linking::get_member_flight_groups($member_id);
             $all_groups = array_merge($all_groups, $member_groups);
         }
         
@@ -727,8 +734,8 @@ class SRT_REST {
         // Get pricing for each group
         $groups_with_pricing = array();
         foreach ($unique_groups as $group) {
-            $pricing_response = SRT_Flight_Linking::get_flight_group_pricing(
-                new WP_REST_Request('GET', '/srt/v1/flight-group-pricing/' . $group['group_id'])
+            $pricing_response = FTT_Flight_Linking::get_flight_group_pricing(
+                new WP_REST_Request('GET', '/ftt/v1/flight-group-pricing/' . $group['group_id'])
             );
             
             if (!is_wp_error($pricing_response)) {
@@ -747,7 +754,7 @@ class SRT_REST {
         $group_id = $request->get_param('group_id');
         
         // Get all legs in this group
-        $legs = SRT_Flight_Linking::get_flight_group_legs($group_id);
+        $legs = FTT_Flight_Linking::get_flight_group_legs($group_id);
         
         if (empty($legs)) {
             return new WP_Error('not_found', 'Flight group not found', array('status' => 404));
@@ -817,7 +824,7 @@ class SRT_REST {
                         
                         if (!$was_booked) {
                             // This leg was just marked as booked - delete all price alerts for it
-                            $alerts_table = $wpdb->prefix . 'srt_price_alerts';
+                            $alerts_table = $wpdb->prefix . 'ftt_price_alerts';
                             $deleted = $wpdb->delete(
                                 $alerts_table,
                                 array(
@@ -856,12 +863,12 @@ class SRT_REST {
         
         // Validate event exists
         $event = get_post($event_id);
-        if (!$event || $event->post_type !== 'srt_event') {
+        if (!$event || $event->post_type !== 'ftt_event') {
             return new WP_Error('invalid_event', 'Invalid event ID', array('status' => 404));
         }
         
         // Insert alert
-        $alerts_table = $wpdb->prefix . 'srt_price_alerts';
+        $alerts_table = $wpdb->prefix . 'ftt_price_alerts';
         $result = $wpdb->insert($alerts_table, array(
             'user_id' => $user_id,
             'event_id' => $event_id,
@@ -880,7 +887,7 @@ class SRT_REST {
         $alert_id = $wpdb->insert_id;
         
         // Send confirmation email
-        $confirmation = SRT_Price_Tracking::send_alert_confirmation($alert_id);
+        $confirmation = FTT_Price_Tracking::send_alert_confirmation($alert_id);
         
         return rest_ensure_response(array(
             'success' => true,
@@ -900,7 +907,7 @@ class SRT_REST {
         
         // Validate event exists
         $event = get_post($event_id);
-        if (!$event || $event->post_type !== 'srt_event') {
+        if (!$event || $event->post_type !== 'ftt_event') {
             return new WP_Error('invalid_event', 'Invalid event ID', array('status' => 404));
         }
         
@@ -952,14 +959,14 @@ class SRT_REST {
         
         // Fetch current price (round-trip or one-way)
         if ($is_round_trip) {
-            $price_result = SRT_Price_Tracking::fetch_flight_price_serpapi(
+            $price_result = FTT_Price_Tracking::fetch_flight_price_serpapi(
                 $leg['depart_airport'],
                 $leg['arrive_airport'],
                 $leg['depart_date'],
                 $return_date  // Pass return date for round-trip
             );
         } else {
-            $price_result = SRT_Price_Tracking::fetch_flight_price_serpapi(
+            $price_result = FTT_Price_Tracking::fetch_flight_price_serpapi(
                 $leg['depart_airport'],
                 $leg['arrive_airport'],
                 $leg['depart_date']
@@ -1003,7 +1010,7 @@ class SRT_REST {
         // Record the price
         $trip_type = $is_round_trip ? 'manual_roundtrip' : 'manual';
         error_log("SRT: Recording price check - Event: $event_id, Leg: $leg_index, Price: $price, Type: $trip_type");
-        $recorded_id = SRT_Price_Tracking::record_price(
+        $recorded_id = FTT_Price_Tracking::record_price(
             $event_id,
             $leg_index,
             $leg['depart_airport'],
@@ -1066,7 +1073,7 @@ class SRT_REST {
         $event_id = $request->get_param('event_id');
         $leg_index = $request->get_param('leg_index');
         
-        $table_name = $wpdb->prefix . 'srt_price_history';
+        $table_name = $wpdb->prefix . 'ftt_price_history';
         
         error_log("SRT get_price_history: event=$event_id, leg=$leg_index");
         
@@ -1165,7 +1172,7 @@ class SRT_REST {
         global $wpdb;
         
         $user_id = get_current_user_id();
-        $alerts_table = $wpdb->prefix . 'srt_price_alerts';
+        $alerts_table = $wpdb->prefix . 'ftt_price_alerts';
         
         $alerts = $wpdb->get_results($wpdb->prepare(
             "SELECT a.*, p.post_title as event_title 
@@ -1200,7 +1207,7 @@ class SRT_REST {
         
         $user_id = get_current_user_id();
         $alert_id = $request['id'];
-        $alerts_table = $wpdb->prefix . 'srt_price_alerts';
+        $alerts_table = $wpdb->prefix . 'ftt_price_alerts';
         
         // Verify ownership
         $alert = $wpdb->get_row($wpdb->prepare(
@@ -1232,7 +1239,7 @@ class SRT_REST {
         $user_id = get_current_user_id();
         
         $preferences = array(
-            'home_airport' => get_user_meta($user_id, 'srt_home_airport', true) ?: '',
+            'home_airport' => get_user_meta($user_id, 'ftt_home_airport', true) ?: '',
             'timezone' => get_user_meta($user_id, 'srt_timezone', true) ?: wp_timezone_string(),
         );
         
@@ -1249,7 +1256,7 @@ class SRT_REST {
         $timezone = $request->get_param('timezone');
         
         if ($home_airport !== null) {
-            update_user_meta($user_id, 'srt_home_airport', strtoupper(sanitize_text_field($home_airport)));
+            update_user_meta($user_id, 'ftt_home_airport', strtoupper(sanitize_text_field($home_airport)));
         }
         
         if ($timezone !== null) {
@@ -1330,7 +1337,81 @@ class SRT_REST {
     }
     
     /**
-     * Create Stripe checkout session
+     * Register new user and create checkout session
+     * Public endpoint for sign-up page on www domain
+     */
+    public static function register_new_user($request) {
+        $params = $request->get_json_params();
+        
+        // Validate required fields
+        $email = sanitize_email($params['email'] ?? '');
+        $name = sanitize_text_field($params['name'] ?? '');
+        $password = $params['password'] ?? '';
+        $interval = $params['interval'] ?? 'month';
+        $addon_quantity = (int) ($params['addon_quantity'] ?? 0);
+        
+        if (empty($email) || !is_email($email)) {
+            return new WP_Error('invalid_email', 'Please provide a valid email address', ['status' => 400]);
+        }
+        
+        if (empty($name)) {
+            return new WP_Error('invalid_name', 'Please provide your name', ['status' => 400]);
+        }
+        
+        if (empty($password) || strlen($password) < 8) {
+            return new WP_Error('invalid_password', 'Password must be at least 8 characters', ['status' => 400]);
+        }
+        
+        if (!in_array($interval, ['month', 'year'])) {
+            return new WP_Error('invalid_interval', 'Invalid billing interval', ['status' => 400]);
+        }
+        
+        // Check if user already exists
+        if (email_exists($email)) {
+            return new WP_Error('email_exists', 'An account with this email already exists. Please log in instead.', ['status' => 400]);
+        }
+        
+        // Create WordPress user
+        $user_id = wp_create_user($email, $password, $email);
+        
+        if (is_wp_error($user_id)) {
+            return new WP_Error('registration_failed', 'Failed to create account: ' . $user_id->get_error_message(), ['status' => 500]);
+        }
+        
+        // Update user display name
+        wp_update_user([
+            'ID' => $user_id,
+            'display_name' => $name,
+            'first_name' => $name,
+        ]);
+        
+        // Set user role to subscriber
+        $user = new WP_User($user_id);
+        $user->set_role('subscriber');
+        
+        // Log user in
+        wp_set_current_user($user_id);
+        wp_set_auth_cookie($user_id, true);
+        
+        do_action('ftt_user_registered', $user_id, $email, $name);
+        
+        // Create Stripe checkout session
+        $session = FTT_Stripe_Integration::create_checkout_session($user_id, $interval, $addon_quantity);
+        
+        if (!$session) {
+            // If checkout fails, still keep the account but return error
+            return new WP_Error('checkout_failed', 'Account created but failed to initialize checkout. Please contact support.', ['status' => 500]);
+        }
+        
+        return rest_ensure_response([
+            'success' => true,
+            'user_id' => $user_id,
+            'checkout_url' => $session['url'],
+        ]);
+    }
+    
+    /**
+     * Create Stripe checkout session (for logged-in users)
      */
     public static function create_checkout_session($request) {
         $user_id = get_current_user_id();

@@ -10,7 +10,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class SRT_CPT {
+class FTT_CPT {
     
     /**
      * Initialize hooks
@@ -32,8 +32,8 @@ class SRT_CPT {
     public static function test_hook() {
         global $current_screen;
         error_log('test_hook called on screen: ' . ($current_screen ? $current_screen->id : 'unknown'));
-        if ($current_screen && $current_screen->id === 'edit-srt_event') {
-            error_log('We are on edit-srt_event screen');
+        if ($current_screen && $current_screen->id === 'edit-ftt_event') {
+            error_log('We are on edit-ftt_event screen');
         }
     }
     
@@ -86,14 +86,14 @@ class SRT_CPT {
             'show_in_rest'       => true,
         );
         
-        register_post_type('srt_event', $args);
+        register_post_type('ftt_event', $args);
     }
     
     /**
      * Get event types
      */
     public static function get_event_types() {
-        $settings = get_option('srt_settings', array());
+        $settings = get_option('ftt_settings', array());
         
         // Use custom event types if defined
         if (!empty($settings['event_types'])) {
@@ -125,7 +125,7 @@ class SRT_CPT {
      * Get event type color
      */
     public static function get_event_type_color($type_key) {
-        $settings = get_option('srt_settings', array());
+        $settings = get_option('ftt_settings', array());
         
         if (!empty($settings['event_types'][$type_key]['color'])) {
             return $settings['event_types'][$type_key]['color'];
@@ -195,12 +195,12 @@ class SRT_CPT {
     public static function redirect_to_custom_form() {
         global $pagenow;
         
-        // Check if we're on post.php or post-new.php for srt_event
+        // Check if we're on post.php or post-new.php for ftt_event
         if (($pagenow === 'post.php' || $pagenow === 'post-new.php') && 
-            isset($_GET['post_type']) && $_GET['post_type'] === 'srt_event') {
+            isset($_GET['post_type']) && $_GET['post_type'] === 'ftt_event') {
             
             // Get the event form page URL
-            $event_form_url = SRT_Pages::get_page_url('event_form');
+            $event_form_url = FTT_Pages::get_page_url('event_form');
             
             if ($event_form_url) {
                 // Add event ID if editing
@@ -216,8 +216,8 @@ class SRT_CPT {
         // Also handle when editing existing event (post.php without post_type param)
         if ($pagenow === 'post.php' && isset($_GET['post']) && !isset($_GET['post_type'])) {
             $post = get_post(intval($_GET['post']));
-            if ($post && $post->post_type === 'srt_event') {
-                $event_form_url = SRT_Pages::get_page_url('event_form');
+            if ($post && $post->post_type === 'ftt_event') {
+                $event_form_url = FTT_Pages::get_page_url('event_form');
                 if ($event_form_url) {
                     $event_form_url = add_query_arg('event_id', $post->ID, $event_form_url);
                     wp_redirect($event_form_url);
@@ -231,8 +231,8 @@ class SRT_CPT {
      * Modify row actions to point to custom form
      */
     public static function modify_row_actions($actions, $post) {
-        if ($post->post_type === 'srt_event') {
-            $event_form_url = SRT_Pages::get_page_url('event_form');
+        if ($post->post_type === 'ftt_event') {
+            $event_form_url = FTT_Pages::get_page_url('event_form');
             
             if ($event_form_url) {
                 // Replace Edit link
@@ -262,9 +262,9 @@ class SRT_CPT {
         
         error_log('bulk_edit_custom_box called - column: ' . $column_name . ', post_type: ' . $post_type);
         
-        // Only render for srt_event post type
-        if ($post_type !== 'srt_event') {
-            error_log('Skipping - not srt_event');
+        // Only render for ftt_event post type
+        if ($post_type !== 'ftt_event') {
+            error_log('Skipping - not ftt_event');
             return;
         }
         
@@ -274,13 +274,13 @@ class SRT_CPT {
             return;
         }
         
-        // Check if SRT_Roles class exists
-        if (!class_exists('SRT_Roles')) {
-            error_log('SRT_Roles class does not exist');
+        // Check if FTT_Roles class exists
+        if (!class_exists('FTT_Roles')) {
+            error_log('FTT_Roles class does not exist');
             return;
         }
         
-        $members = SRT_Roles::get_all_members();
+        $members = FTT_Roles::get_all_members();
         error_log('Found ' . count($members) . ' members');
         
         if (empty($members)) {
@@ -296,7 +296,7 @@ class SRT_CPT {
                 <label>
                     <span class="title"><?php _e('Assign to Member', 'schedule-collaboration-tracking'); ?></span>
                     <span class="input-text-wrap">
-                        <select name="srt_bulk_assign_member" id="srt_bulk_assign_member">
+                        <select name="ftt_bulk_assign_member" id="ftt_bulk_assign_member">
                             <option value="-1"><?php _e('— No Change —', 'schedule-collaboration-tracking'); ?></option>
                             <?php foreach ($members as $member): ?>
                                 <option value="<?php echo esc_attr($member->ID); ?>">
@@ -321,20 +321,20 @@ class SRT_CPT {
         error_log('REQUEST data: ' . print_r($_REQUEST, true));
         
         // Check if this is a bulk edit
-        if (!isset($_REQUEST['srt_bulk_assign_member'])) {
-            error_log('srt_bulk_assign_member not set in REQUEST');
+        if (!isset($_REQUEST['ftt_bulk_assign_member'])) {
+            error_log('ftt_bulk_assign_member not set in REQUEST');
             return;
         }
         
-        error_log('srt_bulk_assign_member found: ' . $_REQUEST['srt_bulk_assign_member']);
+        error_log('ftt_bulk_assign_member found: ' . $_REQUEST['ftt_bulk_assign_member']);
         
         // Verify post type
-        if (get_post_type($post_id) !== 'srt_event') {
-            error_log('Post type is not srt_event: ' . get_post_type($post_id));
+        if (get_post_type($post_id) !== 'ftt_event') {
+            error_log('Post type is not ftt_event: ' . get_post_type($post_id));
             return;
         }
         
-        $member_id = intval($_REQUEST['srt_bulk_assign_member']);
+        $member_id = intval($_REQUEST['ftt_bulk_assign_member']);
         
         // -1 means "No Change"
         if ($member_id === -1) {
@@ -343,8 +343,8 @@ class SRT_CPT {
         }
         
         // Verify member exists and is a member
-        if (!class_exists('SRT_Roles') || !SRT_Roles::is_member($member_id)) {
-            error_log('SRT_Roles class missing or user is not a member');
+        if (!class_exists('FTT_Roles') || !FTT_Roles::is_member($member_id)) {
+            error_log('FTT_Roles class missing or user is not a member');
             return;
         }
         
@@ -366,16 +366,16 @@ class SRT_CPT {
         global $current_screen;
         
         // Only load on the edit screen for our post type
-        if (!$current_screen || $current_screen->id !== 'edit-srt_event') {
+        if (!$current_screen || $current_screen->id !== 'edit-ftt_event') {
             return;
         }
         
-        // Check if SRT_Roles class exists
-        if (!class_exists('SRT_Roles')) {
+        // Check if FTT_Roles class exists
+        if (!class_exists('FTT_Roles')) {
             return;
         }
         
-        $members = SRT_Roles::get_all_members();
+        $members = FTT_Roles::get_all_members();
         
         if (empty($members)) {
             return;
@@ -390,7 +390,7 @@ class SRT_CPT {
             var memberDropdown = '<fieldset class="inline-edit-col-right"><div class="inline-edit-col">';
             memberDropdown += '<label class="inline-edit-group">';
             memberDropdown += '<span class="title">Assign to Member</span>';
-            memberDropdown += '<select name="srt_bulk_assign_member" id="srt_bulk_assign_member">';
+            memberDropdown += '<select name="ftt_bulk_assign_member" id="ftt_bulk_assign_member">';
             memberDropdown += '<option value="-1">— No Change —</option>';
             <?php foreach ($members as $member): ?>
             memberDropdown += '<option value="<?php echo esc_js($member->ID); ?>"><?php echo esc_js($member->display_name); ?></option>';
@@ -402,10 +402,10 @@ class SRT_CPT {
             // Wait for bulk edit panel to be created, then inject our dropdown
             var checkBulkEdit = setInterval(function() {
                 var bulkEditRow = $('#bulk-edit');
-                if (bulkEditRow.length && !$('#srt_bulk_assign_member').length) {
+                if (bulkEditRow.length && !$('#ftt_bulk_assign_member').length) {
                     console.log('Bulk edit panel found, injecting dropdown');
                     bulkEditRow.find('fieldset.inline-edit-col-left').last().after(memberDropdown);
-                    console.log('Dropdown exists:', $('#srt_bulk_assign_member').length);
+                    console.log('Dropdown exists:', $('#ftt_bulk_assign_member').length);
                     clearInterval(checkBulkEdit);
                 }
             }, 100);
@@ -420,7 +420,7 @@ class SRT_CPT {
                 console.log('Bulk edit clicked');
                 
                 // Get the selected member
-                var member_id = $('#srt_bulk_assign_member').val();
+                var member_id = $('#ftt_bulk_assign_member').val();
                 console.log('Selected member ID:', member_id);
                 
                 // If no member selected or -1 (No Change), don't add the field
@@ -432,11 +432,11 @@ class SRT_CPT {
                 // Add the member ID to each hidden field in the bulk edit row
                 var bulkRow = $('#bulk-edit');
                 
-                // Remove any existing srt_bulk_assign_member fields to avoid duplicates
-                bulkRow.find('input[name="srt_bulk_assign_member"]').remove();
+                // Remove any existing ftt_bulk_assign_member fields to avoid duplicates
+                bulkRow.find('input[name="ftt_bulk_assign_member"]').remove();
                 
                 // Add our hidden input
-                bulkRow.append('<input type="hidden" name="srt_bulk_assign_member" value="' + member_id + '" />');
+                bulkRow.append('<input type="hidden" name="ftt_bulk_assign_member" value="' + member_id + '" />');
                 console.log('Added hidden input with member ID:', member_id);
             });
         });
@@ -446,4 +446,4 @@ class SRT_CPT {
 }
 
 // Initialize
-SRT_CPT::init();
+FTT_CPT::init();

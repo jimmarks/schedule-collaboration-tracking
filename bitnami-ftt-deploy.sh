@@ -1,0 +1,401 @@
+#!/bin/bash
+###############################################################################
+# Family Travel Tracker - AWS Bitnami WordPress Deployment Script
+#
+# This script configures a fresh Bitnami WordPress installation for dual-domain
+# operation with the Family Travel Tracker plugin.
+#
+# Prerequisites:
+# - Bitnami WordPress Stack installed on AWS
+# - DNS records pointing both domains to server IP
+# - FTT plugin zip file uploaded to /tmp/ directory
+#
+# Usage: sudo ./bitnami-ftt-deploy.sh
+###############################################################################
+
+set -e  # Exit on error
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Configuration
+DOMAINS="www.familytraveltracker.app my.familytraveltracker.app familytraveltracker.app"
+PRIMARY_DOMAIN="www.familytraveltracker.app"
+APP_DOMAIN="my.familytraveltracker.app"
+BARE_DOMAIN="familytraveltracker.app"
+WP_PATH="/opt/bitnami/wordpress"
+APACHE_CONF_DIR="/opt/bitnami/apache2/conf"
+PLUGIN_SLUG="schedule-collaboration-tracking"
+
+echo -e "${BLUE}═══════════════════════════════════════════════════════════════${NC}"
+echo -e "${BLUE}  Family Travel Tracker - Bitnami WordPress Deployment${NC}"
+echo -e "${BLUE}═══════════════════════════════════════════════════════════════${NC}"
+echo ""
+
+# Check if running as root
+if [ "$EUID" -ne 0 ]; then 
+    echo -e "${RED}✗ Please run as root (use sudo)${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}✓ Running as root${NC}"
+echo ""
+
+###############################################################################
+# STEP 1: Pre-flight Checks
+###############################################################################
+echo -e "${YELLOW}STEP 1: Pre-flight Checks${NC}"
+echo "─────────────────────────────────────────"
+
+# Check if WordPress exists
+if [ ! -f "$WP_PATH/wp-config.php" ]; then
+    echo -e "${RED}✗ WordPress not found at $WP_PATH${NC}"
+    exit 1
+fi
+echo -e "${GREEN}✓ WordPress installation found${NC}"
+
+# Check DNS resolution
+echo "Checking DNS resolution..."
+for domain in $PRIMARY_DOMAIN $APP_DOMAIN $BARE_DOMAIN; do
+    if host "$domain" > /dev/null 2>&1; then
+        echo -e "${GREEN}✓ $domain resolves${NC}"
+    else
+        echo -e "${YELLOW}⚠ $domain does not resolve (may need to wait for DNS propagation)${NC}"
+    fi
+done
+echo ""
+
+###############################################################################
+# STEP 2: Backup Existing Configuration
+###############################################################################
+echo -e "${YELLOW}STEP 2: Backup Existing Configuration${NC}"
+echo "─────────────────────────────────────────"
+
+BACKUP_DIR="/home/bitnami/ftt-backup-$(date +%Y%m%d_%H%M%S)"
+mkdir -p "$BACKUP_DIR"
+
+# Backup wp-config.php
+if [ -f "$WP_PATH/wp-config.php" ]; then
+    cp "$WP_PATH/wp-config.php" "$BACKUP_DIR/wp-config.php.backup"
+    echo -e "${GREEN}✓ Backed up wp-config.php${NC}"
+fi
+
+# Backup .htaccess
+if [ -f "$WP_PATH/.htaccess" ]; then
+    cp "$WP_PATH/.htaccess" "$BACKUP_DIR/htaccess.backup"
+    echo -e "${GREEN}✓ Backed up .htaccess${NC}"
+fi
+
+# Backup Apache configs
+if [ -f "$APACHE_CONF_DIR/bitnami/bitnami-ssl.conf" ]; then
+    cp "$APACHE_CONF_DIR/bitnami/bitnami-ssl.conf" "$BACKUP_DIR/bitnami-ssl.conf.backup"
+    echo -e "${GREEN}✓ Backed up Apache SSL config${NC}"
+fi
+
+if [ -f "$APACHE_CONF_DIR/bitnami/bitnami.conf" ]; then
+    cp "$APACHE_CONF_DIR/bitnami/bitnami.conf" "$BACKUP_DIR/bitnami.conf.backup"
+    echo -e "${GREEN}✓ Backed up Apache HTTP config${NC}"
+fi
+
+echo -e "${GREEN}✓ All backups saved to: $BACKUP_DIR${NC}"
+echo ""
+
+###############################################################################
+# STEP 3: Configure WordPress for Multi-Domain
+###############################################################################
+echo -e "${YELLOW}STEP 3: Configure WordPress for Multi-Domain${NC}"
+echo "─────────────────────────────────────────"
+
+# Check if already configured
+if grep -q "Support multiple domains" "$WP_PATH/wp-config.php"; then
+    echo -e "${GREEN}✓ WordPress already configured for multi-domain${NC}"
+else
+    echo "Adding multi-domain support to wp-config.php..."
+    
+    # Find the line before wp-settings.php
+    LINE_NUM=$(grep -n "wp-settings.php" "$WP_PATH/wp-config.php" | cut -d: -f1 | head -1)
+    
+    if [ -n "$LINE_NUM" ]; then
+        # Create temp file with multi-domain config
+        awk -v line=$((LINE_NUM-1)) '
+        NR==line {
+            print ""
+            print "/* Support multiple domains - BEGIN */"
+            print "// Dynamic domain support for www and my subdomains"
+            print "define('"'"'WP_HOME'"'"', '"'"'https://'"'"' . $_SERVER['"'"'HTTP_HOST'"'"']);"
+            print "define('"'"'WP_SITEURL'"'"', '"'"'https://'"'"' . $_SERVER['"'"'HTTP_HOST'"'"']);"
+            print ""
+            print "// Force HTTPS"
+            print "define('"'"'FORCE_SSL_ADMIN'"'"', true);"
+            print ""
+            print "// Handle proxy/load balancer HTTPS detection"
+            print "if (isset($_SERVER['"'"'HTTP_X_FORWARDED_PROTO'"'"']) && $_SERVER['"'"'HTTP_X_FORWARDED_PROTO'"'"'] === '"'"'https'"'"') {"
+            print "    $_SERVER['"'"'HTTPS'"'"'] = '"'"'on'"'"';"
+            print "}"
+            print ""
+            print "// CloudFlare support"
+            print "if (isset($_SERVER['"'"'HTTP_CF_VISITOR'"'"'])) {"
+            print "    $cf_visitor = json_decode($_SERVER['"'"'HTTP_CF_VISITOR'"'"']);"
+            print "    if (isset($cf_visitor->scheme) && $cf_visitor->scheme === '"'"'https'"'"') {"
+            print "        $_SERVER['"'"'HTTPS'"'"'] = '"'"'on'"'"';"
+            print "    }"
+            print "}"
+            print "/* Support multiple domains - END */"
+            print ""
+        }
+        {print}
+        ' "$WP_PATH/wp-config.php" > "$WP_PATH/wp-config.php.new"
+        
+        mv "$WP_PATH/wp-config.php.new" "$WP_PATH/wp-config.php"
+        chown daemon:daemon "$WP_PATH/wp-config.php"
+        echo -e "${GREEN}✓ Added multi-domain configuration to wp-config.php${NC}"
+    else
+        echo -e "${RED}✗ Could not find wp-settings.php line${NC}"
+        exit 1
+    fi
+fi
+echo ""
+
+###############################################################################
+# STEP 4: Configure Apache VirtualHost
+###############################################################################
+echo -e "${YELLOW}STEP 4: Configure Apache VirtualHost${NC}"
+echo "─────────────────────────────────────────"
+
+SSL_CONF="$APACHE_CONF_DIR/bitnami/bitnami-ssl.conf"
+HTTP_CONF="$APACHE_CONF_DIR/bitnami/bitnami.conf"
+
+# Update SSL config
+if [ -f "$SSL_CONF" ]; then
+    # Check if ServerAlias already configured
+    if grep -q "ServerAlias.*$APP_DOMAIN" "$SSL_CONF"; then
+        echo -e "${GREEN}✓ Apache SSL config already has ServerAlias${NC}"
+    else
+        echo "Adding ServerName and ServerAlias to SSL config..."
+        
+        # Check if ServerName exists
+        if grep -q "ServerName" "$SSL_CONF"; then
+            # Add ServerAlias after existing ServerName
+            sed -i "/ServerName/a\\  ServerAlias $APP_DOMAIN\\n  ServerAlias $PRIMARY_DOMAIN\\n  ServerAlias $BARE_DOMAIN" "$SSL_CONF"
+        else
+            # Add both ServerName and ServerAlias after VirtualHost
+            sed -i "/<VirtualHost/a\\  ServerName $PRIMARY_DOMAIN\\n  ServerAlias $APP_DOMAIN\\n  ServerAlias $BARE_DOMAIN" "$SSL_CONF"
+        fi
+        
+        echo -e "${GREEN}✓ Updated Apache SSL config${NC}"
+    fi
+    
+    # Ensure DocumentRoot is correct
+    if ! grep -q "DocumentRoot \"$WP_PATH\"" "$SSL_CONF"; then
+        sed -i "s|DocumentRoot \".*\"|DocumentRoot \"$WP_PATH\"|g" "$SSL_CONF"
+        echo -e "${GREEN}✓ Updated DocumentRoot in SSL config${NC}"
+    fi
+fi
+
+# Update HTTP config (for redirects to HTTPS)
+if [ -f "$HTTP_CONF" ]; then
+    if ! grep -q "ServerAlias.*$APP_DOMAIN" "$HTTP_CONF"; then
+        if grep -q "ServerName" "$HTTP_CONF"; then
+            sed -i "/ServerName/a\\  ServerAlias $APP_DOMAIN\\n  ServerAlias $PRIMARY_DOMAIN\\n  ServerAlias $BARE_DOMAIN" "$HTTP_CONF"
+        else
+            sed -i "/<VirtualHost/a\\  ServerName $PRIMARY_DOMAIN\\n  ServerAlias $APP_DOMAIN\\n  ServerAlias $BARE_DOMAIN" "$HTTP_CONF"
+        fi
+        echo -e "${GREEN}✓ Updated Apache HTTP config${NC}"
+    fi
+fi
+
+# Test Apache configuration
+if /opt/bitnami/apache2/bin/apachectl configtest 2>&1 | grep -q "Syntax OK"; then
+    echo -e "${GREEN}✓ Apache configuration is valid${NC}"
+else
+    echo -e "${RED}✗ Apache configuration has errors:${NC}"
+    /opt/bitnami/apache2/bin/apachectl configtest
+    echo ""
+    echo -e "${YELLOW}Restoring backups...${NC}"
+    cp "$BACKUP_DIR/bitnami-ssl.conf.backup" "$SSL_CONF" 2>/dev/null || true
+    cp "$BACKUP_DIR/bitnami.conf.backup" "$HTTP_CONF" 2>/dev/null || true
+    exit 1
+fi
+echo ""
+
+###############################################################################
+# STEP 5: Configure Let's Encrypt SSL
+###############################################################################
+echo -e "${YELLOW}STEP 5: Let's Encrypt SSL Configuration${NC}"
+echo "─────────────────────────────────────────"
+
+# Check if certificates already exist
+if [ -f "$APACHE_CONF_DIR/$PRIMARY_DOMAIN.crt" ] || [ -f "$APACHE_CONF_DIR/$BARE_DOMAIN.crt" ]; then
+    echo -e "${GREEN}✓ SSL certificates already exist${NC}"
+else
+    echo -e "${YELLOW}⚠ SSL certificates not found${NC}"
+    echo ""
+    echo "To set up Let's Encrypt certificates, run:"
+    echo -e "${BLUE}  sudo /opt/bitnami/bncert-tool${NC}"
+    echo ""
+    echo "When prompted, enter all domains:"
+    echo "  $PRIMARY_DOMAIN $APP_DOMAIN $BARE_DOMAIN"
+    echo ""
+    read -p "Press Enter to continue (will start bn-cert) or Ctrl+C to skip..."
+    /opt/bitnami/bncert-tool
+fi
+echo ""
+
+###############################################################################
+# STEP 6: Install & Activate FTT Plugin
+###############################################################################
+echo -e "${YELLOW}STEP 6: Install & Activate FTT Plugin${NC}"
+echo "─────────────────────────────────────────"
+
+cd "$WP_PATH"
+
+# Check if plugin exists
+if [ -d "$WP_PATH/wp-content/plugins/$PLUGIN_SLUG" ]; then
+    echo -e "${GREEN}✓ Plugin directory exists${NC}"
+else
+    # Look for plugin zip in common locations
+    PLUGIN_ZIP=""
+    for location in /tmp /home/bitnami "$WP_PATH"; do
+        if ls $location/${PLUGIN_SLUG}*.zip 2>/dev/null | head -1; then
+            PLUGIN_ZIP=$(ls $location/${PLUGIN_SLUG}*.zip 2>/dev/null | head -1)
+            break
+        fi
+    done
+    
+    if [ -n "$PLUGIN_ZIP" ]; then
+        echo "Found plugin: $PLUGIN_ZIP"
+        echo "Installing plugin using WP-CLI..."
+        cd "$WP_PATH"
+        /opt/bitnami/wp-cli/bin/wp plugin install "$PLUGIN_ZIP" --activate --allow-root
+        PLUGIN_VERSION=$(/opt/bitnami/wp-cli/bin/wp plugin get $PLUGIN_SLUG --field=version --allow-root 2>/dev/null)
+        echo -e "${GREEN}✓ Plugin installed and activated (v$PLUGIN_VERSION)${NC}"
+    else
+        echo -e "${YELLOW}⚠ Plugin zip not found${NC}"
+        echo "Please upload ${PLUGIN_SLUG}.zip to /tmp/ and run this script again"
+        echo "Or upload manually via WordPress admin"
+    fi
+fi
+echo ""
+
+###############################################################################
+# STEP 7: Configure Permalinks & Rewrite Rules
+###############################################################################
+echo -e "${YELLOW}STEP 7: Configure Permalinks & Rewrite Rules${NC}"
+echo "─────────────────────────────────────────"
+
+cd "$WP_PATH"
+
+# Enable pretty permalinks
+CURRENT_PERMALINK=$(/opt/bitnami/wp-cli/bin/wp option get permalink_structure --allow-root 2>/dev/null || echo "")
+
+if [ -z "$CURRENT_PERMALINK" ]; then
+    echo "Enabling pretty permalinks..."
+    /opt/bitnami/wp-cli/bin/wp rewrite structure '/%postname%/' --hard --allow-root
+    echo -e "${GREEN}✓ Permalinks enabled${NC}"
+else
+    echo -e "${GREEN}✓ Pretty permalinks already enabled: $CURRENT_PERMALINK${NC}"
+fi
+
+# Create proper .htaccess
+echo "Creating .htaccess with domain redirects..."
+cat > "$WP_PATH/.htaccess" <<'HTACCESS'
+# BEGIN WordPress
+<IfModule mod_rewrite.c>
+RewriteEngine On
+
+# Force HTTPS
+RewriteCond %{HTTPS} off
+RewriteRule ^(.*)$ https://%{HTTP_HOST}/$1 [R=301,L]
+
+# Redirect bare domain to www (only if on bare domain)
+RewriteCond %{HTTP_HOST} ^familytraveltracker\.app$ [NC]
+RewriteRule ^(.*)$ https://www.familytraveltracker.app/$1 [R=301,L]
+
+# WordPress permalinks
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+RewriteBase /
+RewriteRule ^index\.php$ - [L]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule . /index.php [L]
+</IfModule>
+# END WordPress
+HTACCESS
+
+chown daemon:daemon "$WP_PATH/.htaccess"
+echo -e "${GREEN}✓ .htaccess created${NC}"
+
+# Flush rewrite rules
+/opt/bitnami/wp-cli/bin/wp rewrite flush --hard --allow-root
+echo -e "${GREEN}✓ Rewrite rules flushed${NC}"
+echo ""
+
+###############################################################################
+# STEP 8: Restart Services
+###############################################################################
+echo -e "${YELLOW}STEP 8: Restart Services${NC}"
+echo "─────────────────────────────────────────"
+
+echo "Restarting Apache..."
+/opt/bitnami/ctlscript.sh restart apache
+echo -e "${GREEN}✓ Apache restarted${NC}"
+echo ""
+
+###############################################################################
+# STEP 9: Verification
+###############################################################################
+echo -e "${YELLOW}STEP 9: Verification${NC}"
+echo "─────────────────────────────────────────"
+
+# Test plugin status
+cd "$WP_PATH"
+if /opt/bitnami/wp-cli/bin/wp plugin is-active $PLUGIN_SLUG --allow-root 2>/dev/null; then
+    PLUGIN_VERSION=$(/opt/bitnami/wp-cli/bin/wp plugin get $PLUGIN_SLUG --field=version --allow-root 2>/dev/null)
+    echo -e "${GREEN}✓ Plugin active (version $PLUGIN_VERSION)${NC}"
+else
+    echo -e "${YELLOW}⚠ Plugin not active${NC}"
+fi
+
+# Test permalinks
+PERMALINK=$(/opt/bitnami/wp-cli/bin/wp option get permalink_structure --allow-root 2>/dev/null)
+echo -e "${GREEN}✓ Permalinks: $PERMALINK${NC}"
+
+# Test URLs with curl
+echo ""
+echo "Testing URL redirects..."
+echo "  $BARE_DOMAIN → $(curl -sI http://$BARE_DOMAIN 2>&1 | grep -i location | head -1 | cut -d' ' -f2)"
+echo "  $PRIMARY_DOMAIN → $(curl -sIk https://$PRIMARY_DOMAIN 2>&1 | grep -E "HTTP" | head -1)"
+echo "  $APP_DOMAIN → $(curl -sIk https://$APP_DOMAIN 2>&1 | grep -E "HTTP" | head -1)"
+echo ""
+
+###############################################################################
+# COMPLETION
+###############################################################################
+echo -e "${GREEN}═══════════════════════════════════════════════════════════════${NC}"
+echo -e "${GREEN}  DEPLOYMENT COMPLETE!${NC}"
+echo -e "${GREEN}═══════════════════════════════════════════════════════════════${NC}"
+echo ""
+echo "Next steps:"
+echo ""
+echo "1. Test in your browser (use incognito/private window):"
+echo "   • http://$BARE_DOMAIN"
+echo "   • https://$PRIMARY_DOMAIN"
+echo "   • https://$APP_DOMAIN"
+echo ""
+echo "2. Expected behavior:"
+echo "   • $BARE_DOMAIN → redirects to https://$PRIMARY_DOMAIN"
+echo "   • $PRIMARY_DOMAIN shows marketing homepage"
+echo "   • $APP_DOMAIN shows WordPress (will redirect marketing pages to www)"
+echo "   • $PRIMARY_DOMAIN/ftt-dashboard/ → redirects to $APP_DOMAIN/ftt-dashboard/"
+echo ""
+echo "3. If you see issues:"
+echo "   • Clear browser cache/cookies"
+echo "   • Check Apache logs: tail -50 /opt/bitnami/apache2/logs/error_log"
+echo "   • Restore from backup: $BACKUP_DIR"
+echo ""
+echo -e "${BLUE}Backup location: $BACKUP_DIR${NC}"
+echo ""

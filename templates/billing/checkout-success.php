@@ -36,7 +36,7 @@ if (!is_user_logged_in()) {
     </div>
     
     <div class="ftt-cta-buttons">
-        <a href="<?php echo esc_url(home_url('/dashboard/')); ?>" class="button button-primary button-large">
+        <a href="<?php echo esc_url(home_url('/ftt-dashboard/')); ?>" class="button button-primary button-large">
             <?php esc_html_e('Go to Dashboard', 'schedule-collaboration-tracking'); ?>
         </a>
         <a href="<?php echo esc_url(home_url('/billing/manage/')); ?>" class="button button-secondary">

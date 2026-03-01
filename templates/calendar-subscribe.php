@@ -10,35 +10,35 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-$settings = get_option('srt_settings', array());
+$settings = get_option('ftt_settings', array());
 $requires_auth = $settings['ical_require_auth'] ?? false;
 ?>
 
-<div class="srt-container srt-subscribe-page">
+<div class="ftt-container ftt-subscribe-page">
     <h2><?php esc_html_e('Subscribe to Calendar', 'schedule-collaboration-tracking'); ?></h2>
     
     <p><?php esc_html_e('Subscribe to your family calendar in your calendar app to automatically receive updates when events are added or changed.', 'schedule-collaboration-tracking'); ?></p>
     
     <?php if ($requires_auth && empty($feed_url)) : ?>
-        <div class="srt-notice srt-notice-info">
+        <div class="ftt-notice ftt-notice-info">
             <p><strong><?php esc_html_e('Authentication Required', 'schedule-collaboration-tracking'); ?></strong></p>
             <p><?php esc_html_e('This calendar requires an authentication token. Please contact your administrator for a calendar subscription URL.', 'schedule-collaboration-tracking'); ?></p>
         </div>
     <?php else : ?>
         
-        <div class="srt-subscribe-url-box">
+        <div class="ftt-subscribe-url-box">
             <label><strong><?php esc_html_e('Calendar URL:', 'schedule-collaboration-tracking'); ?></strong></label>
-            <div class="srt-url-copy">
-                <input type="text" readonly value="<?php echo esc_attr($feed_url); ?>" id="srt-calendar-url" onclick="this.select();">
-                <button type="button" class="button button-primary" onclick="srtCopyUrl()"><?php esc_html_e('Copy URL', 'schedule-collaboration-tracking'); ?></button>
+            <div class="ftt-url-copy">
+                <input type="text" readonly value="<?php echo esc_attr($feed_url); ?>" id="ftt-calendar-url" onclick="this.select();">
+                <button type="button" class="button button-primary" onclick="fttCopyUrl()"><?php esc_html_e('Copy URL', 'schedule-collaboration-tracking'); ?></button>
             </div>
         </div>
         
-        <div class="srt-instructions">
+        <div class="ftt-instructions">
             <h3><?php esc_html_e('How to Subscribe:', 'schedule-collaboration-tracking'); ?></h3>
             
             <!-- iOS / iPhone / iPad -->
-            <details class="srt-device-instructions">
+            <details class="ftt-device-instructions">
                 <summary><strong>📱 iPhone / iPad (Apple Calendar)</strong></summary>
                 <ol>
                     <li><?php esc_html_e('Copy the calendar URL above', 'schedule-collaboration-tracking'); ?></li>
@@ -48,11 +48,11 @@ $requires_auth = $settings['ical_require_auth'] ?? false;
                     <li><?php esc_html_e('Paste the calendar URL', 'schedule-collaboration-tracking'); ?></li>
                     <li><?php esc_html_e('Tap "Next" → "Save"', 'schedule-collaboration-tracking'); ?></li>
                 </ol>
-                <p class="srt-note"><?php esc_html_e('The calendar will now appear in your Calendar app and sync automatically.', 'schedule-collaboration-tracking'); ?></p>
+                <p class="ftt-note"><?php esc_html_e('The calendar will now appear in your Calendar app and sync automatically.', 'schedule-collaboration-tracking'); ?></p>
             </details>
             
             <!-- Android / Google Calendar -->
-            <details class="srt-device-instructions">
+            <details class="ftt-device-instructions">
                 <summary><strong>📱 Android (Google Calendar)</strong></summary>
                 <ol>
                     <li><?php esc_html_e('Copy the calendar URL above', 'schedule-collaboration-tracking'); ?></li>
@@ -62,11 +62,11 @@ $requires_auth = $settings['ical_require_auth'] ?? false;
                     <li><?php esc_html_e('Paste the calendar URL', 'schedule-collaboration-tracking'); ?></li>
                     <li><?php esc_html_e('Click "Add calendar"', 'schedule-collaboration-tracking'); ?></li>
                 </ol>
-                <p class="srt-note"><?php esc_html_e('The calendar will sync to all devices signed into your Google account.', 'schedule-collaboration-tracking'); ?></p>
+                <p class="ftt-note"><?php esc_html_e('The calendar will sync to all devices signed into your Google account.', 'schedule-collaboration-tracking'); ?></p>
             </details>
             
             <!-- macOS Calendar -->
-            <details class="srt-device-instructions">
+            <details class="ftt-device-instructions">
                 <summary><strong>💻 Mac (Calendar App)</strong></summary>
                 <ol>
                     <li><?php esc_html_e('Copy the calendar URL above', 'schedule-collaboration-tracking'); ?></li>
@@ -76,11 +76,11 @@ $requires_auth = $settings['ical_require_auth'] ?? false;
                     <li><?php esc_html_e('Click "Subscribe"', 'schedule-collaboration-tracking'); ?></li>
                     <li><?php esc_html_e('Configure refresh frequency and click "OK"', 'schedule-collaboration-tracking'); ?></li>
                 </ol>
-                <p class="srt-note"><?php esc_html_e('Calendar will sync with iCloud if enabled.', 'schedule-collaboration-tracking'); ?></p>
+                <p class="ftt-note"><?php esc_html_e('Calendar will sync with iCloud if enabled.', 'schedule-collaboration-tracking'); ?></p>
             </details>
             
             <!-- Outlook -->
-            <details class="srt-device-instructions">
+            <details class="ftt-device-instructions">
                 <summary><strong>💼 Outlook (Windows / macOS / Web)</strong></summary>
                 <ol>
                     <li><?php esc_html_e('Copy the calendar URL above', 'schedule-collaboration-tracking'); ?></li>
@@ -89,11 +89,11 @@ $requires_auth = $settings['ical_require_auth'] ?? false;
                     <li><?php esc_html_e('Paste the calendar URL', 'schedule-collaboration-tracking'); ?></li>
                     <li><?php esc_html_e('Click "OK"', 'schedule-collaboration-tracking'); ?></li>
                 </ol>
-                <p class="srt-note"><?php esc_html_e('Outlook checks for updates every few hours.', 'schedule-collaboration-tracking'); ?></p>
+                <p class="ftt-note"><?php esc_html_e('Outlook checks for updates every few hours.', 'schedule-collaboration-tracking'); ?></p>
             </details>
         </div>
         
-        <div class="srt-faq">
+        <div class="ftt-faq">
             <h3><?php esc_html_e('Frequently Asked Questions', 'schedule-collaboration-tracking'); ?></h3>
             
             <details>
@@ -121,11 +121,11 @@ $requires_auth = $settings['ical_require_auth'] ?? false;
 </div>
 
 <style>
-.srt-subscribe-page {
+.ftt-subscribe-page {
     max-width: 800px;
 }
 
-.srt-subscribe-url-box {
+.ftt-subscribe-url-box {
     background: #f5f5f5;
     border: 1px solid #ddd;
     border-radius: 4px;
@@ -133,17 +133,17 @@ $requires_auth = $settings['ical_require_auth'] ?? false;
     margin: 20px 0;
 }
 
-.srt-subscribe-url-box label {
+.ftt-subscribe-url-box label {
     display: block;
     margin-bottom: 10px;
 }
 
-.srt-url-copy {
+.ftt-url-copy {
     display: flex;
     gap: 10px;
 }
 
-.srt-url-copy input {
+.ftt-url-copy input {
     flex: 1;
     padding: 8px;
     border: 1px solid #ddd;
@@ -152,7 +152,7 @@ $requires_auth = $settings['ical_require_auth'] ?? false;
     font-size: 14px;
 }
 
-.srt-device-instructions {
+.ftt-device-instructions {
     background: #fff;
     border: 1px solid #ddd;
     border-radius: 4px;
@@ -160,25 +160,25 @@ $requires_auth = $settings['ical_require_auth'] ?? false;
     margin-bottom: 10px;
 }
 
-.srt-device-instructions summary {
+.ftt-device-instructions summary {
     cursor: pointer;
     padding: 5px;
     font-size: 16px;
 }
 
-.srt-device-instructions summary:hover {
+.ftt-device-instructions summary:hover {
     background: #f9f9f9;
 }
 
-.srt-device-instructions ol {
+.ftt-device-instructions ol {
     margin: 15px 0 10px 20px;
 }
 
-.srt-device-instructions li {
+.ftt-device-instructions li {
     margin: 8px 0;
 }
 
-.srt-note {
+.ftt-note {
     background: #e7f5ff;
     border-left: 4px solid #2196F3;
     padding: 10px 15px;
@@ -186,11 +186,11 @@ $requires_auth = $settings['ical_require_auth'] ?? false;
     font-style: italic;
 }
 
-.srt-faq {
+.ftt-faq {
     margin-top: 30px;
 }
 
-.srt-faq details {
+.ftt-faq details {
     background: #fff;
     border: 1px solid #ddd;
     border-radius: 4px;
@@ -198,36 +198,36 @@ $requires_auth = $settings['ical_require_auth'] ?? false;
     margin-bottom: 10px;
 }
 
-.srt-faq summary {
+.ftt-faq summary {
     cursor: pointer;
     font-weight: bold;
     padding: 5px;
 }
 
-.srt-faq summary:hover {
+.ftt-faq summary:hover {
     background: #f9f9f9;
 }
 
-.srt-faq p {
+.ftt-faq p {
     margin: 10px 0 0 0;
     padding-left: 10px;
 }
 
-.srt-notice {
+.ftt-notice {
     padding: 15px;
     border-radius: 4px;
     margin: 20px 0;
 }
 
-.srt-notice-info {
+.ftt-notice-info {
     background: #e7f5ff;
     border-left: 4px solid #2196F3;
 }
 </style>
 
 <script>
-function srtCopyUrl() {
-    var input = document.getElementById('srt-calendar-url');
+function fttCopyUrl() {
+    var input = document.getElementById('ftt-calendar-url');
     input.select();
     input.setSelectionRange(0, 99999); // For mobile
     

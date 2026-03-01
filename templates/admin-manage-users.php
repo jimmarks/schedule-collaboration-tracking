@@ -11,16 +11,16 @@ if (!defined('ABSPATH')) {
 }
 
 $all_users = get_users(array('orderby' => 'display_name'));
-$members = SRT_Roles::get_all_members();
-$parents = SRT_Roles::get_all_parents();
+$members = FTT_Roles::get_all_members();
+$parents = FTT_Roles::get_all_parents();
 ?>
 
 <div class="wrap">
     <h1><?php esc_html_e('Manage Users', 'schedule-collaboration-tracking'); ?></h1>
     
-    <?php settings_errors('srt_messages'); ?>
+    <?php settings_errors('ftt_messages'); ?>
     
-    <div class="srt-admin-tabs">
+    <div class="ftt-admin-tabs">
         <nav class="nav-tab-wrapper">
             <a href="#members" class="nav-tab nav-tab-active"><?php esc_html_e('Children', 'schedule-collaboration-tracking'); ?> (<?php echo count($members); ?>)</a>
             <a href="#parents" class="nav-tab"><?php esc_html_e('Parents', 'schedule-collaboration-tracking'); ?> (<?php echo count($parents); ?>)</a>
@@ -52,7 +52,7 @@ $parents = SRT_Roles::get_all_parents();
                     <?php else : ?>
                         <?php foreach ($members as $member) : ?>
                             <?php
-                            $parents_list = SRT_Roles::get_parents($member->ID);
+                            $parents_list = FTT_Roles::get_parents($member->ID);
                             $parent_names = array();
                             foreach ($parents_list as $parent_id) {
                                 $parent = get_user_by('id', $parent_id);
@@ -71,8 +71,8 @@ $parents = SRT_Roles::get_all_parents();
                                 <td>
                                     <a href="<?php echo esc_url(get_edit_user_link($member->ID)); ?>" class="button button-small"><?php esc_html_e('Edit', 'schedule-collaboration-tracking'); ?></a>
                                     <form method="post" style="display: inline;">
-                                        <?php wp_nonce_field('srt_manage_users'); ?>
-                                        <input type="hidden" name="srt_action" value="remove_member">
+                                        <?php wp_nonce_field('ftt_manage_users'); ?>
+                                        <input type="hidden" name="ftt_action" value="remove_member">
                                         <input type="hidden" name="user_id" value="<?php echo esc_attr($member->ID); ?>">
                                         <button type="submit" class="button button-small" onclick="return confirm('Remove member status?');"><?php esc_html_e('Remove Member', 'schedule-collaboration-tracking'); ?></button>
                                     </form>
@@ -107,7 +107,7 @@ $parents = SRT_Roles::get_all_parents();
                     <?php else : ?>
                         <?php foreach ($parents as $parent) : ?>
                             <?php
-                            $children_list = SRT_Roles::get_children($parent->ID);
+                            $children_list = FTT_Roles::get_children($parent->ID);
                             $children_names = array();
                             foreach ($children_list as $child_id) {
                                 $child = get_user_by('id', $child_id);
@@ -153,14 +153,14 @@ $parents = SRT_Roles::get_all_parents();
                             <td><strong><?php echo esc_html($user->display_name); ?></strong></td>
                             <td><?php echo esc_html($user->user_email); ?></td>
                             <td><?php echo esc_html(implode(', ', $user->roles)); ?></td>
-                            <td><?php echo SRT_Roles::is_member($user->ID) ? '✓' : '—'; ?></td>
-                            <td><?php echo SRT_Roles::is_parent($user->ID) ? '✓' : '—'; ?></td>
+                            <td><?php echo FTT_Roles::is_member($user->ID) ? '✓' : '—'; ?></td>
+                            <td><?php echo FTT_Roles::is_parent($user->ID) ? '✓' : '—'; ?></td>
                             <td>
                                 <a href="<?php echo esc_url(get_edit_user_link($user->ID)); ?>" class="button button-small"><?php esc_html_e('Edit', 'schedule-collaboration-tracking'); ?></a>
-                                <?php if (!SRT_Roles::is_member($user->ID)) : ?>
+                                <?php if (!FTT_Roles::is_member($user->ID)) : ?>
                                     <form method="post" style="display: inline;">
-                                        <?php wp_nonce_field('srt_manage_users'); ?>
-                                        <input type="hidden" name="srt_action" value="make_member">
+                                        <?php wp_nonce_field('ftt_manage_users'); ?>
+                                        <input type="hidden" name="ftt_action" value="make_member">
                                         <input type="hidden" name="user_id" value="<?php echo esc_attr($user->ID); ?>">
                                         <button type="submit" class="button button-small button-primary"><?php esc_html_e('Make Member', 'schedule-collaboration-tracking'); ?></button>
                                     </form>
@@ -180,8 +180,8 @@ $parents = SRT_Roles::get_all_parents();
             <div class="card">
                 <h3><?php esc_html_e('Add Parent Relationship', 'schedule-collaboration-tracking'); ?></h3>
                 <form method="post">
-                    <?php wp_nonce_field('srt_manage_users'); ?>
-                    <input type="hidden" name="srt_action" value="add_parent">
+                    <?php wp_nonce_field('ftt_manage_users'); ?>
+                    <input type="hidden" name="ftt_action" value="add_parent">
                     <table class="form-table">
                         <tr>
                             <th><label for="parent_id"><?php esc_html_e('Parent/Guardian', 'schedule-collaboration-tracking'); ?></label></th>
@@ -226,7 +226,7 @@ $parents = SRT_Roles::get_all_parents();
                         <?php
                         $relationships = array();
                         foreach ($all_users as $user) {
-                            $children = SRT_Roles::get_children($user->ID);
+                            $children = FTT_Roles::get_children($user->ID);
                             foreach ($children as $child_id) {
                                 $child = get_user_by('id', $child_id);
                                 if ($child) {
@@ -250,8 +250,8 @@ $parents = SRT_Roles::get_all_parents();
                                     <td><strong><?php echo esc_html($rel['child']->display_name); ?></strong> (<?php echo esc_html($rel['child']->user_email); ?>)</td>
                                     <td>
                                         <form method="post" style="display: inline;">
-                                            <?php wp_nonce_field('srt_manage_users'); ?>
-                                            <input type="hidden" name="srt_action" value="remove_parent">
+                                            <?php wp_nonce_field('ftt_manage_users'); ?>
+                                            <input type="hidden" name="ftt_action" value="remove_parent">
                                             <input type="hidden" name="parent_id" value="<?php echo esc_attr($rel['parent']->ID); ?>">
                                             <input type="hidden" name="child_id" value="<?php echo esc_attr($rel['child']->ID); ?>">
                                             <button type="submit" class="button button-small" onclick="return confirm('Remove this relationship?');"><?php esc_html_e('Remove', 'schedule-collaboration-tracking'); ?></button>
@@ -268,7 +268,7 @@ $parents = SRT_Roles::get_all_parents();
 </div>
 
 <style>
-.srt-admin-tabs .tab-content {
+.ftt-admin-tabs .tab-content {
     margin-top: 20px;
 }
 .card {

@@ -10,7 +10,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class SRT_Settings {
+class FTT_Settings {
     
     /**
      * Initialize hooks
@@ -25,11 +25,11 @@ class SRT_Settings {
      */
     public static function add_settings_page() {
         add_submenu_page(
-            'edit.php?post_type=srt_event',
+            'edit.php?post_type=ftt_event',
             __('Schedule Settings', 'schedule-collaboration-tracking'),
             __('Settings', 'schedule-collaboration-tracking'),
             'manage_options',
-            'srt-settings',
+            'ftt-settings',
             array(__CLASS__, 'render_settings_page')
         );
     }
@@ -39,8 +39,8 @@ class SRT_Settings {
      */
     public static function register_settings() {
         register_setting(
-            'srt_settings_group',
-            'srt_settings',
+            'ftt_settings_group',
+            'ftt_settings',
             array(
                 'sanitize_callback' => array(__CLASS__, 'sanitize_settings'),
             )
@@ -48,154 +48,178 @@ class SRT_Settings {
         
         // TAB 1: GENERAL
         add_settings_section(
-            'srt_general_section',
+            'ftt_general_section',
             __('General Settings', 'schedule-collaboration-tracking'),
             array(__CLASS__, 'render_general_section'),
-            'srt-settings-general'
+            'ftt-settings-general'
         );
         
         add_settings_field(
             'require_login',
             __('Require Login', 'schedule-collaboration-tracking'),
             array(__CLASS__, 'render_require_login_field'),
-            'srt-settings-general',
-            'srt_general_section'
-        );
-        
-        add_settings_field(
-            'default_home_airport',
-            __('Default Home Airport', 'schedule-collaboration-tracking'),
-            array(__CLASS__, 'render_default_airport_field'),
-            'srt-settings-general',
-            'srt_general_section'
+            'ftt-settings-general',
+            'ftt_general_section'
         );
         
         add_settings_field(
             'default_timezone',
             __('Default Timezone', 'schedule-collaboration-tracking'),
             array(__CLASS__, 'render_default_timezone_field'),
-            'srt-settings-general',
-            'srt_general_section'
+            'ftt-settings-general',
+            'ftt_general_section'
         );
         
         add_settings_field(
             'enable_login_menu',
             __('Login/Logout Menu', 'schedule-collaboration-tracking'),
             array(__CLASS__, 'render_login_menu_field'),
-            'srt-settings-general',
-            'srt_general_section'
+            'ftt-settings-general',
+            'ftt_general_section'
         );
         
         add_settings_field(
             'login_menu_mode',
             __('Menu Display Mode', 'schedule-collaboration-tracking'),
             array(__CLASS__, 'render_login_menu_mode_field'),
-            'srt-settings-general',
-            'srt_general_section'
+            'ftt-settings-general',
+            'ftt_general_section'
         );
         
         add_settings_field(
             'notification_from_email',
             __('Notification From Email', 'schedule-collaboration-tracking'),
             array(__CLASS__, 'render_notification_from_email_field'),
-            'srt-settings-general',
-            'srt_general_section'
+            'ftt-settings-general',
+            'ftt_general_section'
         );
         
         add_settings_field(
             'notification_from_name',
             __('Notification From Name', 'schedule-collaboration-tracking'),
             array(__CLASS__, 'render_notification_from_name_field'),
-            'srt-settings-general',
-            'srt_general_section'
+            'ftt-settings-general',
+            'ftt_general_section'
         );
         
         // TAB 2: API KEYS
         add_settings_section(
-            'srt_api_section',
+            'ftt_api_section',
             __('API Configuration', 'schedule-collaboration-tracking'),
             array(__CLASS__, 'render_api_section'),
-            'srt-settings-api'
+            'ftt-settings-api'
         );
         
         add_settings_field(
             'geocoding_provider',
             __('Address Autocomplete Provider', 'schedule-collaboration-tracking'),
             array(__CLASS__, 'render_geocoding_provider_field'),
-            'srt-settings-api',
-            'srt_api_section'
+            'ftt-settings-api',
+            'ftt_api_section'
         );
         
         add_settings_field(
             'mapbox_api_key',
             __('Mapbox API Key', 'schedule-collaboration-tracking'),
             array(__CLASS__, 'render_mapbox_api_key_field'),
-            'srt-settings-api',
-            'srt_api_section'
+            'ftt-settings-api',
+            'ftt_api_section'
         );
         
         add_settings_field(
             'google_places_api_key',
             __('Google Places API Key', 'schedule-collaboration-tracking'),
             array(__CLASS__, 'render_google_places_api_key_field'),
-            'srt-settings-api',
-            'srt_api_section'
+            'ftt-settings-api',
+            'ftt_api_section'
         );
         
         add_settings_field(
             'serpapi_api_key',
             __('SerpAPI Key (Flight Pricing)', 'schedule-collaboration-tracking'),
             array(__CLASS__, 'render_serpapi_api_key_field'),
-            'srt-settings-api',
-            'srt_api_section'
+            'ftt-settings-api',
+            'ftt_api_section'
         );
         
         // TAB 3: EVENTS
         add_settings_section(
-            'srt_event_types_section',
+            'ftt_event_types_section',
             __('Event Types', 'schedule-collaboration-tracking'),
             array(__CLASS__, 'render_event_types_section'),
-            'srt-settings-events'
+            'ftt-settings-events'
         );
         
         add_settings_field(
             'event_types',
             __('Custom Event Types', 'schedule-collaboration-tracking'),
             array(__CLASS__, 'render_event_types_field'),
-            'srt-settings-events',
-            'srt_event_types_section'
+            'ftt-settings-events',
+            'ftt_event_types_section'
         );
         
         // TAB 4: CALENDAR
         add_settings_section(
-            'srt_calendar_section',
+            'ftt_calendar_section',
             __('Calendar Subscription', 'schedule-collaboration-tracking'),
             array(__CLASS__, 'render_calendar_section'),
-            'srt-settings-calendar'
+            'ftt-settings-calendar'
         );
         
         add_settings_field(
             'enable_ical_feed',
             __('Enable iCal Feed', 'schedule-collaboration-tracking'),
             array(__CLASS__, 'render_enable_ical_field'),
-            'srt-settings-calendar',
-            'srt_calendar_section'
+            'ftt-settings-calendar',
+            'ftt_calendar_section'
         );
         
         add_settings_field(
             'ical_require_auth',
             __('Require Authentication', 'schedule-collaboration-tracking'),
             array(__CLASS__, 'render_ical_auth_field'),
-            'srt-settings-calendar',
-            'srt_calendar_section'
+            'ftt-settings-calendar',
+            'ftt_calendar_section'
         );
         
         add_settings_field(
             'calendar_tokens',
             __('Calendar Tokens', 'schedule-collaboration-tracking'),
             array(__CLASS__, 'render_calendar_tokens_field'),
-            'srt-settings',
-            'srt_calendar_section'
+            'ftt-settings',
+            'ftt_calendar_section'
+        );
+        
+        // TAB 5: SECURITY
+        add_settings_section(
+            'ftt_security_section',
+            __('Security & Spam Protection', 'schedule-collaboration-tracking'),
+            array(__CLASS__, 'render_security_section'),
+            'ftt-settings-security'
+        );
+        
+        add_settings_field(
+            'enable_hcaptcha',
+            __('Enable hCaptcha', 'schedule-collaboration-tracking'),
+            array(__CLASS__, 'render_enable_hcaptcha_field'),
+            'ftt-settings-security',
+            'ftt_security_section'
+        );
+        
+        add_settings_field(
+            'hcaptcha_site_key',
+            __('hCaptcha Site Key', 'schedule-collaboration-tracking'),
+            array(__CLASS__, 'render_hcaptcha_site_key_field'),
+            'ftt-settings-security',
+            'ftt_security_section'
+        );
+        
+        add_settings_field(
+            'hcaptcha_secret_key',
+            __('hCaptcha Secret Key', 'schedule-collaboration-tracking'),
+            array(__CLASS__, 'render_hcaptcha_secret_key_field'),
+            'ftt-settings-security',
+            'ftt_security_section'
         );
     }
     
@@ -204,15 +228,12 @@ class SRT_Settings {
      */
     public static function sanitize_settings($input) {
         // Get existing settings and merge with new input
-        $existing = get_option('srt_settings', array());
+        $existing = get_option('ftt_settings', array());
         $sanitized = $existing; // Start with existing settings
         
         // Only update fields that are present in input (current tab)
         if (isset($input['require_login'])) {
             $sanitized['require_login'] = (bool) $input['require_login'];
-        }
-        if (isset($input['default_home_airport'])) {
-            $sanitized['default_home_airport'] = strtoupper(sanitize_text_field($input['default_home_airport']));
         }
         if (isset($input['default_timezone'])) {
             $sanitized['default_timezone'] = sanitize_text_field($input['default_timezone']);
@@ -266,6 +287,17 @@ class SRT_Settings {
             $sanitized['ical_require_auth'] = (bool) $input['ical_require_auth'];
         }
         
+        // Sanitize hCaptcha settings
+        if (isset($input['enable_hcaptcha'])) {
+            $sanitized['enable_hcaptcha'] = (bool) $input['enable_hcaptcha'];
+        }
+        if (isset($input['hcaptcha_site_key'])) {
+            $sanitized['hcaptcha_site_key'] = sanitize_text_field($input['hcaptcha_site_key']);
+        }
+        if (isset($input['hcaptcha_secret_key'])) {
+            $sanitized['hcaptcha_secret_key'] = sanitize_text_field($input['hcaptcha_secret_key']);
+        }
+        
         return $sanitized;
     }
     
@@ -294,25 +326,13 @@ class SRT_Settings {
      * Render require login field
      */
     public static function render_require_login_field() {
-        $settings = get_option('srt_settings', array());
+        $settings = get_option('ftt_settings', array());
         $value = $settings['require_login'] ?? false;
         ?>
         <label>
-            <input type="checkbox" name="srt_settings[require_login]" value="1" <?php checked($value, true); ?>>
+            <input type="checkbox" name="ftt_settings[require_login]" value="1" <?php checked($value, true); ?>>
             <?php esc_html_e('Require users to be logged in to view the schedule', 'schedule-collaboration-tracking'); ?>
         </label>
-        <?php
-    }
-    
-    /**
-     * Render default airport field
-     */
-    public static function render_default_airport_field() {
-        $settings = get_option('srt_settings', array());
-        $value = $settings['default_home_airport'] ?? '';
-        ?>
-        <input type="text" name="srt_settings[default_home_airport]" value="<?php echo esc_attr($value); ?>" class="regular-text" maxlength="3" placeholder="ORD">
-        <p class="description"><?php esc_html_e('IATA airport code (e.g., ORD for Chicago O\'Hare). Used as default for travel forms.', 'schedule-collaboration-tracking'); ?></p>
         <?php
     }
     
@@ -320,11 +340,11 @@ class SRT_Settings {
      * Render default timezone field
      */
     public static function render_default_timezone_field() {
-        $settings = get_option('srt_settings', array());
+        $settings = get_option('ftt_settings', array());
         $value = $settings['default_timezone'] ?? wp_timezone_string();
         $timezones = timezone_identifiers_list();
         ?>
-        <select name="srt_settings[default_timezone]" class="regular-text">
+        <select name="ftt_settings[default_timezone]" class="regular-text">
             <?php foreach ($timezones as $timezone) : ?>
                 <option value="<?php echo esc_attr($timezone); ?>" <?php selected($value, $timezone); ?>>
                     <?php echo esc_html($timezone); ?>
@@ -339,11 +359,11 @@ class SRT_Settings {
      * Render login menu field
      */
     public static function render_login_menu_field() {
-        $settings = get_option('srt_settings', array());
+        $settings = get_option('ftt_settings', array());
         $value = $settings['enable_login_menu'] ?? false;
         ?>
         <label>
-            <input type="checkbox" name="srt_settings[enable_login_menu]" value="1" <?php checked($value, true); ?>>
+            <input type="checkbox" name="ftt_settings[enable_login_menu]" value="1" <?php checked($value, true); ?>>
             <?php esc_html_e('Enable Login/Logout menu items', 'schedule-collaboration-tracking'); ?>
         </label>
         <p class="description"><?php esc_html_e('Add login and/or logout links to your WordPress menus. Use the menu item "Schedule Login/Logout" in Appearance → Menus.', 'schedule-collaboration-tracking'); ?></p>
@@ -354,11 +374,11 @@ class SRT_Settings {
      * Render login menu mode field
      */
     public static function render_login_menu_mode_field() {
-        $settings = get_option('srt_settings', array());
+        $settings = get_option('ftt_settings', array());
         $value = $settings['login_menu_mode'] ?? 'both';
         $enabled = $settings['enable_login_menu'] ?? false;
         ?>
-        <select name="srt_settings[login_menu_mode]" <?php disabled(!$enabled); ?>>
+        <select name="ftt_settings[login_menu_mode]" <?php disabled(!$enabled); ?>>
             <option value="login_only" <?php selected($value, 'login_only'); ?>><?php esc_html_e('Login Only (hide when logged in)', 'schedule-collaboration-tracking'); ?></option>
             <option value="both" <?php selected($value, 'both'); ?>><?php esc_html_e('Login/Logout (show both)', 'schedule-collaboration-tracking'); ?></option>
         </select>
@@ -370,11 +390,11 @@ class SRT_Settings {
      * Render notification from email field
      */
     public static function render_notification_from_email_field() {
-        $settings = get_option('srt_settings', array());
+        $settings = get_option('ftt_settings', array());
         $value = $settings['notification_from_email'] ?? '';
         $default = get_option('admin_email');
         ?>
-        <input type="email" name="srt_settings[notification_from_email]" value="<?php echo esc_attr($value); ?>" class="regular-text" placeholder="<?php echo esc_attr($default); ?>">
+        <input type="email" name="ftt_settings[notification_from_email]" value="<?php echo esc_attr($value); ?>" class="regular-text" placeholder="<?php echo esc_attr($default); ?>">
         <p class="description">
             <?php esc_html_e('Email address to use as the "From" address for price alerts and notifications. Leave blank to use WordPress admin email.', 'schedule-collaboration-tracking'); ?>
             <br><strong><?php esc_html_e('Note:', 'schedule-collaboration-tracking'); ?></strong> <?php esc_html_e('If using an SMTP plugin, configure it to send from this address for best deliverability.', 'schedule-collaboration-tracking'); ?>
@@ -386,11 +406,11 @@ class SRT_Settings {
      * Render notification from name field
      */
     public static function render_notification_from_name_field() {
-        $settings = get_option('srt_settings', array());
+        $settings = get_option('ftt_settings', array());
         $value = $settings['notification_from_name'] ?? '';
         $default = get_bloginfo('name');
         ?>
-        <input type="text" name="srt_settings[notification_from_name]" value="<?php echo esc_attr($value); ?>" class="regular-text" placeholder="<?php echo esc_attr($default); ?>">
+        <input type="text" name="ftt_settings[notification_from_name]" value="<?php echo esc_attr($value); ?>" class="regular-text" placeholder="<?php echo esc_attr($default); ?>">
         <p class="description">
             <?php esc_html_e('Name to display as the email sender. Leave blank to use site name.', 'schedule-collaboration-tracking'); ?>
         </p>
@@ -401,10 +421,10 @@ class SRT_Settings {
      * Render geocoding provider field
      */
     public static function render_geocoding_provider_field() {
-        $settings = get_option('srt_settings', array());
+        $settings = get_option('ftt_settings', array());
         $value = $settings['geocoding_provider'] ?? 'none';
         ?>
-        <select name="srt_settings[geocoding_provider]" id="srt_geocoding_provider">
+        <select name="ftt_settings[geocoding_provider]" id="ftt_geocoding_provider">
             <option value="none" <?php selected($value, 'none'); ?>><?php esc_html_e('None (Manual Entry Only)', 'schedule-collaboration-tracking'); ?></option>
             <option value="google" <?php selected($value, 'google'); ?>><?php esc_html_e('Google Places (Best for Schools/Venues)', 'schedule-collaboration-tracking'); ?></option>
             <option value="mapbox" <?php selected($value, 'mapbox'); ?>><?php esc_html_e('Mapbox (Good for Addresses)', 'schedule-collaboration-tracking'); ?></option>
@@ -419,11 +439,11 @@ class SRT_Settings {
      * Render Mapbox API key field
      */
     public static function render_mapbox_api_key_field() {
-        $settings = get_option('srt_settings', array());
+        $settings = get_option('ftt_settings', array());
         $value = $settings['mapbox_api_key'] ?? '';
         $provider = $settings['geocoding_provider'] ?? 'none';
         ?>
-        <input type="text" name="srt_settings[mapbox_api_key]" value="<?php echo esc_attr($value); ?>" class="regular-text" placeholder="pk.eyJ1..." <?php disabled($provider !== 'mapbox'); ?>>
+        <input type="text" name="ftt_settings[mapbox_api_key]" value="<?php echo esc_attr($value); ?>" class="regular-text" placeholder="pk.eyJ1..." <?php disabled($provider !== 'mapbox'); ?>>
         <p class="description">
             <?php 
             echo wp_kses_post(
@@ -441,11 +461,11 @@ class SRT_Settings {
      * Render Google Places API key field
      */
     public static function render_google_places_api_key_field() {
-        $settings = get_option('srt_settings', array());
+        $settings = get_option('ftt_settings', array());
         $value = $settings['google_places_api_key'] ?? '';
         $provider = $settings['geocoding_provider'] ?? 'none';
         ?>
-        <input type="text" name="srt_settings[google_places_api_key]" value="<?php echo esc_attr($value); ?>" class="regular-text" placeholder="AIza..." <?php disabled($provider !== 'google'); ?>>
+        <input type="text" name="ftt_settings[google_places_api_key]" value="<?php echo esc_attr($value); ?>" class="regular-text" placeholder="AIza..." <?php disabled($provider !== 'google'); ?>>
         <p class="description">
             <?php 
             echo wp_kses_post(
@@ -463,72 +483,72 @@ class SRT_Settings {
      * Render event types field
      */
     public static function render_event_types_field() {
-        $settings = get_option('srt_settings', array());
+        $settings = get_option('ftt_settings', array());
         $event_types = $settings['event_types'] ?? self::get_default_event_types();
         
         wp_enqueue_style('wp-color-picker');
         wp_enqueue_script('wp-color-picker');
         ?>
         <style>
-            .srt-event-type-row { margin-bottom: 15px; display: flex; align-items: center; gap: 10px; }
-            .srt-event-type-row input[type="text"] { width: 200px; }
-            .srt-event-type-row .wp-picker-container { display: inline-block; }
-            .srt-event-type-key { width: 150px; font-family: monospace; color: #666; }
-            .srt-event-type-remove { color: #dc3232; cursor: pointer; text-decoration: none; }
-            .srt-event-type-remove:hover { color: #a00; }
-            #srt-add-event-type { margin-top: 10px; }
+            .ftt-event-type-row { margin-bottom: 15px; display: flex; align-items: center; gap: 10px; }
+            .ftt-event-type-row input[type="text"] { width: 200px; }
+            .ftt-event-type-row .wp-picker-container { display: inline-block; }
+            .ftt-event-type-key { width: 150px; font-family: monospace; color: #666; }
+            .ftt-event-type-remove { color: #dc3232; cursor: pointer; text-decoration: none; }
+            .ftt-event-type-remove:hover { color: #a00; }
+            #ftt-add-event-type { margin-top: 10px; }
         </style>
-        <div id="srt-event-types-container">
+        <div id="ftt-event-types-container">
             <?php foreach ($event_types as $key => $type) : ?>
-                <div class="srt-event-type-row" data-key="<?php echo esc_attr($key); ?>">
-                    <span class="srt-event-type-key"><?php echo esc_html($key); ?></span>
+                <div class="ftt-event-type-row" data-key="<?php echo esc_attr($key); ?>">
+                    <span class="ftt-event-type-key"><?php echo esc_html($key); ?></span>
                     <input type="text" 
-                           name="srt_settings[event_types][<?php echo esc_attr($key); ?>][label]" 
+                           name="ftt_settings[event_types][<?php echo esc_attr($key); ?>][label]" 
                            value="<?php echo esc_attr($type['label']); ?>" 
                            placeholder="Event Type Label">
                     <input type="text" 
-                           name="srt_settings[event_types][<?php echo esc_attr($key); ?>][color]" 
+                           name="ftt_settings[event_types][<?php echo esc_attr($key); ?>][color]" 
                            value="<?php echo esc_attr($type['color']); ?>" 
-                           class="srt-color-picker">
-                    <a href="#" class="srt-event-type-remove" onclick="return srtRemoveEventType(this);">✕ Remove</a>
+                           class="ftt-color-picker">
+                    <a href="#" class="ftt-event-type-remove" onclick="return fttRemoveEventType(this);">✕ Remove</a>
                 </div>
             <?php endforeach; ?>
         </div>
-        <button type="button" id="srt-add-event-type" class="button">+ Add Event Type</button>
+        <button type="button" id="ftt-add-event-type" class="button">+ Add Event Type</button>
         <p class="description"><?php esc_html_e('Customize event types and their calendar colors. Key names should be lowercase with underscores (e.g., camp_weekend).', 'schedule-collaboration-tracking'); ?></p>
         
         <script>
         jQuery(document).ready(function($) {
             // Initialize color pickers
-            $('.srt-color-picker').wpColorPicker();
+            $('.ftt-color-picker').wpColorPicker();
             
             // Add new event type
-            $('#srt-add-event-type').on('click', function() {
+            $('#ftt-add-event-type').on('click', function() {
                 var key = prompt('Enter event type key (lowercase with underscores, e.g., "my_event"):');
                 if (!key) return;
                 
                 key = key.toLowerCase().replace(/[^a-z0-9_]/g, '_');
                 
-                if ($('.srt-event-type-row[data-key="' + key + '"]').length > 0) {
+                if ($('.ftt-event-type-row[data-key="' + key + '"]').length > 0) {
                     alert('Event type key already exists!');
                     return;
                 }
                 
-                var row = $('<div class="srt-event-type-row" data-key="' + key + '">' +
-                    '<span class="srt-event-type-key">' + key + '</span>' +
-                    '<input type="text" name="srt_settings[event_types][' + key + '][label]" value="" placeholder="Event Type Label">' +
-                    '<input type="text" name="srt_settings[event_types][' + key + '][color]" value="#2196F3" class="srt-color-picker">' +
-                    '<a href="#" class="srt-event-type-remove" onclick="return srtRemoveEventType(this);">✕ Remove</a>' +
+                var row = $('<div class="ftt-event-type-row" data-key="' + key + '">' +
+                    '<span class="ftt-event-type-key">' + key + '</span>' +
+                    '<input type="text" name="ftt_settings[event_types][' + key + '][label]" value="" placeholder="Event Type Label">' +
+                    '<input type="text" name="ftt_settings[event_types][' + key + '][color]" value="#2196F3" class="ftt-color-picker">' +
+                    '<a href="#" class="ftt-event-type-remove" onclick="return fttRemoveEventType(this);">✕ Remove</a>' +
                     '</div>');
                 
-                $('#srt-event-types-container').append(row);
-                row.find('.srt-color-picker').wpColorPicker();
+                $('#ftt-event-types-container').append(row);
+                row.find('.ftt-color-picker').wpColorPicker();
             });
         });
         
-        function srtRemoveEventType(el) {
+        function fttRemoveEventType(el) {
             if (confirm('Remove this event type?')) {
-                jQuery(el).closest('.srt-event-type-row').remove();
+                jQuery(el).closest('.ftt-event-type-row').remove();
             }
             return false;
         }
@@ -652,18 +672,18 @@ class SRT_Settings {
      * Render enable iCal field
      */
     public static function render_enable_ical_field() {
-        $settings = get_option('srt_settings', array());
+        $settings = get_option('ftt_settings', array());
         $value = $settings['enable_ical_feed'] ?? false;
         ?>
         <label>
-            <input type="checkbox" name="srt_settings[enable_ical_feed]" value="1" <?php checked($value, true); ?>>
+            <input type="checkbox" name="ftt_settings[enable_ical_feed]" value="1" <?php checked($value, true); ?>>
             <?php esc_html_e('Enable calendar subscription feed', 'schedule-collaboration-tracking'); ?>
         </label>
         <p class="description"><?php esc_html_e('Allow users to subscribe to the schedule in their calendar applications.', 'schedule-collaboration-tracking'); ?></p>
         <?php
         
         if ($value) {
-            $feed_url = rest_url('srt/v1/calendar.ics');
+            $feed_url = rest_url('ftt/v1/calendar.ics');
             ?>
             <p><strong><?php esc_html_e('Public Feed URL:', 'schedule-collaboration-tracking'); ?></strong><br>
             <code><?php echo esc_url($feed_url); ?></code>
@@ -677,12 +697,12 @@ class SRT_Settings {
      * Render iCal auth field
      */
     public static function render_ical_auth_field() {
-        $settings = get_option('srt_settings', array());
+        $settings = get_option('ftt_settings', array());
         $value = $settings['ical_require_auth'] ?? false;
         $enabled = $settings['enable_ical_feed'] ?? false;
         ?>
         <label>
-            <input type="checkbox" name="srt_settings[ical_require_auth]" value="1" <?php checked($value, true); ?> <?php disabled(!$enabled); ?>>
+            <input type="checkbox" name="ftt_settings[ical_require_auth]" value="1" <?php checked($value, true); ?> <?php disabled(!$enabled); ?>>
             <?php esc_html_e('Require authentication token for calendar access', 'schedule-collaboration-tracking'); ?>
         </label>
         <p class="description"><?php esc_html_e('Recommended for private schedules. Users will need a token to subscribe to the calendar.', 'schedule-collaboration-tracking'); ?></p>
@@ -693,7 +713,7 @@ class SRT_Settings {
      * Render calendar tokens field
      */
     public static function render_calendar_tokens_field() {
-        $settings = get_option('srt_settings', array());
+        $settings = get_option('ftt_settings', array());
         $enabled = $settings['enable_ical_feed'] ?? false;
         $requires_auth = $settings['ical_require_auth'] ?? false;
         
@@ -702,10 +722,10 @@ class SRT_Settings {
             return;
         }
         
-        $tokens = SRT_ICal::get_calendar_tokens();
+        $tokens = FTT_ICal::get_calendar_tokens();
         
         ?>
-        <div id="srt-calendar-tokens">
+        <div id="ftt-calendar-tokens">
             <?php if (empty($tokens)) : ?>
                 <p><?php esc_html_e('No calendar tokens generated yet.', 'schedule-collaboration-tracking'); ?></p>
             <?php else : ?>
@@ -719,7 +739,7 @@ class SRT_Settings {
                     </thead>
                     <tbody>
                         <?php foreach ($tokens as $token) : 
-                            $token_url = rest_url('srt/v1/calendar.ics') . '?token=' . $token;
+                            $token_url = rest_url('ftt/v1/calendar.ics') . '?token=' . $token;
                         ?>
                             <tr>
                                 <td><code><?php echo esc_html(substr($token, 0, 8) . '...'); ?></code></td>
@@ -728,7 +748,7 @@ class SRT_Settings {
                                     <button type="button" class="button button-small" onclick="navigator.clipboard.writeText('<?php echo esc_js($token_url); ?>'); this.textContent='Copied!';"><?php esc_html_e('Copy', 'schedule-collaboration-tracking'); ?></button>
                                 </td>
                                 <td>
-                                    <button type="button" class="button button-small" onclick="srtDeleteToken('<?php echo esc_js($token); ?>')"><?php esc_html_e('Delete', 'schedule-collaboration-tracking'); ?></button>
+                                    <button type="button" class="button button-small" onclick="fttDeleteToken('<?php echo esc_js($token); ?>')"><?php esc_html_e('Delete', 'schedule-collaboration-tracking'); ?></button>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -737,7 +757,7 @@ class SRT_Settings {
             <?php endif; ?>
             
             <p style="margin-top: 10px;">
-                <button type="button" class="button" id="srt-generate-token"><?php esc_html_e('Generate New Token', 'schedule-collaboration-tracking'); ?></button>
+                <button type="button" class="button" id="ftt-generate-token"><?php esc_html_e('Generate New Token', 'schedule-collaboration-tracking'); ?></button>
             </p>
             
             <p class="description"><?php esc_html_e('Each token provides access to subscribe to the calendar. Share these URLs with authorized users only.', 'schedule-collaboration-tracking'); ?></p>
@@ -745,12 +765,12 @@ class SRT_Settings {
         
         <script>
         jQuery(document).ready(function($) {
-            $('#srt-generate-token').on('click', function() {
+            $('#ftt-generate-token').on('click', function() {
                 var button = $(this);
                 button.prop('disabled', true).text('Generating...');
                 
                 $.ajax({
-                    url: '<?php echo esc_js(rest_url('srt/v1/calendar/token')); ?>',
+                    url: '<?php echo esc_js(rest_url('ftt/v1/calendar/token')); ?>',
                     method: 'POST',
                     beforeSend: function(xhr) {
                         xhr.setRequestHeader('X-WP-Nonce', '<?php echo wp_create_nonce('wp_rest'); ?>');
@@ -767,7 +787,7 @@ class SRT_Settings {
             });
         });
         
-        function srtDeleteToken(token) {
+        function fttDeleteToken(token) {
             if (!confirm('Delete this calendar token? Users with this URL will lose access.')) {
                 return;
             }
@@ -781,6 +801,74 @@ class SRT_Settings {
     }
     
     /**
+     * Render security section description
+     */
+    public static function render_security_section() {
+        echo '<p>' . esc_html__('Protect your registration and login forms from spam and bots using hCaptcha.', 'schedule-collaboration-tracking') . '</p>';
+        echo '<p>' . wp_kses_post(
+            sprintf(
+                __('Get your free hCaptcha keys at <a href="%s" target="_blank">hCaptcha.com</a>. Free tier includes unlimited requests.', 'schedule-collaboration-tracking'),
+                'https://dashboard.hcaptcha.com/signup'
+            )
+        ) . '</p>';
+    }
+    
+    /**
+     * Render enable hCaptcha field
+     */
+    public static function render_enable_hcaptcha_field() {
+        $settings = get_option('ftt_settings', array());
+        $value = $settings['enable_hcaptcha'] ?? false;
+        ?>
+        <label>
+            <input type="checkbox" name="ftt_settings[enable_hcaptcha]" value="1" <?php checked($value, true); ?>>
+            <?php esc_html_e('Enable hCaptcha on registration and login forms', 'schedule-collaboration-tracking'); ?>
+        </label>
+        <p class="description"><?php esc_html_e('Protects against spam and bot registrations.', 'schedule-collaboration-tracking'); ?></p>
+        <?php
+    }
+    
+    /**
+     * Render hCaptcha site key field
+     */
+    public static function render_hcaptcha_site_key_field() {
+        $settings = get_option('ftt_settings', array());
+        $value = $settings['hcaptcha_site_key'] ?? '';
+        $enabled = $settings['enable_hcaptcha'] ?? false;
+        ?>
+        <input type="text" 
+               name="ftt_settings[hcaptcha_site_key]" 
+               value="<?php echo esc_attr($value); ?>" 
+               class="regular-text"
+               placeholder="10000000-ffff-ffff-ffff-000000000001"
+               <?php disabled(!$enabled); ?>>
+        <p class="description">
+            <?php esc_html_e('Your hCaptcha Site Key (public key). Found in your hCaptcha dashboard under Settings.', 'schedule-collaboration-tracking'); ?>
+        </p>
+        <?php
+    }
+    
+    /**
+     * Render hCaptcha secret key field
+     */
+    public static function render_hcaptcha_secret_key_field() {
+        $settings = get_option('ftt_settings', array());
+        $value = $settings['hcaptcha_secret_key'] ?? '';
+        $enabled = $settings['enable_hcaptcha'] ?? false;
+        ?>
+        <input type="password" 
+               name="ftt_settings[hcaptcha_secret_key]" 
+               value="<?php echo esc_attr($value); ?>" 
+               class="regular-text"
+               placeholder="0x0000000000000000000000000000000000000000"
+               <?php disabled(!$enabled); ?>>
+        <p class="description">
+            <?php esc_html_e('Your hCaptcha Secret Key (private key). Keep this secure and never share it publicly.', 'schedule-collaboration-tracking'); ?>
+        </p>
+        <?php
+    }
+    
+    /**
      * Render price tracking section
      */
     
@@ -788,11 +876,11 @@ class SRT_Settings {
      * Render SerpAPI key field
      */
     public static function render_serpapi_api_key_field() {
-        $settings = get_option('srt_settings', array());
+        $settings = get_option('ftt_settings', array());
         $value = isset($settings['serpapi_api_key']) ? $settings['serpapi_api_key'] : '';
         ?>
         <input type="text" 
-               name="srt_settings[serpapi_api_key]" 
+               name="ftt_settings[serpapi_api_key]" 
                value="<?php echo esc_attr($value); ?>" 
                class="regular-text"
                placeholder="<?php echo esc_attr__('Enter your SerpAPI Key', 'schedule-collaboration-tracking'); ?>">
@@ -818,51 +906,57 @@ class SRT_Settings {
         // Handle messages
         if (isset($_GET['settings-updated'])) {
             add_settings_error(
-                'srt_messages',
-                'srt_message',
+                'ftt_messages',
+                'ftt_message',
                 __('Settings saved.', 'schedule-collaboration-tracking'),
                 'updated'
             );
         }
         
-        settings_errors('srt_messages');
+        settings_errors('ftt_messages');
         ?>
         <div class="wrap">
             <h1><?php echo esc_html(get_admin_page_title()); ?></h1>
             
             <h2 class="nav-tab-wrapper">
-                <a href="?post_type=srt_event&page=srt-settings&tab=general" class="nav-tab <?php echo $active_tab === 'general' ? 'nav-tab-active' : ''; ?>">
+                <a href="?post_type=ftt_event&page=ftt-settings&tab=general" class="nav-tab <?php echo $active_tab === 'general' ? 'nav-tab-active' : ''; ?>">
                     <span class="dashicons dashicons-admin-settings"></span> <?php _e('General', 'schedule-collaboration-tracking'); ?>
                 </a>
-                <a href="?post_type=srt_event&page=srt-settings&tab=api" class="nav-tab <?php echo $active_tab === 'api' ? 'nav-tab-active' : ''; ?>">
+                <a href="?post_type=ftt_event&page=ftt-settings&tab=api" class="nav-tab <?php echo $active_tab === 'api' ? 'nav-tab-active' : ''; ?>">
                     <span class="dashicons dashicons-admin-network"></span> <?php _e('API Keys', 'schedule-collaboration-tracking'); ?>
                 </a>
-                <a href="?post_type=srt_event&page=srt-settings&tab=events" class="nav-tab <?php echo $active_tab === 'events' ? 'nav-tab-active' : ''; ?>">
+                <a href="?post_type=ftt_event&page=ftt-settings&tab=events" class="nav-tab <?php echo $active_tab === 'events' ? 'nav-tab-active' : ''; ?>">
                     <span class="dashicons dashicons-calendar-alt"></span> <?php _e('Events', 'schedule-collaboration-tracking'); ?>
                 </a>
-                <a href="?post_type=srt_event&page=srt-settings&tab=calendar" class="nav-tab <?php echo $active_tab === 'calendar' ? 'nav-tab-active' : ''; ?>">
+                <a href="?post_type=ftt_event&page=ftt-settings&tab=calendar" class="nav-tab <?php echo $active_tab === 'calendar' ? 'nav-tab-active' : ''; ?>">
                     <span class="dashicons dashicons-rss"></span> <?php _e('Calendar', 'schedule-collaboration-tracking'); ?>
+                </a>
+                <a href="?post_type=ftt_event&page=ftt-settings&tab=security" class="nav-tab <?php echo $active_tab === 'security' ? 'nav-tab-active' : ''; ?>">
+                    <span class="dashicons dashicons-shield"></span> <?php _e('Security', 'schedule-collaboration-tracking'); ?>
                 </a>
             </h2>
             
             <form action="options.php" method="post">
                 <?php
-                settings_fields('srt_settings_group');
+                settings_fields('ftt_settings_group');
                 
                 // Display the appropriate settings page
                 switch ($active_tab) {
                     case 'api':
-                        do_settings_sections('srt-settings-api');
+                        do_settings_sections('ftt-settings-api');
                         break;
                     case 'events':
-                        do_settings_sections('srt-settings-events');
+                        do_settings_sections('ftt-settings-events');
                         break;
                     case 'calendar':
-                        do_settings_sections('srt-settings-calendar');
+                        do_settings_sections('ftt-settings-calendar');
+                        break;
+                    case 'security':
+                        do_settings_sections('ftt-settings-security');
                         break;
                     case 'general':
                     default:
-                        do_settings_sections('srt-settings-general');
+                        do_settings_sections('ftt-settings-general');
                         break;
                 }
                 
@@ -873,9 +967,9 @@ class SRT_Settings {
             <?php if ($active_tab === 'api'): ?>
             <script>
             jQuery(document).ready(function($) {
-                var providerSelect = $('#srt_geocoding_provider');
-                var mapboxInput = $('input[name="srt_settings[mapbox_api_key]"]');
-                var googleInput = $('input[name="srt_settings[google_places_api_key]"]');
+                var providerSelect = $('#ftt_geocoding_provider');
+                var mapboxInput = $('input[name="ftt_settings[mapbox_api_key]"]');
+                var googleInput = $('input[name="ftt_settings[google_places_api_key]"]');
                 
                 function updateApiKeyFields() {
                     var provider = providerSelect.val();
@@ -909,11 +1003,11 @@ class SRT_Settings {
             <h2><?php esc_html_e('Shortcodes', 'schedule-collaboration-tracking'); ?></h2>
             <p><?php esc_html_e('Use these shortcodes to display different views on your pages:', 'schedule-collaboration-tracking'); ?></p>
             <ul style="list-style: disc; margin-left: 20px;">
-                <li><code>[srt_login]</code> - <?php esc_html_e('Display the custom login form', 'schedule-collaboration-tracking'); ?></li>
-                <li><code>[srt_calendar]</code> - <?php esc_html_e('Display the calendar view', 'schedule-collaboration-tracking'); ?></li>
-                <li><code>[srt_event_form]</code> - <?php esc_html_e('Display the event add/edit form (admin only)', 'schedule-collaboration-tracking'); ?></li>
-                <li><code>[srt_dashboard]</code> - <?php esc_html_e('Display the dashboard with flights and travel overview', 'schedule-collaboration-tracking'); ?></li>
-                <li><code>[srt_event_list]</code> - <?php esc_html_e('Display a simple list of upcoming events', 'schedule-collaboration-tracking'); ?></li>
+                <li><code>[ftt_login]</code> - <?php esc_html_e('Display the custom login form', 'schedule-collaboration-tracking'); ?></li>
+                <li><code>[ftt_calendar]</code> - <?php esc_html_e('Display the calendar view', 'schedule-collaboration-tracking'); ?></li>
+                <li><code>[ftt_event_form]</code> - <?php esc_html_e('Display the event add/edit form (admin only)', 'schedule-collaboration-tracking'); ?></li>
+                <li><code>[ftt_dashboard]</code> - <?php esc_html_e('Display the dashboard with flights and travel overview', 'schedule-collaboration-tracking'); ?></li>
+                <li><code>[ftt_event_list]</code> - <?php esc_html_e('Display a simple list of upcoming events', 'schedule-collaboration-tracking'); ?></li>
             </ul>
             <?php endif; ?>
         </div>
@@ -922,4 +1016,4 @@ class SRT_Settings {
 }
 
 // Initialize
-SRT_Settings::init();
+FTT_Settings::init();

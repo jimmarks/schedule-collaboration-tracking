@@ -198,7 +198,7 @@ class FTT_Billing_Manager {
             self::check_child_limit($parent_id, $child_id);
             
             // Add child relationship
-            SRT_Roles::add_parent_child($parent_id, $child_id);
+            FTT_Roles::add_parent_child($parent_id, $child_id);
             
             // Update count
             $children_count = (int) get_user_meta($parent_id, 'ftt_children_count', true);
@@ -226,7 +226,7 @@ class FTT_Billing_Manager {
      */
     public static function remove_child_with_billing($parent_id, $child_id) {
         // Remove relationship
-        SRT_Roles::remove_parent_child($parent_id, $child_id);
+        FTT_Roles::remove_parent_child($parent_id, $child_id);
         
         // Update count
         $children_count = (int) get_user_meta($parent_id, 'ftt_children_count', true);

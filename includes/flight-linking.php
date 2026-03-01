@@ -10,7 +10,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class SRT_Flight_Linking {
+class FTT_Flight_Linking {
     
     /**
      * Initialize hooks
@@ -24,10 +24,10 @@ class SRT_Flight_Linking {
      * Register REST API routes
      */
     public static function register_routes() {
-        register_rest_route('srt/v1', '/flight-suggestions/(?P<event_id>\d+)', array(
+        register_rest_route('ftt/v1', '/flight-suggestions/(?P<event_id>\d+)', array(
             'methods'             => 'GET',
             'callback'            => array(__CLASS__, 'get_flight_suggestions'),
-            'permission_callback' => array('SRT_REST', 'check_user_permission'),
+            'permission_callback' => array('FTT_REST', 'check_user_permission'),
             'args'                => array(
                 'event_id' => array(
                     'required'          => true,
@@ -38,10 +38,10 @@ class SRT_Flight_Linking {
             ),
         ));
         
-        register_rest_route('srt/v1', '/link-flights', array(
+        register_rest_route('ftt/v1', '/link-flights', array(
             'methods'             => 'POST',
             'callback'            => array(__CLASS__, 'link_flights'),
-            'permission_callback' => array('SRT_REST', 'check_user_permission'),
+            'permission_callback' => array('FTT_REST', 'check_user_permission'),
             'args'                => array(
                 'event_ids' => array(
                     'required'          => true,
@@ -58,10 +58,10 @@ class SRT_Flight_Linking {
             ),
         ));
         
-        register_rest_route('srt/v1', '/unlink-flight', array(
+        register_rest_route('ftt/v1', '/unlink-flight', array(
             'methods'             => 'POST',
             'callback'            => array(__CLASS__, 'unlink_flight'),
-            'permission_callback' => array('SRT_REST', 'check_user_permission'),
+            'permission_callback' => array('FTT_REST', 'check_user_permission'),
             'args'                => array(
                 'event_id' => array(
                     'required'          => true,
@@ -78,10 +78,10 @@ class SRT_Flight_Linking {
             ),
         ));
         
-        register_rest_route('srt/v1', '/flight-group-pricing/(?P<group_id>[a-zA-Z0-9_-]+)', array(
+        register_rest_route('ftt/v1', '/flight-group-pricing/(?P<group_id>[a-zA-Z0-9_-]+)', array(
             'methods'             => 'GET',
             'callback'            => array(__CLASS__, 'get_flight_group_pricing'),
-            'permission_callback' => array('SRT_REST', 'check_user_permission'),
+            'permission_callback' => array('FTT_REST', 'check_user_permission'),
             'args'                => array(
                 'group_id' => array(
                     'required' => true,
@@ -98,7 +98,7 @@ class SRT_Flight_Linking {
         $event_id = $request->get_param('event_id');
         
         $event = get_post($event_id);
-        if (!$event || $event->post_type !== 'srt_event') {
+        if (!$event || $event->post_type !== 'ftt_event') {
             return new WP_Error('invalid_event', 'Invalid event ID', array('status' => 404));
         }
         
@@ -155,7 +155,7 @@ class SRT_Flight_Linking {
         
         // Get all events for this member within date range
         $query = new WP_Query(array(
-            'post_type'      => 'srt_event',
+            'post_type'      => 'ftt_event',
             'posts_per_page' => -1,
             'post__not_in'   => array($exclude_event_id),
             'meta_query'     => array(
@@ -225,7 +225,7 @@ class SRT_Flight_Linking {
         // Update each leg with the group ID
         foreach ($event_ids as $i => $event_id) {
             $event = get_post($event_id);
-            if (!$event || $event->post_type !== 'srt_event') {
+            if (!$event || $event->post_type !== 'ftt_event') {
                 continue;
             }
             
@@ -267,7 +267,7 @@ class SRT_Flight_Linking {
         $leg_index = $request->get_param('leg_index');
         
         $event = get_post($event_id);
-        if (!$event || $event->post_type !== 'srt_event') {
+        if (!$event || $event->post_type !== 'ftt_event') {
             return new WP_Error('invalid_event', 'Invalid event ID', array('status' => 404));
         }
         
@@ -361,7 +361,7 @@ class SRT_Flight_Linking {
      */
     public static function get_flight_group_legs($group_id) {
         $query = new WP_Query(array(
-            'post_type'      => 'srt_event',
+            'post_type'      => 'ftt_event',
             'posts_per_page' => -1,
             'post_status'    => array('publish', 'future', 'draft'),
         ));
@@ -404,7 +404,7 @@ class SRT_Flight_Linking {
         
         // Get price history from database
         global $wpdb;
-        $table_name = $wpdb->prefix . 'srt_price_history';
+        $table_name = $wpdb->prefix . 'ftt_price_history';
         
         $prices = $wpdb->get_results($wpdb->prepare(
             "SELECT price, checked_date, trip_type 
@@ -451,7 +451,7 @@ class SRT_Flight_Linking {
         
         // Get round-trip price history from database
         global $wpdb;
-        $table_name = $wpdb->prefix . 'srt_price_history';
+        $table_name = $wpdb->prefix . 'ftt_price_history';
         
         $prices = $wpdb->get_results($wpdb->prepare(
             "SELECT price, checked_date 
@@ -492,7 +492,7 @@ class SRT_Flight_Linking {
      */
     public static function get_member_flight_groups($member_id) {
         $query = new WP_Query(array(
-            'post_type'      => 'srt_event',
+            'post_type'      => 'ftt_event',
             'posts_per_page' => -1,
             'meta_query'     => array(
                 array(
@@ -537,4 +537,4 @@ class SRT_Flight_Linking {
 }
 
 // Initialize
-SRT_Flight_Linking::init();
+FTT_Flight_Linking::init();

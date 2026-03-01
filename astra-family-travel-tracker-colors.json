@@ -1,0 +1,33 @@
+{
+  "astra-settings": {
+    "global-color-palette": {
+      "desktop": {
+        "colors": [
+          "#6A3E8E",
+          "#F05A5A",
+          "#E84E4E",
+          "#5B347A",
+          "#E9E3F2",
+          "#F8F6FB",
+          "#FFFFFF",
+          "#000000"
+        ]
+      }
+    },
+    "theme-color": "#6A3E8E",
+    "link-color": "#6A3E8E",
+    "text-color": "#333333",
+    "theme-color-hover": "#5B347A",
+    "link-h-color": "#5B347A",
+    "heading-base-color": "#6A3E8E",
+    "button-color": "#FFFFFF",
+    "button-h-color": "#FFFFFF",
+    "button-bg-color": "#F05A5A",
+    "button-bg-h-color": "#E84E4E",
+    "secondary-button-color": "#FFFFFF",
+    "secondary-button-h-color": "#FFFFFF",
+    "secondary-button-bg-color": "#6A3E8E",
+    "secondary-button-bg-h-color": "#5B347A",
+    "border-color": "#E9E3F2"
+  }
+}
