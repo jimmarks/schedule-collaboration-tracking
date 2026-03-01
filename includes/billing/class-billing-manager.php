@@ -43,30 +43,53 @@ class FTT_Billing_Manager {
      * Redirects to billing page if subscription required
      */
     public static function check_access() {
+        // Only check on frontend page loads
+        if (is_admin() || wp_doing_ajax() || wp_doing_cron()) {
+            return;
+        }
+        
         if (!is_user_logged_in()) {
             return;
         }
+        
+        error_log('FTT BILLING DEBUG: check_access called for user ID: ' . get_current_user_id());
         
         // Skip checks for admins
         if (current_user_can('manage_options')) {
             return;
         }
         
-        // Skip checks on billing pages
-        if (self::is_billing_page()) {
+        // Skip checks if Stripe is not configured
+        $stripe_settings = get_option('ftt_stripe_settings', []);
+        if (empty($stripe_settings['secret_key']) || empty($stripe_settings['price_base_monthly'])) {
+            error_log('FTT BILLING DEBUG: Stripe not configured - allowing access (secret_key: ' . (empty($stripe_settings['secret_key']) ? 'EMPTY' : 'SET') . ', price_base_monthly: ' . (empty($stripe_settings['price_base_monthly']) ? 'EMPTY' : 'SET') . ')');
+            // Stripe not configured, allow access
             return;
         }
+        
+        error_log('FTT BILLING DEBUG: Stripe IS configured, checking subscription status');
+        
+        // Skip checks on billing pages
+        if (self::is_billing_page()) {
+            error_log('FTT BILLING DEBUG: Current page is billing page - allowing access');
+            return;
+        }
+        
+        error_log('FTT BILLING DEBUG: Not on billing page, checking subscription');
         
         $user_id = get_current_user_id();
         $status = get_user_meta($user_id, 'ftt_subscription_status', true);
         
+        error_log('FTT BILLING DEBUG: Subscription status: ' . ($status ?: 'EMPTY'));
+        
         // No subscription - redirect to pricing
         if (empty($status)) {
-            if (!self::is_billing_page()) {
-                wp_redirect(home_url('/billing/pricing/'));
-                exit;
-            }
+            error_log('FTT BILLING DEBUG: No subscription - redirecting to /pricing/');
+            wp_redirect(home_url('/pricing/'));
+            exit;
         }
+        
+        error_log('FTT BILLING DEBUG: User has valid subscription - allowing access');
         
         // Grace period expired - show warning
         if ($status === 'past_due') {
@@ -74,7 +97,7 @@ class FTT_Billing_Manager {
             if ($grace_end && strtotime($grace_end) < time()) {
                 // Grace period expired, restrict access
                 add_action('wp_footer', function() {
-                    echo '<div class="ftt-access-warning">Your subscription payment failed. Please update your payment method to continue using Family Travel Tracker. <a href="' . home_url('/billing/manage/') . '">Update Payment Method</a></div>';
+                    echo '<div class="ftt-access-warning">Your subscription payment failed. Please update your payment method to continue using Family Travel Tracker. <a href="' . home_url('/manage-subscription/') . '">Update Payment Method</a></div>';
                 });
             }
         }
@@ -84,18 +107,24 @@ class FTT_Billing_Manager {
      * Check if current page is a billing page
      */
     private static function is_billing_page() {
-        global $wp;
-        $current_url = trailingslashit(home_url($wp->request));
-        $billing_urls = [
-            home_url('/billing/'),
-            home_url('/billing/pricing/'),
-            home_url('/billing/success/'),
-            home_url('/billing/manage/'),
-        ];
+        global $post;
         
-        foreach ($billing_urls as $url) {
-            if (strpos($current_url, $url) === 0) {
+        // Check by post slug
+        if (is_object($post) && isset($post->post_name)) {
+            $billing_slugs = ['pricing', 'manage-subscription', 'checkout-success', 'checkout-cancel'];
+            if (in_array($post->post_name, $billing_slugs)) {
                 return true;
+            }
+        }
+        
+        // Fallback: check by REQUEST_URI
+        if (isset($_SERVER['REQUEST_URI'])) {
+            $uri = $_SERVER['REQUEST_URI'];
+            $billing_paths = ['/pricing', '/manage-subscription', '/checkout-success', '/checkout-cancel'];
+            foreach ($billing_paths as $path) {
+                if (strpos($uri, $path) !== false) {
+                    return true;
+                }
             }
         }
         
@@ -316,7 +345,7 @@ class FTT_Billing_Manager {
             $message .= "Your free trial ends today. You'll be charged \${$price}/{$period} tomorrow.\n\n";
         }
         
-        $message .= "Cancel anytime: " . home_url('/billing/manage/') . "\n\n";
+        $message .= "Cancel anytime: " . home_url('/manage-subscription/') . "\n\n";
         $message .= "Thanks for using Family Travel Tracker!\n";
         
         wp_mail($user->user_email, $subject, $message);
@@ -360,7 +389,7 @@ class FTT_Billing_Manager {
         $message = "Hi {$user->display_name},\n\n";
         $message .= "Your Family Travel Tracker access has been suspended due to payment failure.\n\n";
         $message .= "To restore access, please update your payment method:\n";
-        $message .= home_url('/billing/manage/') . "\n\n";
+        $message .= home_url('/manage-subscription/') . "\n\n";
         $message .= "Questions? Reply to this email.\n";
         
         wp_mail($user->user_email, $subject, $message);

@@ -20,8 +20,24 @@ class FTT_Registration {
      */
     public static function init() {
         add_shortcode('ftt_register', array(__CLASS__, 'registration_shortcode'));
-        add_action('init', array(__CLASS__, 'handle_registration'));
+        add_action('init', array(__CLASS__, 'handle_registration'), 5); // Earlier priority
         add_filter('authenticate', array(__CLASS__, 'verify_login_hcaptcha'), 30, 3);
+        add_filter('login_redirect', array(__CLASS__, 'intercept_login_redirect'), 1, 3); // Highest priority
+    }
+    
+    /**
+     * Intercept login redirects for newly registered users
+     */
+    public static function intercept_login_redirect($redirect_to, $request, $user) {
+        if (isset($user->ID)) {
+            $stored_redirect = get_transient('ftt_post_registration_redirect_' . $user->ID);
+            if ($stored_redirect) {
+                error_log('FTT DEBUG: intercept_login_redirect - using stored redirect: ' . $stored_redirect);
+                delete_transient('ftt_post_registration_redirect_' . $user->ID);
+                return $stored_redirect;
+            }
+        }
+        return $redirect_to;
     }
     
     /**
@@ -32,6 +48,9 @@ class FTT_Registration {
         if (is_user_logged_in()) {
             return '<p>' . __('You are already registered and logged in.', 'schedule-collaboration-tracking') . ' <a href="' . wp_logout_url(home_url()) . '">' . __('Logout', 'schedule-collaboration-tracking') . '</a></p>';
         }
+        
+        // Ensure jQuery is loaded
+        wp_enqueue_script('jquery');
         
         ob_start();
         include FTT_PLUGIN_DIR . 'templates/registration-form.php';
@@ -55,6 +74,7 @@ class FTT_Registration {
         // Verify hCaptcha if enabled
         $settings = get_option('ftt_settings', array());
         $enable_hcaptcha = $settings['enable_hcaptcha'] ?? false;
+        error_log('FTT DEBUG: hCaptcha enabled: ' . ($enable_hcaptcha ? 'yes' : 'no'));
         
         if ($enable_hcaptcha) {
             $hcaptcha_response = isset($_POST['h-captcha-response']) ? $_POST['h-captcha-response'] : '';
@@ -71,11 +91,14 @@ class FTT_Registration {
         
         // Return early if captcha failed
         if (!empty($errors)) {
+            error_log('FTT DEBUG: hCaptcha validation failed: ' . implode(', ', $errors));
             set_transient('ftt_registration_errors', $errors, 60);
             $redirect_url = isset($_POST['redirect_to']) ? $_POST['redirect_to'] : home_url('/ftt-register/');
             wp_safe_redirect($redirect_url);
             exit;
         }
+        
+        error_log('FTT DEBUG: hCaptcha passed, continuing with registration');
         
         $user_type = sanitize_text_field($_POST['user_type']);
         $first_name = sanitize_text_field($_POST['first_name']);
@@ -108,22 +131,19 @@ class FTT_Registration {
         }
         
         if (!empty($errors)) {
+            error_log('FTT DEBUG: Validation failed: ' . implode(', ', $errors));
             set_transient('ftt_registration_errors', $errors, 45);
             return;
         }
         
-        // Create user
-        $username = sanitize_user(strtolower($first_name . '.' . $last_name));
+        error_log('FTT DEBUG: Validation passed. Creating user with email: ' . $email);
         
-        // Make username unique if needed
-        $username_base = $username;
-        $counter = 1;
-        while (username_exists($username)) {
-            $username = $username_base . $counter;
-            $counter++;
-        }
+        // Create user - use email as username
+        $username = $email;
         
         $user_id = wp_create_user($username, $password, $email);
+        
+        error_log('FTT DEBUG: User created with ID: ' . $user_id);
         
         if (is_wp_error($user_id)) {
             set_transient('ftt_registration_errors', array($user_id->get_error_message()), 45);
@@ -138,6 +158,9 @@ class FTT_Registration {
             'display_name' => $first_name . ' ' . $last_name,
         ));
         
+        // Disable admin toolbar on frontend for this user
+        update_user_meta($user_id, 'show_admin_bar_front', 'false');
+        
         // Store phone
         if (!empty($phone)) {
             update_user_meta($user_id, 'phone', $phone);
@@ -146,6 +169,9 @@ class FTT_Registration {
         // Store planned children count
         if (!empty($planned_children)) {
             update_user_meta($user_id, 'planned_children', $planned_children);
+            error_log('FTT DEBUG: Stored planned_children: ' . $planned_children);
+        } else {
+            error_log('FTT DEBUG: WARNING - No planned_children value!');
         }
         
         // Handle user type
@@ -216,14 +242,51 @@ class FTT_Registration {
         );
         wp_mail($admin_email, $subject, $message);
         
-        // Log user in
-        wp_set_current_user($user_id);
-        wp_set_auth_cookie($user_id);
+        error_log('FTT DEBUG: Registration complete. Determining redirect...');
         
-        // Redirect
-        $redirect = !empty($_POST['redirect_to']) ? $_POST['redirect_to'] : home_url();
-        wp_safe_redirect($redirect);
-        exit;
+        // Determine redirect destination BEFORE logging user in
+        $redirect_url = home_url('/pricing/'); // Default fallback
+        error_log('FTT DEBUG: Default redirect URL: ' . $redirect_url);
+        
+        // Try to create Stripe checkout session directly with planned children count
+        if (class_exists('FTT_Stripe_Integration') && !empty($planned_children)) {
+            error_log('FTT DEBUG: FTT_Stripe_Integration class exists, planned_children: ' . $planned_children);
+            
+            // Base subscription includes 1 child, so additional children = planned - 1
+            $addon_quantity = max(0, $planned_children - 1);
+            error_log('FTT DEBUG: Calculated addon_quantity: ' . $addon_quantity);
+            
+            // Default to monthly interval
+            $interval = 'month';
+            error_log('FTT DEBUG: Calling create_checkout_session with user_id=' . $user_id . ', interval=' . $interval . ', addon_qty=' . $addon_quantity);
+            
+            $session = FTT_Stripe_Integration::create_checkout_session($user_id, $interval, $addon_quantity);
+            
+            if ($session && !empty($session['url'])) {
+                $redirect_url = $session['url'];
+                error_log('FTT DEBUG: Stripe session created! URL: ' . $redirect_url);
+            } else {
+                error_log('FTT DEBUG: Stripe session creation FAILED - session is: ' . print_r($session, true));
+            }
+        } else {
+            error_log('FTT DEBUG: Skipping Stripe - class exists: ' . (class_exists('FTT_Stripe_Integration') ? 'yes' : 'no') . ', planned_children: ' . ($planned_children ?? 'null'));
+        }
+        
+        // Store redirect URL in transient before logging in
+        set_transient('ftt_post_registration_redirect_' . $user_id, $redirect_url, 60);
+        error_log('FTT DEBUG: Stored redirect URL in transient for user: ' . $user_id);
+        
+        // Log user in WITHOUT triggering wp_login action (which causes wp-admin redirect)
+        error_log('FTT DEBUG: Logging in user ID: ' . $user_id);
+        $user = get_user_by('id', $user_id);
+        wp_clear_auth_cookie();
+        wp_set_current_user($user_id);
+        wp_set_auth_cookie($user_id, true);
+        
+        // IMMEDIATELY redirect - don't let WordPress process anything else
+        error_log('FTT DEBUG: Performing immediate redirect to: ' . $redirect_url);
+        wp_redirect($redirect_url, 302);
+        die(); // Use die() instead of exit() to stop ALL execution
     }
     
     /**

@@ -37,6 +37,51 @@ if (!defined('ABSPATH')) {
             </div>
         <?php endif; ?>
         
+        <!-- Event Category Filters -->
+        <div class="ftt-event-filters">
+            <button type="button" id="ftt-filter-toggle" class="button">
+                <span class="dashicons dashicons-filter"></span>
+                <?php esc_html_e('Filter Events', 'schedule-collaboration-tracking'); ?>
+            </button>
+            
+            <div id="ftt-filter-panel" class="ftt-filter-panel" style="display: none;">
+                <h4><?php esc_html_e('Show Event Types:', 'schedule-collaboration-tracking'); ?></h4>
+                <div class="ftt-filter-categories">
+                    <?php
+                    // Get user's preferences
+                    $user_preferences = get_user_meta($current_user_id, 'ftt_visible_event_categories', true);
+                    if (!is_array($user_preferences)) {
+                        $user_preferences = array(); // Show all by default
+                    }
+                    
+                    // Get event categories
+                    $categories = FTT_CPT::get_event_categories();
+                    foreach ($categories as $cat_key => $category):
+                        $is_checked = empty($user_preferences) || in_array($cat_key, $user_preferences);
+                    ?>
+                        <label class="ftt-filter-category">
+                            <input type="checkbox" 
+                                   name="event_category[]" 
+                                   value="<?php echo esc_attr($cat_key); ?>"
+                                   class="ftt-category-filter"
+                                   <?php checked($is_checked); ?>>
+                            <span class="ftt-category-icon"><?php echo $category['icon']; ?></span>
+                            <span class="ftt-category-label"><?php echo esc_html($category['label']); ?></span>
+                        </label>
+                    <?php endforeach; ?>
+                </div>
+                
+                <div class="ftt-filter-actions">
+                    <button type="button" id="ftt-filter-apply" class="button button-primary">
+                        <?php esc_html_e('Apply Filters', 'schedule-collaboration-tracking'); ?>
+                    </button>
+                    <button type="button" id="ftt-filter-reset" class="button">
+                        <?php esc_html_e('Reset', 'schedule-collaboration-tracking'); ?>
+                    </button>
+                </div>
+            </div>
+        </div>
+        
         <?php if (current_user_can('edit_posts')) : ?>
             <?php
             $event_form_url = FTT_Pages::get_page_url('event_form');
@@ -341,4 +386,165 @@ if (!defined('ABSPATH')) {
 .ftt-legend-label {
     font-size: 14px;
 }
+
+/* Event Category Filters */
+.ftt-event-filters {
+    margin: 20px 0;
+    position: relative;
+}
+
+#ftt-filter-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    font-size: 14px;
+    cursor: pointer;
+    background: #6A3E8E;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+
+#ftt-filter-toggle:hover {
+    background: #5B347A;
+}
+
+#ftt-filter-toggle.active {
+    background: #5B347A;
+}
+
+#ftt-filter-toggle .dashicons {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+}
+
+.ftt-filter-panel {
+    margin-top: 15px;
+    background: #fff;
+    border: 2px solid #6A3E8E;
+    border-radius: 8px;
+    padding: 20px;
+}
+
+.ftt-filter-panel h4 {
+    margin: 0 0 15px 0;
+    color: #6A3E8E;
+    font-size: 16px;
+}
+
+.ftt-filter-categories {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.ftt-filter-category {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 15px;
+    border: 2px solid #e0e0e0;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: white;
+}
+
+.ftt-filter-category:hover {
+    border-color: #6A3E8E;
+    background: #f5f5f5;
+}
+
+.ftt-filter-category input[type="checkbox"] {
+    margin: 0;
+}
+
+.ftt-filter-category input[type="checkbox"]:checked + .ftt-category-icon {
+    transform: scale(1.2);
+}
+
+.ftt-filter-category .ftt-category-icon {
+    font-size: 20px;
+    transition: transform 0.2s;
+}
+
+.ftt-filter-category .ftt-category-label {
+    flex: 1;
+    font-weight: 500;
+    font-size: 14px;
+}
+
+.ftt-filter-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    padding-top: 15px;
+    border-top: 1px solid #e0e0e0;
+}
+
+.ftt-filter-actions .button {
+    min-width: 100px;
+}
 </style>
+
+<script>
+jQuery(document).ready(function($) {
+    console.log('FTT CALENDAR: Filter handlers loaded');
+    
+    // Toggle filter panel
+    $('#ftt-filter-toggle').on('click', function() {
+        $(this).toggleClass('active');
+        $('#ftt-filter-panel').slideToggle(300);
+    });
+    
+    // Apply filters
+    $('#ftt-filter-apply').on('click', function() {
+        console.log('Applying event category filters');
+        
+        var visibleCategories = [];
+        $('.ftt-category-filter:checked').each(function() {
+            visibleCategories.push($(this).val());
+        });
+        
+        console.log('Visible categories:', visibleCategories);
+        
+        // Save preferences via REST API
+        $.ajax({
+            url: '/wp-json/ftt/v1/save-event-preferences',
+            method: 'POST',
+            beforeSend: function(xhr) {
+                xhr.setRequestHeader('X-WP-Nonce', '<?php echo wp_create_nonce('wp_rest'); ?>');
+            },
+            contentType: 'application/json',
+            data: JSON.stringify({ visible_categories: visibleCategories }),
+            success: function(response) {
+                console.log('Filters saved, reloading calendar');
+                // Reload calendar to apply filters
+                if (typeof window.fttCalendar !== 'undefined' && window.fttCalendar.refetchEvents) {
+                    window.fttCalendar.refetchEvents();
+                } else {
+                    location.reload();
+                }
+            },
+            error: function(xhr) {
+                console.error('Error saving filters:', xhr.responseJSON);
+                alert('Failed to save filters. Please try again.');
+            }
+        });
+    });
+    
+    // Reset filters
+    $('#ftt-filter-reset').on('click', function() {
+        console.log('Resetting filters');
+        $('.ftt-category-filter').prop('checked', true);
+        $('#ftt-filter-apply').click();
+    });
+    
+    console.log('FTT CALENDAR: Filter handlers attached');
+});
+</script>
+

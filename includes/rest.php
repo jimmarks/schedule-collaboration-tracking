@@ -266,6 +266,49 @@ class FTT_REST {
                 'callback'            => array(__CLASS__, 'reactivate_subscription'),
                 'permission_callback' => 'is_user_logged_in',
             ));
+            
+            // Family management endpoints
+            register_rest_route('ftt/v1', '/add-child', array(
+                'methods'             => 'POST',
+                'callback'            => array(__CLASS__, 'add_child'),
+                'permission_callback' => 'is_user_logged_in',
+            ));
+            
+            register_rest_route('ftt/v1', '/edit-child', array(
+                'methods'             => 'POST',
+                'callback'            => array(__CLASS__, 'edit_child'),
+                'permission_callback' => 'is_user_logged_in',
+            ));
+            
+            register_rest_route('ftt/v1', '/remove-child', array(
+                'methods'             => 'POST',
+                'callback'            => array(__CLASS__, 'remove_child'),
+                'permission_callback' => 'is_user_logged_in',
+            ));
+            
+            register_rest_route('ftt/v1', '/invite-adult', array(
+                'methods'             => 'POST',
+                'callback'            => array(__CLASS__, 'invite_adult'),
+                'permission_callback' => 'is_user_logged_in',
+            ));
+            
+            register_rest_route('ftt/v1', '/remove-adult', array(
+                'methods'             => 'POST',
+                'callback'            => array(__CLASS__, 'remove_adult'),
+                'permission_callback' => 'is_user_logged_in',
+            ));
+            
+            register_rest_route('ftt/v1', '/save-event-preferences', array(
+                'methods'             => 'POST',
+                'callback'            => array(__CLASS__, 'save_event_preferences'),
+                'permission_callback' => 'is_user_logged_in',
+            ));
+            
+            register_rest_route('ftt/v1', '/get-family-members', array(
+                'methods'             => 'GET',
+                'callback'            => array(__CLASS__, 'get_family_members'),
+                'permission_callback' => 'is_user_logged_in',
+            ));
         }
     }
     
@@ -1476,6 +1519,333 @@ class FTT_REST {
         }
         
         return rest_ensure_response(['success' => true]);
+    }
+    
+    /**
+     * Add child to parent account
+     */
+    public static function add_child($request) {
+        $user_id = get_current_user_id();
+        $params = $request->get_json_params();
+        
+        error_log('FTT REST: Adding child - User ID: ' . $user_id);
+        
+        $first_name = sanitize_text_field($params['first_name'] ?? '');
+        $last_name = sanitize_text_field($params['last_name'] ?? '');
+        $email = sanitize_email($params['email'] ?? '');
+        $age = absint($params['age'] ?? 0);
+        $grade = sanitize_text_field($params['grade'] ?? '');
+        $school = sanitize_text_field($params['school'] ?? '');
+        $color = sanitize_hex_color($params['color'] ?? '#2196F3');
+        
+        if (empty($first_name) || empty($last_name)) {
+            return new WP_Error('missing_data', 'First name and last name are required', ['status' => 400]);
+        }
+        
+        $child_id = null;
+        
+        // If email provided, try to find existing user
+        if (!empty($email)) {
+            $existing_user = get_user_by('email', $email);
+            if ($existing_user) {
+                $child_id = $existing_user->ID;
+                error_log('FTT REST: Found existing user with email: ' . $email);
+            }
+        }
+        
+        // If no existing user, create new one
+        if (!$child_id) {
+            $username = !empty($email) ? $email : strtolower($first_name . '.' . $last_name) . rand(100, 999);
+            $password = wp_generate_password(12, true, true);
+            
+            $child_id = wp_create_user($username, $password, $email);
+            
+            if (is_wp_error($child_id)) {
+                error_log('FTT REST: Failed to create user: ' . $child_id->get_error_message());
+                return $child_id;
+            }
+            
+            // Set user metadata
+            wp_update_user([
+                'ID' => $child_id,
+                'first_name' => $first_name,
+                'last_name' => $last_name,
+                'display_name' => $first_name . ' ' . $last_name,
+            ]);
+            
+            // Set role
+            $user = new WP_User($child_id);
+            $user->set_role('ftt_member');
+            
+            error_log('FTT REST: Created new user ID: ' . $child_id);
+        }
+        
+        // Update child metadata
+        if ($age > 0) {
+            update_user_meta($child_id, 'child_age', $age);
+        }
+        if (!empty($grade)) {
+            update_user_meta($child_id, 'child_grade', $grade);
+        }
+        if (!empty($school)) {
+            update_user_meta($child_id, 'child_school', $school);
+        }
+        if (!empty($color)) {
+            update_user_meta($child_id, 'child_color', $color);
+        }
+        
+        // Link to parent
+        FTT_Roles::add_parent_child($user_id, $child_id);
+        
+        error_log('FTT REST: Child linked successfully');
+        
+        return rest_ensure_response([
+            'success' => true,
+            'child_id' => $child_id,
+            'message' => 'Child added successfully'
+        ]);
+    }
+    
+    /**
+     * Edit child information
+     */
+    public static function edit_child($request) {
+        $user_id = get_current_user_id();
+        $params = $request->get_json_params();
+        
+        $child_id = absint($params['child_id'] ?? 0);
+        
+        if (!$child_id) {
+            return new WP_Error('missing_child_id', 'Child ID is required', ['status' => 400]);
+        }
+        
+        // Verify parent-child relationship
+        if (!FTT_Roles::is_parent($user_id) || !in_array($child_id, FTT_Roles::get_children($user_id))) {
+            return new WP_Error('unauthorized', 'You do not have permission to edit this child', ['status' => 403]);
+        }
+        
+        $first_name = sanitize_text_field($params['first_name'] ?? '');
+        $last_name = sanitize_text_field($params['last_name'] ?? '');
+        $age = absint($params['age'] ?? 0);
+        $grade = sanitize_text_field($params['grade'] ?? '');
+        $school = sanitize_text_field($params['school'] ?? '');
+        $color = sanitize_hex_color($params['color'] ?? '#2196F3');
+        
+        // Update user data
+        if (!empty($first_name) && !empty($last_name)) {
+            wp_update_user([
+                'ID' => $child_id,
+                'first_name' => $first_name,
+                'last_name' => $last_name,
+                'display_name' => $first_name . ' ' . $last_name,
+            ]);
+        }
+        
+        // Update metadata
+        if ($age > 0) {
+            update_user_meta($child_id, 'child_age', $age);
+        }
+        if (!empty($grade)) {
+            update_user_meta($child_id, 'child_grade', $grade);
+        }
+        if (!empty($school)) {
+            update_user_meta($child_id, 'child_school', $school);
+        }
+        if (!empty($color)) {
+            update_user_meta($child_id, 'child_color', $color);
+        }
+        
+        return rest_ensure_response([
+            'success' => true,
+            'message' => 'Child updated successfully'
+        ]);
+    }
+    
+    /**
+     * Remove child from parent account
+     */
+    public static function remove_child($request) {
+        $user_id = get_current_user_id();
+        $params = $request->get_json_params();
+        
+        $child_id = absint($params['child_id'] ?? 0);
+        
+        if (!$child_id) {
+            return new WP_Error('missing_child_id', 'Child ID is required', ['status' => 400]);
+        }
+        
+        // Verify parent-child relationship
+        if (!FTT_Roles::is_parent($user_id) || !in_array($child_id, FTT_Roles::get_children($user_id))) {
+            return new WP_Error('unauthorized', 'You do not have permission to remove this child', ['status' => 403]);
+        }
+        
+        // Remove parent-child relationship
+        FTT_Roles::remove_parent_child($user_id, $child_id);
+        
+        return rest_ensure_response([
+            'success' => true,
+            'message' => 'Child removed successfully'
+        ]);
+    }
+    
+    /**
+     * Invite adult (co-parent/guardian)
+     */
+    public static function invite_adult($request) {
+        $user_id = get_current_user_id();
+        $params = $request->get_json_params();
+        
+        $email = sanitize_email($params['email'] ?? '');
+        $relationship = sanitize_text_field($params['relationship'] ?? 'co-parent');
+        
+        if (empty($email)) {
+            return new WP_Error('missing_email', 'Email address is required', ['status' => 400]);
+        }
+        
+        // Generate invitation
+        $invite_code = wp_generate_password(12, false);
+        $expires = time() + (7 * DAY_IN_SECONDS); // 7 days
+        
+        // Store invitation data
+        $invitations = get_user_meta($user_id, 'ftt_adult_invitations', true);
+        if (!is_array($invitations)) {
+            $invitations = [];
+        }
+        
+        $invitations[$invite_code] = [
+            'email' => $email,
+            'relationship' => $relationship,
+            'expires' => $expires,
+            'created' => time(),
+        ];
+        
+        update_user_meta($user_id, 'ftt_adult_invitations', $invitations);
+        
+        // Generate invitation URL
+        $invite_url = add_query_arg([
+            'ftt_invite' => $invite_code,
+            'inviter' => $user_id,
+        ], home_url('/ftt-dashboard/'));
+        
+        // Send email
+        $current_user = wp_get_current_user();
+        $subject = sprintf('Family Calendar Invitation from %s', $current_user->display_name);
+        $message = sprintf(
+            "You've been invited by %s to share access to their family calendar.\n\n" .
+            "Click here to accept: %s\n\n" .
+            "This invitation expires in 7 days.",
+            $current_user->display_name,
+            $invite_url
+        );
+        
+        wp_mail($email, $subject, $message);
+        
+        return rest_ensure_response([
+            'success' => true,
+            'invite_url' => $invite_url,
+            'message' => 'Invitation sent successfully'
+        ]);
+    }
+    
+    /**
+     * Remove adult access
+     */
+    public static function remove_adult($request) {
+        $user_id = get_current_user_id();
+        $params = $request->get_json_params();
+        
+        $adult_id = absint($params['adult_id'] ?? 0);
+        
+        if (!$adult_id) {
+            return new WP_Error('missing_adult_id', 'Adult ID is required', ['status' => 400]);
+        }
+        
+        // Get current user's children
+        $children = FTT_Roles::get_children($user_id);
+        
+        // Remove adult as parent of all these children
+        foreach ($children as $child_id) {
+            FTT_Roles::remove_parent_child($adult_id, $child_id);
+        }
+        
+        return rest_ensure_response([
+            'success' => true,
+            'message' => 'Adult access removed successfully'
+        ]);
+    }
+    
+    /**
+     * Save event preferences (visible categories)
+     */
+    public static function save_event_preferences($request) {
+        $user_id = get_current_user_id();
+        $params = $request->get_json_params();
+        
+        $visible_categories = $params['visible_categories'] ?? [];
+        
+        if (!is_array($visible_categories)) {
+            return new WP_Error('invalid_data', 'Visible categories must be an array', ['status' => 400]);
+        }
+        
+        // Sanitize categories
+        $visible_categories = array_map('sanitize_text_field', $visible_categories);
+        
+        // Save to user meta
+        update_user_meta($user_id, 'ftt_visible_event_categories', $visible_categories);
+        
+        return rest_ensure_response([
+            'success' => true,
+            'message' => 'Preferences saved successfully'
+        ]);
+    }
+    
+    /**
+     * Get family members (children and adults)
+     */
+    public static function get_family_members($request) {
+        $user_id = get_current_user_id();
+        
+        $children = [];
+        $child_ids = FTT_Roles::get_children($user_id);
+        
+        foreach ($child_ids as $child_id) {
+            $child = get_userdata($child_id);
+            if ($child) {
+                $children[] = [
+                    'id' => $child_id,
+                    'name' => $child->display_name,
+                    'first_name' => $child->first_name,
+                    'last_name' => $child->last_name,
+                    'email' => $child->user_email,
+                    'age' => get_user_meta($child_id, 'child_age', true),
+                    'grade' => get_user_meta($child_id, 'child_grade', true),
+                    'school' => get_user_meta($child_id, 'child_school', true),
+                    'color' => get_user_meta($child_id, 'child_color', true),
+                ];
+            }
+        }
+        
+        $adults = [];
+        $parent_ids = FTT_Roles::get_parents($user_id);
+        
+        foreach ($parent_ids as $parent_id) {
+            if ($parent_id == $user_id) continue; // Skip self
+            
+            $parent = get_userdata($parent_id);
+            if ($parent) {
+                $adults[] = [
+                    'id' => $parent_id,
+                    'name' => $parent->display_name,
+                    'email' => $parent->user_email,
+                    'relationship' => get_user_meta($parent_id, 'relationship_to_' . $user_id, true),
+                ];
+            }
+        }
+        
+        return rest_ensure_response([
+            'children' => $children,
+            'adults' => $adults,
+        ]);
     }
 }
 

@@ -36,7 +36,6 @@ if ($errors) {
         
         <form method="post" id="ftt-register-form">
             <?php wp_nonce_field('ftt_register', 'ftt_register_nonce'); ?>
-            <input type="hidden" name="redirect_to" value="<?php echo esc_url(home_url('/pricing/')); ?>">
             <input type="hidden" name="user_type" value="parent">
             
             <!-- Personal Information -->
@@ -314,21 +313,12 @@ if ($errors) {
 
 .ftt-child-selector select {
     width: 100%;
-    font-size: 18px;
-    font-weight: 600;
-    color: #6A3E8E;
-    padding: 16px;
+    height: 50px;
+    font-size: 16px;
+    padding: 5px;
     border: 2px solid #6A3E8E;
     border-radius: 6px;
-    cursor: pointer;
-    background-color: white;
-    appearance: auto;
-    -webkit-appearance: menulist;
-    -moz-appearance: menulist;
-    box-sizing: border-box;
-    pointer-events: auto;
-    position: relative;
-    z-index: 10;
+    background: white;
 }
 
 .ftt-pricing-breakdown {
@@ -482,49 +472,83 @@ if ($errors) {
 </style>
 
 <script>
-jQuery(document).ready(function($) {
-    // Live pricing calculator
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('FTT REGISTRATION: DOMContentLoaded fired');
+    
+    var childCount = document.getElementById('child-count');
+    var addonLabel = document.getElementById('addon-label');
+    var addonPrice = document.getElementById('addon-price');
+    var totalPrice = document.getElementById('total-price');
+    var registerForm = document.getElementById('ftt-register-form');
+    
+    console.log('FTT REGISTRATION: Form elements found:', {
+        childCount: !!childCount,
+        addonLabel: !!addonLabel,
+        addonPrice: !!addonPrice,
+        totalPrice: !!totalPrice,
+        registerForm: !!registerForm
+    });
+    
     function updatePricing() {
-        var childCount = parseInt($('#child-count').val());
-        var basePrice = 9.99;
-        var addonPrice = 5.00;
+        var count = parseInt(childCount.value) || 1;
+        var base = 9.99;
+        var addon = (count - 1) * 5.00;
+        var total = base + addon;
         
-        var addons = Math.max(0, childCount - 1);
-        var addonTotal = addons * addonPrice;
-        var total = basePrice + addonTotal;
+        console.log('FTT REGISTRATION: Pricing updated - children:', count, 'base:', base, 'addon:', addon, 'total:', total);
         
-        // Update addon label
-        if (addons === 0) {
-            $('#addon-label').text('Additional children');
-            $('#addon-price').text('$0.00/mo');
+        if (addon === 0) {
+            addonLabel.textContent = 'Additional children';
+            addonPrice.textContent = '$0.00/mo';
         } else {
-            var childText = (addons > 1) ? 'children' : 'child';
-            $('#addon-label').text(addons + ' additional ' + childText + ' × $5');
-            $('#addon-price').text('$' + addonTotal.toFixed(2) + '/mo');
+            var numAdditional = addon / 5;
+            var childText = numAdditional > 1 ? 'children' : 'child';
+            addonLabel.textContent = numAdditional + ' additional ' + childText + ' x $5';
+            addonPrice.textContent = '$' + addon.toFixed(2) + '/mo';
         }
         
-        // Update total
-        $('#total-price').text('$' + total.toFixed(2) + '/mo');
+        totalPrice.textContent = '$' + total.toFixed(2) + '/mo';
     }
     
-    // Initialize pricing
+    console.log('FTT REGISTRATION: Initial pricing calculation');
     updatePricing();
     
-    // Update pricing on child count change
-    $('#child-count').on('change', updatePricing);
+    console.log('FTT REGISTRATION: Attaching change listener to child count dropdown');
+    childCount.addEventListener('change', function() {
+        console.log('FTT REGISTRATION: Child count changed to:', this.value);
+        updatePricing();
+    });
     
-    // Password confirmation validation
-    $('#ftt-register-form').on('submit', function(e) {
-        var password = $('#password').val();
-        var confirm = $('#password_confirm').val();
+    console.log('FTT REGISTRATION: Attaching submit listener to form');
+    registerForm.addEventListener('submit', function(e) {
+        console.log('FTT REGISTRATION: Form submission started');
         
-        if (password !== confirm) {
+        var password = document.getElementById('password');
+        var passwordConfirm = document.getElementById('password_confirm');
+        var email = document.getElementById('email');
+        var firstName = document.getElementById('first_name');
+        var lastName = document.getElementById('last_name');
+        
+        console.log('FTT REGISTRATION: Form data:', {
+            email: email.value,
+            firstName: firstName.value,
+            lastName: lastName.value,
+            childCount: childCount.value,
+            passwordsMatch: password.value === passwordConfirm.value
+        });
+        
+        if (password.value !== passwordConfirm.value) {
+            console.error('FTT REGISTRATION: Password mismatch - preventing submission');
             e.preventDefault();
             alert('Passwords do not match!');
-            $('#password_confirm').focus();
             return false;
         }
+        
+        console.log('FTT REGISTRATION: Validation passed - submitting form');
+        console.log('FTT REGISTRATION: Form will submit to:', registerForm.action || window.location.href);
     });
+    
+    console.log('FTT REGISTRATION: Script initialization complete');
 });
 </script>
 <?php

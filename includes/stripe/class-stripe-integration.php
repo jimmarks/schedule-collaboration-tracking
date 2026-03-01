@@ -132,15 +132,21 @@ class FTT_Stripe_Integration {
      * @return array|false Session data or false on failure
      */
     public static function create_checkout_session($user_id, $interval = 'month', $addon_quantity = 0) {
+        error_log('FTT STRIPE DEBUG: create_checkout_session called with user_id=' . $user_id . ', interval=' . $interval . ', addon_qty=' . $addon_quantity);
+        
         self::init();
+        error_log('FTT STRIPE DEBUG: Stripe initialized');
         
         $customer_id = self::get_or_create_customer($user_id);
         if (!$customer_id) {
+            error_log('FTT STRIPE DEBUG: FAILED to get/create customer ID');
             return false;
         }
+        error_log('FTT STRIPE DEBUG: Customer ID: ' . $customer_id);
         
         $settings = get_option('ftt_stripe_settings', []);
         $trial_days = $settings['trial_days'] ?? 14;
+        error_log('FTT STRIPE DEBUG: Trial days: ' . $trial_days);
         
         // Get price IDs
         $base_price_id = $interval === 'year' 
@@ -151,8 +157,11 @@ class FTT_Stripe_Integration {
             ? ($settings['price_addon_yearly'] ?? '')
             : ($settings['price_addon_monthly'] ?? '');
         
+        error_log('FTT STRIPE DEBUG: Base price ID: ' . ($base_price_id ?: 'EMPTY'));
+        error_log('FTT STRIPE DEBUG: Addon price ID: ' . ($addon_price_id ?: 'EMPTY'));
+        
         if (empty($base_price_id)) {
-            error_log('FTT: Base price ID not configured for interval: ' . $interval);
+            error_log('FTT STRIPE DEBUG: FATAL - Base price ID not configured for interval: ' . $interval);
             return false;
         }
         
@@ -180,13 +189,17 @@ class FTT_Stripe_Integration {
         
         $success_url = add_query_arg(
             ['ftt_checkout' => 'success', 'session_id' => '{CHECKOUT_SESSION_ID}'],
-            $app_url . '/ftt-checkout-success/'
+            $app_url . '/checkout-success/'
         );
         
         $cancel_url = add_query_arg(
             ['ftt_checkout' => 'cancel'],
-            $app_url . '/ftt-checkout-cancel/'
+            $app_url . '/checkout-cancel/'
         );
+        
+        error_log('FTT STRIPE DEBUG: Creating Stripe session with ' . count($line_items) . ' line items');
+        error_log('FTT STRIPE DEBUG: Success URL: ' . $success_url);
+        error_log('FTT STRIPE DEBUG: Cancel URL: ' . $cancel_url);
         
         try {
             $session = \Stripe\Checkout\Session::create([
@@ -208,6 +221,9 @@ class FTT_Stripe_Integration {
                 ],
             ]);
             
+            error_log('FTT STRIPE DEBUG: SUCCESS! Session created: ' . $session->id);
+            error_log('FTT STRIPE DEBUG: Checkout URL: ' . $session->url);
+            
             // Store session ID for verification
             update_user_meta($user_id, 'ftt_pending_checkout_session', $session->id);
             
@@ -217,7 +233,8 @@ class FTT_Stripe_Integration {
             ];
             
         } catch (Exception $e) {
-            error_log('FTT: Error creating checkout session: ' . $e->getMessage());
+            error_log('FTT STRIPE DEBUG: EXCEPTION - ' . $e->getMessage());
+            error_log('FTT STRIPE DEBUG: Exception trace: ' . $e->getTraceAsString());
             return false;
         }
     }
@@ -537,7 +554,7 @@ class FTT_Stripe_Integration {
             return false;
         }
         
-        $return_url = home_url('/billing/manage/');
+        $return_url = home_url('/manage-subscription/');
         
         try {
             $session = \Stripe\BillingPortal\Session::create([

@@ -12,7 +12,7 @@ if (!defined('ABSPATH')) {
 
 // Require login
 if (!is_user_logged_in()) {
-    wp_redirect(wp_login_url(home_url('/billing/manage/')));
+    wp_redirect(wp_login_url(home_url('/manage-subscription/')));
     exit;
 }
 
@@ -26,7 +26,7 @@ if (!class_exists('FTT_Billing_Manager')) {
 $billing = FTT_Billing_Manager::get_billing_summary($user_id);
 
 if (!$billing || empty($billing['status'])) {
-    wp_redirect(home_url('/billing/pricing/'));
+    wp_redirect(home_url('/pricing/'));
     exit;
 }
 ?>

@@ -1,0 +1,802 @@
+<?php
+/**
+ * Template: Family Management
+ * 
+ * Manage children, co-parents, and family settings
+ *
+ * @package Family_Travel_Tracker
+ */
+
+// Exit if accessed directly
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+// Require login
+if (!is_user_logged_in()) {
+    echo '<p>' . esc_html__('Please log in to manage your family.', 'schedule-collaboration-tracking') . '</p>';
+    return;
+}
+
+$current_user = wp_get_current_user();
+$is_parent = FTT_Roles::is_parent($current_user->ID);
+$children = FTT_Roles::get_children($current_user->ID);
+$parents = FTT_Roles::get_parents($current_user->ID);
+?>
+
+<div class="ftt-family-management-container">
+    <div class="ftt-page-header">
+        <h1><?php esc_html_e('Manage Family', 'schedule-collaboration-tracking'); ?></h1>
+        <a href="<?php echo esc_url(home_url('/ftt-dashboard/')); ?>" class="button button-secondary">
+            ← <?php esc_html_e('Back to Dashboard', 'schedule-collaboration-tracking'); ?>
+        </a>
+    </div>
+
+    <!-- Children Section -->
+    <div class="ftt-management-section ftt-children-section">
+        <div class="ftt-section-header">
+            <h2>👦 <?php esc_html_e('Children', 'schedule-collaboration-tracking'); ?></h2>
+            <button type="button" class="button button-primary" id="ftt-add-child-btn">
+                <span class="dashicons dashicons-plus"></span> <?php esc_html_e('Add Child', 'schedule-collaboration-tracking'); ?>
+            </button>
+        </div>
+
+        <div id="ftt-children-list" class="ftt-children-grid">
+            <?php if (!empty($children)): ?>
+                <?php foreach ($children as $child_id):
+                    $child = get_userdata($child_id);
+                    if (!$child) continue;
+                    
+                    $child_age = get_user_meta($child_id, 'child_age', true);
+                    $child_grade = get_user_meta($child_id, 'child_grade', true);
+                    $child_school = get_user_meta($child_id, 'child_school', true);
+                    $child_color = get_user_meta($child_id, 'child_color', true) ?: '#2196F3';
+                ?>
+                    <div class="ftt-child-card" data-child-id="<?php echo esc_attr($child_id); ?>">
+                        <div class="ftt-child-avatar" style="background-color: <?php echo esc_attr($child_color); ?>">
+                            <?php echo esc_html(strtoupper(substr($child->first_name, 0, 1))); ?>
+                        </div>
+                        <div class="ftt-child-info">
+                            <h3><?php echo esc_html($child->display_name); ?></h3>
+                            <?php if ($child_age): ?>
+                                <p class="ftt-child-meta"><?php printf(esc_html__('Age: %s', 'schedule-collaboration-tracking'), esc_html($child_age)); ?></p>
+                            <?php endif; ?>
+                            <?php if ($child_grade): ?>
+                                <p class="ftt-child-meta"><?php printf(esc_html__('Grade: %s', 'schedule-collaboration-tracking'), esc_html($child_grade)); ?></p>
+                            <?php endif; ?>
+                            <?php if ($child_school): ?>
+                                <p class="ftt-child-meta"><?php echo esc_html($child_school); ?></p>
+                            <?php endif; ?>
+                        </div>
+                        <div class="ftt-child-actions">
+                            <button type="button" class="button button-small ftt-edit-child" data-child-id="<?php echo esc_attr($child_id); ?>">
+                                <span class="dashicons dashicons-edit"></span> <?php esc_html_e('Edit', 'schedule-collaboration-tracking'); ?>
+                            </button>
+                            <button type="button" class="button button-small button-link-delete ftt-remove-child" data-child-id="<?php echo esc_attr($child_id); ?>">
+                                <span class="dashicons dashicons-trash"></span> <?php esc_html_e('Remove', 'schedule-collaboration-tracking'); ?>
+                            </button>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <div class="ftt-empty-state">
+                    <p><?php esc_html_e('No children added yet. Click "Add Child" to get started.', 'schedule-collaboration-tracking'); ?></p>
+                </div>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <!-- Co-Parents/Adults Section -->
+    <div class="ftt-management-section ftt-adults-section">
+        <div class="ftt-section-header">
+            <h2>👥 <?php esc_html_e('Co-Parents & Guardians', 'schedule-collaboration-tracking'); ?></h2>
+            <button type="button" class="button button-primary" id="ftt-invite-adult-btn">
+                <span class="dashicons dashicons-email"></span> <?php esc_html_e('Invite Adult', 'schedule-collaboration-tracking'); ?>
+            </button>
+        </div>
+
+        <div id="ftt-adults-list" class="ftt-adults-grid">
+            <?php if (!empty($parents)): ?>
+                <?php foreach ($parents as $parent_id):
+                    if ($parent_id == $current_user->ID) continue; // Skip self
+                    
+                    $parent = get_userdata($parent_id);
+                    if (!$parent) continue;
+                    
+                    $relationship = get_user_meta($parent_id, 'relationship_to_' . $current_user->ID, true);
+                ?>
+                    <div class="ftt-adult-card" data-adult-id="<?php echo esc_attr($parent_id); ?>">
+                        <div class="ftt-adult-avatar">
+                            <?php echo esc_html(strtoupper(substr($parent->first_name, 0, 1))); ?>
+                        </div>
+                        <div class="ftt-adult-info">
+                            <h3><?php echo esc_html($parent->display_name); ?></h3>
+                            <p class="ftt-adult-email"><?php echo esc_html($parent->user_email); ?></p>
+                            <?php if ($relationship): ?>
+                                <p class="ftt-adult-meta"><?php echo esc_html($relationship); ?></p>
+                            <?php endif; ?>
+                        </div>
+                        <div class="ftt-adult-actions">
+                            <button type="button" class="button button-small button-link-delete ftt-remove-adult" data-adult-id="<?php echo esc_attr($parent_id); ?>">
+                                <span class="dashicons dashicons-dismiss"></span> <?php esc_html_e('Remove Access', 'schedule-collaboration-tracking'); ?>
+                            </button>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <div class="ftt-empty-state">
+                    <p><?php esc_html_e('No linked adults yet. Invite co-parents or guardians to share calendar access.', 'schedule-collaboration-tracking'); ?></p>
+                </div>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <!-- Event Preferences Section -->
+    <div class="ftt-management-section ftt-event-preferences-section">
+        <div class="ftt-section-header">
+            <h2>🎯 <?php esc_html_e('Event Preferences', 'schedule-collaboration-tracking'); ?></h2>
+            <p class="ftt-section-description"><?php esc_html_e('Choose which types of events you want to see on your calendar', 'schedule-collaboration-tracking'); ?></p>
+        </div>
+
+        <form id="ftt-event-preferences-form" class="ftt-event-categories-form">
+            <?php
+            $user_preferences = get_user_meta($current_user->ID, 'ftt_visible_event_categories', true);
+            if (!is_array($user_preferences)) {
+                $user_preferences = array(); // Show all by default
+            }
+            
+            $categories = FTT_CPT::get_event_categories();
+            foreach ($categories as $cat_key => $category):
+                $is_checked = empty($user_preferences) || in_array($cat_key, $user_preferences);
+            ?>
+                <label class="ftt-category-checkbox">
+                    <input type="checkbox" 
+                           name="visible_categories[]" 
+                           value="<?php echo esc_attr($cat_key); ?>"
+                           <?php checked($is_checked); ?>>
+                    <span class="ftt-category-icon"><?php echo $category['icon']; ?></span>
+                    <span class="ftt-category-label"><?php echo esc_html($category['label']); ?></span>
+                    <span class="ftt-category-count"><?php echo count($category['types']); ?> types</span>
+                </label>
+            <?php endforeach; ?>
+            
+            <div class="ftt-form-actions">
+                <button type="submit" class="button button-primary button-large">
+                    <span class="dashicons dashicons-yes"></span> <?php esc_html_e('Save Preferences', 'schedule-collaboration-tracking'); ?>
+                </button>
+                <span id="ftt-preferences-message" class="ftt-message"></span>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Add/Edit Child Modal -->
+<div id="ftt-child-modal" class="ftt-modal" style="display:none;">
+    <div class="ftt-modal-content">
+        <div class="ftt-modal-header">
+            <h2 id="ftt-child-modal-title"><?php esc_html_e('Add Child', 'schedule-collaboration-tracking'); ?></h2>
+            <button type="button" class="ftt-modal-close">&times;</button>
+        </div>
+        <form id="ftt-child-form">
+            <input type="hidden" name="child_id" id="ftt-child-id">
+            
+            <div class="ftt-form-group">
+                <label for="child-first-name"><?php esc_html_e('First Name', 'schedule-collaboration-tracking'); ?> *</label>
+                <input type="text" id="child-first-name" name="first_name" required>
+            </div>
+            
+            <div class="ftt-form-group">
+                <label for="child-last-name"><?php esc_html_e('Last Name', 'schedule-collaboration-tracking'); ?> *</label>
+                <input type="text" id="child-last-name" name="last_name" required>
+            </div>
+            
+            <div class="ftt-form-group">
+                <label for="child-email"><?php esc_html_e('Email (optional)', 'schedule-collaboration-tracking'); ?></label>
+                <input type="email" id="child-email" name="email">
+                <small><?php esc_html_e('Enter if child has their own account', 'schedule-collaboration-tracking'); ?></small>
+            </div>
+            
+            <div class="ftt-form-row">
+                <div class="ftt-form-group">
+                    <label for="child-age"><?php esc_html_e('Age', 'schedule-collaboration-tracking'); ?></label>
+                    <input type="number" id="child-age" name="age" min="3" max="25">
+                </div>
+                
+                <div class="ftt-form-group">
+                    <label for="child-grade"><?php esc_html_e('Grade', 'schedule-collaboration-tracking'); ?></label>
+                    <input type="text" id="child-grade" name="grade" placeholder="e.g., 5th, 10th">
+                </div>
+            </div>
+            
+            <div class="ftt-form-group">
+                <label for="child-school"><?php esc_html_e('School', 'schedule-collaboration-tracking'); ?></label>
+                <input type="text" id="child-school" name="school">
+            </div>
+            
+            <div class="ftt-form-group">
+                <label for="child-color"><?php esc_html_e('Color (for calendar)', 'schedule-collaboration-tracking'); ?></label>
+                <input type="color" id="child-color" name="color" value="#2196F3">
+            </div>
+            
+            <div class="ftt-modal-actions">
+                <button type="button" class="button ftt-modal-close"><?php esc_html_e('Cancel', 'schedule-collaboration-tracking'); ?></button>
+                <button type="submit" class="button button-primary"><?php esc_html_e('Save Child', 'schedule-collaboration-tracking'); ?></button>
+            </div>
+            
+            <div id="ftt-child-form-message" class="ftt-message"></div>
+        </form>
+    </div>
+</div>
+
+<!-- Invite Adult Modal -->
+<div id="ftt-invite-adult-modal" class="ftt-modal" style="display:none;">
+    <div class="ftt-modal-content">
+        <div class="ftt-modal-header">
+            <h2><?php esc_html_e('Invite Co-Parent or Guardian', 'schedule-collaboration-tracking'); ?></h2>
+            <button type="button" class="ftt-modal-close">&times;</button>
+        </div>
+        <form id="ftt-invite-adult-form">
+            <div class="ftt-form-group">
+                <label for="adult-email"><?php esc_html_e('Email Address', 'schedule-collaboration-tracking'); ?> *</label>
+                <input type="email" id="adult-email" name="email" required>
+                <small><?php esc_html_e('They will receive an invitation to link their account', 'schedule-collaboration-tracking'); ?></small>
+            </div>
+            
+            <div class="ftt-form-group">
+                <label for="adult-relationship"><?php esc_html_e('Relationship', 'schedule-collaboration-tracking'); ?></label>
+                <select id="adult-relationship" name="relationship">
+                    <option value=""><?php esc_html_e('Select...', 'schedule-collaboration-tracking'); ?></option>
+                    <option value="co-parent"><?php esc_html_e('Co-Parent', 'schedule-collaboration-tracking'); ?></option>
+                    <option value="guardian"><?php esc_html_e('Guardian', 'schedule-collaboration-tracking'); ?></option>
+                    <option value="grandparent"><?php esc_html_e('Grandparent', 'schedule-collaboration-tracking'); ?></option>
+                    <option value="other"><?php esc_html_e('Other', 'schedule-collaboration-tracking'); ?></option>
+                </select>
+            </div>
+            
+            <div class="ftt-modal-actions">
+                <button type="button" class="button ftt-modal-close"><?php esc_html_e('Cancel', 'schedule-collaboration-tracking'); ?></button>
+                <button type="submit" class="button button-primary"><?php esc_html_e('Send Invitation', 'schedule-collaboration-tracking'); ?></button>
+            </div>
+            
+            <div id="ftt-invite-adult-message" class="ftt-message"></div>
+        </form>
+    </div>
+</div>
+
+<style>
+.ftt-family-management-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.ftt-page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+}
+
+.ftt-page-header h1 {
+    margin: 0;
+}
+
+.ftt-management-section {
+    background: white;
+    border-radius: 8px;
+    padding: 30px;
+    margin-bottom: 30px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.ftt-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.ftt-section-header h2 {
+    margin: 0;
+}
+
+.ftt-section-description {
+    color: #666;
+    margin: 10px 0 0 0;
+}
+
+.ftt-children-grid,
+.ftt-adults-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.ftt-child-card,
+.ftt-adult-card {
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 20px;
+    display: flex;
+    align-items: flex-start;
+    gap: 15px;
+    transition: all 0.2s;
+}
+
+.ftt-child-card:hover,
+.ftt-adult-card:hover {
+    border-color: #2196F3;
+    box-shadow: 0 2px 8px rgba(33, 150, 243, 0.2);
+}
+
+.ftt-child-avatar,
+.ftt-adult-avatar {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+    font-size: 20px;
+    flex-shrink: 0;
+}
+
+.ftt-adult-avatar {
+    background-color: #6A3E8E;
+}
+
+.ftt-child-info,
+.ftt-adult-info {
+    flex: 1;
+}
+
+.ftt-child-info h3,
+.ftt-adult-info h3 {
+    margin: 0 0 5px 0;
+    font-size: 18px;
+}
+
+.ftt-child-meta,
+.ftt-adult-meta,
+.ftt-adult-email {
+    margin: 2px 0;
+    color: #666;
+    font-size: 14px;
+}
+
+.ftt-child-actions,
+.ftt-adult-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.ftt-empty-state {
+    text-align: center;
+    padding: 40px;
+    color: #999;
+}
+
+.ftt-event-categories-form {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 15px;
+}
+
+.ftt-category-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 15px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.ftt-category-checkbox:hover {
+    border-color: #2196F3;
+    background: #f5f5f5;
+}
+
+.ftt-category-checkbox input[type="checkbox"] {
+    margin: 0;
+}
+
+.ftt-category-icon {
+    font-size: 24px;
+}
+
+.ftt-category-label {
+    flex: 1;
+    font-weight: 500;
+}
+
+.ftt-category-count {
+    font-size: 12px;
+    color: #999;
+}
+
+.ftt-form-actions {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-top: 20px;
+}
+
+/* Modal Styles */
+.ftt-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+}
+
+.ftt-modal-content {
+    background: white;
+    border-radius: 8px;
+    max-width: 500px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.ftt-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.ftt-modal-header h2 {
+    margin: 0;
+}
+
+.ftt-modal-close {
+    background: none;
+    border: none;
+    font-size: 28px;
+    cursor: pointer;
+    color: #999;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+}
+
+.ftt-modal-close:hover {
+    color: #333;
+}
+
+.ftt-modal-content form {
+    padding: 20px;
+}
+
+.ftt-form-group {
+    margin-bottom: 20px;
+}
+
+.ftt-form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+}
+
+.ftt-form-group input,
+.ftt-form-group select {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.ftt-form-group small {
+    display: block;
+    margin-top: 5px;
+    color: #666;
+    font-size: 12px;
+}
+
+.ftt-form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+}
+
+.ftt-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.ftt-message {
+    display: block;
+    padding: 10px;
+    border-radius: 4px;
+    margin-top: 10px;
+}
+
+.ftt-message.success {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.ftt-message.error {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+</style>
+
+<script>
+console.log('FTT FAMILY MANAGEMENT: Script loaded');
+
+jQuery(document).ready(function($) {
+    console.log('FTT FAMILY MANAGEMENT: jQuery ready');
+    
+    // Add Child Modal
+    $('#ftt-add-child-btn').on('click', function() {
+        $('#ftt-child-modal-title').text('<?php esc_js(_e('Add Child', 'schedule-collaboration-tracking')); ?>');
+        $('#ftt-child-form')[0].reset();
+        $('#ftt-child-id').val('');
+        $('#ftt-child-form-message').removeClass('success error').text('');
+        $('#ftt-child-modal').fadeIn();
+    });
+    
+    // Submit Child Form
+    $('#ftt-child-form').on('submit', function(e) {
+        e.preventDefault();
+        console.log('Child form submitted');
+        
+        var childId = $('#ftt-child-id').val();
+        var endpoint = childId ? '/wp-json/ftt/v1/edit-child' : '/wp-json/ftt/v1/add-child';
+        var formData = {
+            child_id: childId,
+            first_name: $('#child-first-name').val(),
+            last_name: $('#child-last-name').val(),
+            email: $('#child-email').val(),
+            age: $('#child-age').val(),
+            grade: $('#child-grade').val(),
+            school: $('#child-school').val(),
+            color: $('#child-color').val()
+        };
+        
+        console.log('Submitting to:', endpoint, formData);
+        
+        $.ajax({
+            url: endpoint,
+            method: 'POST',
+            beforeSend: function(xhr) {
+                xhr.setRequestHeader('X-WP-Nonce', '<?php echo wp_create_nonce('wp_rest'); ?>');
+            },
+            contentType: 'application/json',
+            data: JSON.stringify(formData),
+            success: function(response) {
+                console.log('Success:', response);
+                $('#ftt-child-form-message')
+                    .removeClass('error')
+                    .addClass('success')
+                    .text(response.message || 'Child saved successfully!');
+                
+                setTimeout(function() {
+                    location.reload();
+                }, 1500);
+            },
+            error: function(xhr, status, error) {
+                console.error('Error:', xhr.responseJSON);
+                var message = xhr.responseJSON?.message || 'Failed to save child';
+                $('#ftt-child-form-message')
+                    .removeClass('success')
+                    .addClass('error')
+                    .text(message);
+            }
+        });
+    });
+    
+    // Edit Child
+    $('.ftt-edit-child').on('click', function() {
+        var childId = $(this).data('child-id');
+        console.log('Editing child:', childId);
+        
+        $('#ftt-child-modal-title').text('<?php esc_js(_e('Edit Child', 'schedule-collaboration-tracking')); ?>');
+        $('#ftt-child-id').val(childId);
+        $('#ftt-child-form-message').removeClass('success error').text('');
+        
+        // Load child data via REST API
+        $.ajax({
+            url: '/wp-json/ftt/v1/get-family-members',
+            method: 'GET',
+            beforeSend: function(xhr) {
+                xhr.setRequestHeader('X-WP-Nonce', '<?php echo wp_create_nonce('wp_rest'); ?>');
+            },
+            success: function(response) {
+                var child = response.children.find(c => c.id == childId);
+                if (child) {
+                    $('#child-first-name').val(child.first_name);
+                    $('#child-last-name').val(child.last_name);
+                    $('#child-email').val(child.email);
+                    $('#child-age').val(child.age);
+                    $('#child-grade').val(child.grade);
+                    $('#child-school').val(child.school);
+                    $('#child-color').val(child.color || '#2196F3');
+                }
+                $('#ftt-child-modal').fadeIn();
+            },
+            error: function() {
+                alert('Failed to load child data');
+            }
+        });
+    });
+    
+    // Remove Child
+    $('.ftt-remove-child').on('click', function() {
+        var childId = $(this).data('child-id');
+        
+        if (!confirm('<?php esc_js(_e('Are you sure you want to remove this child from your account?', 'schedule-collaboration-tracking')); ?>')) {
+            return;
+        }
+        
+        console.log('Removing child:', childId);
+        
+        $.ajax({
+            url: '/wp-json/ftt/v1/remove-child',
+            method: 'POST',
+            beforeSend: function(xhr) {
+                xhr.setRequestHeader('X-WP-Nonce', '<?php echo wp_create_nonce('wp_rest'); ?>');
+            },
+            contentType: 'application/json',
+            data: JSON.stringify({ child_id: childId }),
+            success: function(response) {
+                console.log('Child removed:', response);
+                location.reload();
+            },
+            error: function(xhr) {
+                console.error('Error removing child:', xhr.responseJSON);
+                alert(xhr.responseJSON?.message || 'Failed to remove child');
+            }
+        });
+    });
+    
+    // Invite Adult Modal
+    $('#ftt-invite-adult-btn').on('click', function() {
+        $('#ftt-invite-adult-form')[0].reset();
+        $('#ftt-invite-adult-message').removeClass('success error').text('');
+        $('#ftt-invite-adult-modal').fadeIn();
+    });
+    
+    // Submit Invite Adult Form
+    $('#ftt-invite-adult-form').on('submit', function(e) {
+        e.preventDefault();
+        console.log('Adult invitation form submitted');
+        
+        var formData = {
+            email: $('#adult-email').val(),
+            relationship: $('#adult-relationship').val()
+        };
+        
+        console.log('Sending invitation:', formData);
+        
+        $.ajax({
+            url: '/wp-json/ftt/v1/invite-adult',
+            method: 'POST',
+            beforeSend: function(xhr) {
+                xhr.setRequestHeader('X-WP-Nonce', '<?php echo wp_create_nonce('wp_rest'); ?>');
+            },
+            contentType: 'application/json',
+            data: JSON.stringify(formData),
+            success: function(response) {
+                console.log('Invitation sent:', response);
+                $('#ftt-invite-adult-message')
+                    .removeClass('error')
+                    .addClass('success')
+                    .html('Invitation sent! They can accept here:<br><input type="text" value="' + response.invite_url + '" readonly style="width:100%;margin-top:5px;">');
+            },
+            error: function(xhr) {
+                console.error('Error sending invitation:', xhr.responseJSON);
+                var message = xhr.responseJSON?.message || 'Failed to send invitation';
+                $('#ftt-invite-adult-message')
+                    .removeClass('success')
+                    .addClass('error')
+                    .text(message);
+            }
+        });
+    });
+    
+    // Remove Adult
+    $('.ftt-remove-adult').on('click', function() {
+        var adultId = $(this).data('adult-id');
+        
+        if (!confirm('<?php esc_js(_e('Are you sure you want to revoke access for this adult?', 'schedule-collaboration-tracking')); ?>')) {
+            return;
+        }
+        
+        console.log('Removing adult:', adultId);
+        
+        $.ajax({
+            url: '/wp-json/ftt/v1/remove-adult',
+            method: 'POST',
+            beforeSend: function(xhr) {
+                xhr.setRequestHeader('X-WP-Nonce', '<?php echo wp_create_nonce('wp_rest'); ?>');
+            },
+            contentType: 'application/json',
+            data: JSON.stringify({ adult_id: adultId }),
+            success: function(response) {
+                console.log('Adult removed:', response);
+                location.reload();
+            },
+            error: function(xhr) {
+                console.error('Error removing adult:', xhr.responseJSON);
+                alert(xhr.responseJSON?.message || 'Failed to remove adult');
+            }
+        });
+    });
+    
+    // Save Event Preferences
+    $('#ftt-event-preferences-form').on('submit', function(e) {
+        e.preventDefault();
+        console.log('Saving event preferences');
+        
+        var visibleCategories = [];
+        $('input[name="visible_categories[]"]:checked').each(function() {
+            visibleCategories.push($(this).val());
+        });
+        
+        console.log('Visible categories:', visibleCategories);
+        
+        $.ajax({
+            url: '/wp-json/ftt/v1/save-event-preferences',
+            method: 'POST',
+            beforeSend: function(xhr) {
+                xhr.setRequestHeader('X-WP-Nonce', '<?php echo wp_create_nonce('wp_rest'); ?>');
+            },
+            contentType: 'application/json',
+            data: JSON.stringify({ visible_categories: visibleCategories }),
+            success: function(response) {
+                console.log('Preferences saved:', response);
+                $('#ftt-preferences-message')
+                    .removeClass('error')
+                    .addClass('success')
+                    .text('Preferences saved successfully!')
+                    .fadeIn();
+                
+                setTimeout(function() {
+                    $('#ftt-preferences-message').fadeOut();
+                }, 3000);
+            },
+            error: function(xhr) {
+                console.error('Error saving preferences:', xhr.responseJSON);
+                $('#ftt-preferences-message')
+                    .removeClass('success')
+                    .addClass('error')
+                    .text('Failed to save preferences')
+                    .fadeIn();
+            }
+        });
+    });
+    
+    // Close Modal
+    $('.ftt-modal-close').on('click', function() {
+        $(this).closest('.ftt-modal').fadeOut();
+    });
+    
+    // Close on outside click
+    $('.ftt-modal').on('click', function(e) {
+        if ($(e.target).hasClass('ftt-modal')) {
+            $(this).fadeOut();
+        }
+    });
+    
+    console.log('FTT FAMILY MANAGEMENT: All event handlers attached');
+});
+</script>

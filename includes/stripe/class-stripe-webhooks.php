@@ -414,7 +414,7 @@ class FTT_Stripe_Webhooks {
         $message .= "Just a reminder that your 14-day free trial ends on " . date('F j, Y', strtotime($trial_end)) . ".\n\n";
         $message .= "Your subscription will automatically continue at \${$price}/" . ($interval === 'year' ? 'year' : 'month') . ".\n\n";
         $message .= "Want to cancel? You can do so anytime in your billing settings:\n";
-        $message .= home_url('/billing/manage/') . "\n\n";
+        $message .= home_url('/manage-subscription/') . "\n\n";
         $message .= "Thanks for using Family Travel Tracker!\n";
         
         wp_mail($user->user_email, $subject, $message);
@@ -452,7 +452,7 @@ class FTT_Stripe_Webhooks {
         $message = "Hi {$user->display_name},\n\n";
         $message .= "We were unable to process your payment for Family Travel Tracker.\n\n";
         $message .= "Please update your payment method by " . date('F j, Y', strtotime($grace_end)) . " to avoid service interruption.\n\n";
-        $message .= "Update payment method: " . home_url('/billing/manage/') . "\n\n";
+        $message .= "Update payment method: " . home_url('/manage-subscription/') . "\n\n";
         $message .= "Questions? Reply to this email.\n";
         
         wp_mail($user->user_email, $subject, $message);

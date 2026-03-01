@@ -39,7 +39,7 @@ if (!is_user_logged_in()) {
         <a href="<?php echo esc_url(home_url('/ftt-dashboard/')); ?>" class="button button-primary button-large">
             <?php esc_html_e('Go to Dashboard', 'schedule-collaboration-tracking'); ?>
         </a>
-        <a href="<?php echo esc_url(home_url('/billing/manage/')); ?>" class="button button-secondary">
+        <a href="<?php echo esc_url(home_url('/manage-subscription/')); ?>" class="button button-secondary">
             <?php esc_html_e('View Subscription', 'schedule-collaboration-tracking'); ?>
         </a>
     </div>

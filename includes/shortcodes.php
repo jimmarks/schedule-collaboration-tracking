@@ -23,6 +23,7 @@ class FTT_Shortcodes {
         add_shortcode('ftt_calendar_subscribe', array(__CLASS__, 'render_calendar_subscribe'));
         add_shortcode('ftt_login', array(__CLASS__, 'render_login'));
         add_shortcode('ftt_homepage', array(__CLASS__, 'render_homepage'));
+        add_shortcode('ftt_family_management', array(__CLASS__, 'render_family_management'));
         
         // Billing shortcodes
         add_shortcode('ftt_pricing_page', array(__CLASS__, 'render_pricing'));
@@ -217,6 +218,16 @@ class FTT_Shortcodes {
      * Custom login redirect - send users to dashboard instead of wp-admin
      */
     public static function custom_login_redirect($redirect_to, $request, $user) {
+        // Check if this is a post-registration redirect
+        if (isset($user->ID)) {
+            $stored_redirect = get_transient('ftt_post_registration_redirect_' . $user->ID);
+            if ($stored_redirect) {
+                error_log('FTT DEBUG: custom_login_redirect found stored redirect: ' . $stored_redirect);
+                delete_transient('ftt_post_registration_redirect_' . $user->ID);
+                return $stored_redirect;
+            }
+        }
+        
         // Check if user has a valid role
         if (isset($user->roles) && is_array($user->roles)) {
             // If user is an admin or editor, let them go to wp-admin if they want
@@ -279,10 +290,14 @@ class FTT_Shortcodes {
         
         // Add pricing page JavaScript inline to avoid WordPress content filters mangling it
         $pricing_js = "
+        console.log('FTT PRICING: Script loaded');
         jQuery(document).ready(function($) {
+            console.log('FTT PRICING: jQuery ready');
+            
             // Toggle between monthly and yearly
             function updatePricingDisplay() {
                 const interval = $('input[name=\"billing_interval\"]:checked').val();
+                console.log('FTT PRICING: Updating display for interval:', interval);
                 $('.ftt-pricing-card').hide();
                 $(`.ftt-pricing-card[data-interval=\"\${interval}\"]`).show();
             }
@@ -292,6 +307,7 @@ class FTT_Shortcodes {
             
             // Handle radio button changes
             $('input[name=\"billing_interval\"]').on('change', function() {
+                console.log('FTT PRICING: Billing interval changed');
                 updatePricingDisplay();
             });
             
@@ -312,6 +328,7 @@ class FTT_Shortcodes {
                 }
                 
                 \$input.val(current);
+                console.log('FTT PRICING: Addon quantity changed to:', current);
                 
                 // Update total display
                 const interval = targetId.includes('month') ? 'month' : 'year';
@@ -332,6 +349,8 @@ class FTT_Shortcodes {
                 \$input.closest('.ftt-quantity-control').find('.ftt-qty-minus').prop('disabled', current <= min);
             });
             
+            console.log('FTT PRICING: Attaching click handler to checkout buttons');
+            
             // Handle checkout button
             $('.ftt-cta-button[data-interval]').on('click', function(e) {
                 e.preventDefault();
@@ -341,7 +360,11 @@ class FTT_Shortcodes {
                 // Get addon quantity for the current interval
                 const addonQty = parseInt($('#addon-qty-' + interval).val()) || 0;
                 
+                console.log('FTT PRICING: Checkout button clicked - interval:', interval, 'addon_qty:', addonQty);
+                
                 \$button.prop('disabled', true).text('" . esc_js(__('Creating checkout...', 'schedule-collaboration-tracking')) . "');
+                
+                console.log('FTT PRICING: Making AJAX call to:', '" . esc_url(rest_url('ftt/v1/create-checkout')) . "');
                 
                 // Call REST API to create checkout session
                 $.ajax({
@@ -356,23 +379,30 @@ class FTT_Shortcodes {
                     }),
                     contentType: 'application/json',
                     success: function(response) {
+                        console.log('FTT PRICING: AJAX success, response:', response);
                         if (response.url) {
+                            console.log('FTT PRICING: Redirecting to Stripe checkout:', response.url);
                             window.location.href = response.url;
                         } else {
+                            console.error('FTT PRICING: No URL in response');
                             alert('" . esc_js(__('Error creating checkout session', 'schedule-collaboration-tracking')) . "');
                             \$button.prop('disabled', false).text('" . esc_js(__('Start Free Trial', 'schedule-collaboration-tracking')) . "');
                         }
                     },
                     error: function(xhr) {
+                        console.error('FTT PRICING: AJAX error:', xhr);
                         let errorMsg = '" . esc_js(__('Error creating checkout session', 'schedule-collaboration-tracking')) . "';
                         if (xhr.responseJSON && xhr.responseJSON.message) {
                             errorMsg += ': ' + xhr.responseJSON.message;
+                            console.error('FTT PRICING: Error message:', xhr.responseJSON.message);
                         }
                         alert(errorMsg);
                         \$button.prop('disabled', false).text('" . esc_js(__('Start Free Trial', 'schedule-collaboration-tracking')) . "');
                     }
                 });
             });
+            
+            console.log('FTT PRICING: Script initialization complete');
         });
         ";
         
@@ -512,6 +542,23 @@ class FTT_Shortcodes {
         
         ob_start();
         include FTT_PLUGIN_DIR . 'templates/billing/checkout-cancel.php';
+        return ob_get_clean();
+    }
+    
+    /**
+     * Render family management page
+     * 
+     * @return string
+     */
+    public static function render_family_management() {
+        error_log('FTT: Rendering family management page');
+        
+        if (!is_user_logged_in()) {
+            return self::render_login_form();
+        }
+        
+        ob_start();
+        include FTT_PLUGIN_DIR . 'templates/family-management.php';
         return ob_get_clean();
     }
 }

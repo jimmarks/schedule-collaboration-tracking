@@ -30,7 +30,7 @@ if (!defined('ABSPATH')) {
     </div>
     
     <div class="ftt-cta-buttons">
-        <a href="<?php echo esc_url(home_url('/billing/pricing/')); ?>" class="button button-primary button-large">
+        <a href="<?php echo esc_url(home_url('/pricing/')); ?>" class="button button-primary button-large">
             <?php esc_html_e('View Pricing Again', 'schedule-collaboration-tracking'); ?>
         </a>
         <a href="<?php echo esc_url(home_url('/')); ?>" class="button button-secondary">

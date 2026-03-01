@@ -136,6 +136,37 @@ console.log('============================');
                 <p class="ftt-user-role"><?php esc_html_e('Parent Dashboard', 'schedule-collaboration-tracking'); ?></p>
             </div>
 
+            <!-- Quick Action Cards -->
+            <div class="ftt-quick-actions">
+                <div class="ftt-action-card ftt-action-add-child">
+                    <div class="ftt-action-icon">👦</div>
+                    <h3><?php esc_html_e('Add Child', 'schedule-collaboration-tracking'); ?></h3>
+                    <p><?php esc_html_e('Link or create a child profile', 'schedule-collaboration-tracking'); ?></p>
+                    <a href="#" class="button button-primary" id="ftt-quick-add-child"><?php esc_html_e('Add Child', 'schedule-collaboration-tracking'); ?></a>
+                </div>
+                
+                <div class="ftt-action-card ftt-action-invite-adult">
+                    <div class="ftt-action-icon">👥</div>
+                    <h3><?php esc_html_e('Invite Co-Parent', 'schedule-collaboration-tracking'); ?></h3>
+                    <p><?php esc_html_e('Share calendar access with another guardian', 'schedule-collaboration-tracking'); ?></p>
+                    <a href="#" class="button button-primary" id="ftt-quick-invite-adult"><?php esc_html_e('Invite Adult', 'schedule-collaboration-tracking'); ?></a>
+                </div>
+                
+                <div class="ftt-action-card ftt-action-add-event">
+                    <div class="ftt-action-icon">📅</div>
+                    <h3><?php esc_html_e('Quick Add Event', 'schedule-collaboration-tracking'); ?></h3>
+                    <p><?php esc_html_e('Create a new event for your family', 'schedule-collaboration-tracking'); ?></p>
+                    <a href="<?php echo esc_url(home_url('/ftt-calendar/')); ?>" class="button button-primary"><?php esc_html_e('Add Event', 'schedule-collaboration-tracking'); ?></a>
+                </div>
+                
+                <div class="ftt-action-card ftt-action-manage-family">
+                    <div class="ftt-action-icon">⚙️</div>
+                    <h3><?php esc_html_e('Manage Family', 'schedule-collaboration-tracking'); ?></h3>
+                    <p><?php esc_html_e('Update family members and preferences', 'schedule-collaboration-tracking'); ?></p>
+                    <a href="<?php echo esc_url(home_url('/manage-family/')); ?>" class="button button-primary"><?php esc_html_e('Manage', 'schedule-collaboration-tracking'); ?></a>
+                </div>
+            </div>
+
             <?php
             $children = FTT_Roles::get_children($current_user->ID);
             if (!empty($children)):
@@ -585,6 +616,60 @@ console.log('============================');
     font-size: 16px;
 }
 
+/* Quick Action Cards */
+.ftt-quick-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+.ftt-action-card {
+    background: white;
+    border: 2px solid #e0e0e0;
+    border-radius: 12px;
+    padding: 25px;
+    text-align: center;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+.ftt-action-card:hover {
+    border-color: #6A3E8E;
+    box-shadow: 0 6px 20px rgba(106, 62, 142, 0.15);
+    transform: translateY(-3px);
+}
+.ftt-action-icon {
+    font-size: 48px;
+    margin-bottom: 15px;
+    animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
+.ftt-action-card h3 {
+    margin: 0 0 10px 0;
+    color: #333;
+    font-size: 18px;
+}
+.ftt-action-card p {
+    margin: 0 0 20px 0;
+    color: #666;
+    font-size: 14px;
+    min-height: 40px;
+}
+.ftt-action-card .button {
+    width: 100%;
+    justify-content: center;
+    background: linear-gradient(135deg, #6A3E8E 0%, #5B347A 100%);
+    border-color: #6A3E8E;
+    box-shadow: 0 2px 4px rgba(106, 62, 142, 0.2);
+}
+.ftt-action-card .button:hover {
+    background: linear-gradient(135deg, #5B347A 0%, #4D2E68 100%);
+    box-shadow: 0 4px 8px rgba(106, 62, 142, 0.3);
+}
+
 /* Family Section (Parent View) */
 .ftt-family-section {
     margin-bottom: 30px;
@@ -705,5 +790,34 @@ console.log('============================');
     .ftt-children-list {
         grid-template-columns: 1fr;
     }
+    .ftt-quick-actions {
+        grid-template-columns: 1fr;
+    }
 }
 </style>
+
+<script>
+jQuery(document).ready(function($) {
+    console.log('FTT DASHBOARD: Quick action handlers ready');
+    
+    // Quick Add Child button
+    $('#ftt-quick-add-child').on('click', function(e) {
+        e.preventDefault();
+        console.log('Quick add child clicked');
+        
+        // Redirect to family management page, which has the full add child modal
+        window.location.href = '<?php echo esc_js(home_url('/manage-family/')); ?>';
+    });
+    
+    // Quick Invite Adult button  
+    $('#ftt-quick-invite-adult').on('click', function(e) {
+        e.preventDefault();
+        console.log('Quick invite adult clicked');
+        
+        // Redirect to family management page
+        window.location.href = '<?php echo esc_js(home_url('/manage-family/')); ?>';
+    });
+    
+    console.log('FTT DASHBOARD: Event handlers attached');
+});
+</script>
