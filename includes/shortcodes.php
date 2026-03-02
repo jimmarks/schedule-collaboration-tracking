@@ -557,8 +557,19 @@ class FTT_Shortcodes {
             return self::render_login_form();
         }
         
-        // Enqueue jQuery for the family management page
-        wp_enqueue_script('jquery');
+        // Enqueue family management JavaScript with jQuery dependency
+        wp_enqueue_script(
+            'ftt-family-management',
+            plugins_url('assets/js/family-management.js', FTT_PLUGIN_FILE),
+            array('jquery'),
+            FTT_VERSION,
+            true // Load in footer
+        );
+        
+        // Pass REST API nonce to JavaScript
+        wp_localize_script('ftt-family-management', 'fttFamilyMgmt', array(
+            'nonce' => wp_create_nonce('wp_rest')
+        ));
         
         ob_start();
         include FTT_PLUGIN_DIR . 'templates/family-management.php';
