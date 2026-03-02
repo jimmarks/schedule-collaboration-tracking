@@ -27,6 +27,10 @@ $lost_password_url = wp_lostpassword_url($redirect_to);
 $login_errors = array();
 $login_message = '';
 
+if (isset($_GET['access_denied']) && $_GET['access_denied'] === '1') {
+    $login_errors[] = '<strong>Access Denied:</strong> Your account access has been restricted by an administrator. Please contact support at <a href="mailto:support@familytraveltracker.app">support@familytraveltracker.app</a> for assistance.';
+}
+
 if (isset($_GET['login']) && $_GET['login'] === 'failed') {
     $login_errors[] = 'Invalid username or password. Please try again.';
 }

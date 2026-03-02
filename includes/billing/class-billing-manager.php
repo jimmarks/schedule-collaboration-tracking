@@ -85,8 +85,8 @@ class FTT_Billing_Manager {
         // Check for admin-imposed access denial
         $access_denied = get_user_meta($user_id, 'ftt_access_denied', true);
         if ($access_denied) {
-            error_log('FTT BILLING DEBUG: Access manually denied by admin - redirecting to /pricing/');
-            wp_redirect(add_query_arg('reason', 'admin_denied', home_url('/pricing/')));
+            error_log('FTT BILLING DEBUG: Access manually denied by admin - redirecting to login');
+            wp_redirect(add_query_arg('access_denied', '1', home_url('/ftt-login/')));
             exit;
         }
         

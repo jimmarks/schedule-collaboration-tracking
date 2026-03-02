@@ -228,7 +228,9 @@ class FTT_Shortcodes {
                 if (class_exists('FTT_Billing_Manager')) {
                     FTT_Billing_Manager::invalidate_calendar_access($user->ID);
                 }
-                return add_query_arg('reason', 'admin_denied', home_url('/pricing/'));
+                // Log them out and redirect to login with message
+                wp_logout();
+                return add_query_arg('access_denied', '1', home_url('/ftt-login/'));
             }
             
             $stored_redirect = get_transient('ftt_post_registration_redirect_' . $user->ID);

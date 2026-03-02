@@ -35,10 +35,6 @@ $access_denied_notice = '';
 if (isset($_GET['reason'])) {
     $reason = sanitize_text_field($_GET['reason']);
     $messages = array(
-        'admin_denied' => array(
-            'title' => __('Access Denied', 'schedule-collaboration-tracking'),
-            'message' => __('Your account access has been restricted by an administrator. Please contact support for assistance.', 'schedule-collaboration-tracking')
-        ),
         'no_subscription' => array(
             'title' => __('Subscription Required', 'schedule-collaboration-tracking'),
             'message' => __('You need an active subscription to access Family Travel Tracker. Please select a plan below to get started.', 'schedule-collaboration-tracking')
