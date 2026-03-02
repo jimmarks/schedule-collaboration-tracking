@@ -243,8 +243,8 @@ console.log('============================');
                         <?php foreach ($children as $child_id):
                             $child = get_userdata($child_id);
                             if (!$child) continue;
-                            $section = get_user_meta($child_id, 'srt_section', true);
-                            $instrument = get_user_meta($child_id, 'srt_instrument', true);
+                            $section = get_user_meta($child_id, 'ftt_section', true);
+                            $instrument = get_user_meta($child_id, 'ftt_instrument', true);
                         ?>
                             <div class="ftt-child-card">
                                 <h4><?php echo esc_html($child->display_name); ?></h4>
@@ -350,8 +350,8 @@ console.log('============================');
                 <h2><?php printf(esc_html__('Welcome, %s', 'schedule-collaboration-tracking'), esc_html($current_user->display_name)); ?></h2>
                 <p class="ftt-user-role">
                     <?php 
-                    $section = get_user_meta($current_user->ID, 'srt_section', true);
-                    $instrument = get_user_meta($current_user->ID, 'srt_instrument', true);
+                    $section = get_user_meta($current_user->ID, 'ftt_section', true);
+                    $instrument = get_user_meta($current_user->ID, 'ftt_instrument', true);
                     
                     if ($section && $instrument) {
                         printf(esc_html__('%s - %s', 'schedule-collaboration-tracking'), 

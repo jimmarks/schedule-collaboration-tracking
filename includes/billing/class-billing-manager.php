@@ -23,7 +23,7 @@ class FTT_Billing_Manager {
         add_action('init', [__CLASS__, 'check_access']);
         
         // Prevent adding children beyond limit
-        add_action('srt_before_add_child', [__CLASS__, 'check_child_limit'], 10, 2);
+        add_action('ftt_before_add_child', [__CLASS__, 'check_child_limit'], 10, 2);
         
         // Cron for trial reminders
         add_action('ftt_check_trial_reminders', [__CLASS__, 'send_trial_reminders']);

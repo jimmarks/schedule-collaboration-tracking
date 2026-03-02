@@ -40,19 +40,19 @@ class FTT_Price_Tracking {
         add_action('init', array(__CLASS__, 'create_tables'));
         add_action('init', array(__CLASS__, 'upgrade_schema'));
         add_action('init', array(__CLASS__, 'handle_alert_deactivation'));
-        add_action('srt_check_flight_prices', array(__CLASS__, 'check_all_prices'));
-        add_action('srt_daily_digest', array(__CLASS__, 'process_daily_digests'));
+        add_action('ftt_check_flight_prices', array(__CLASS__, 'check_all_prices'));
+        add_action('ftt_daily_digest', array(__CLASS__, 'process_daily_digests'));
         add_filter('cron_schedules', array(__CLASS__, 'add_custom_cron_schedule'));
         
         // Schedule cron job if not already scheduled
-        if (!wp_next_scheduled('srt_check_flight_prices')) {
-            wp_schedule_event(time(), 'fourtimesdaily', 'srt_check_flight_prices');
+        if (!wp_next_scheduled('ftt_check_flight_prices')) {
+            wp_schedule_event(time(), 'fourtimesdaily', 'ftt_check_flight_prices');
         }
         
         // Schedule daily digest at 2am
-        if (!wp_next_scheduled('srt_daily_digest')) {
+        if (!wp_next_scheduled('ftt_daily_digest')) {
             $tomorrow_2am = strtotime('tomorrow 2:00am');
-            wp_schedule_event($tomorrow_2am, 'daily_2am', 'srt_daily_digest');
+            wp_schedule_event($tomorrow_2am, 'daily_2am', 'ftt_daily_digest');
         }
     }
     
@@ -89,7 +89,7 @@ class FTT_Price_Tracking {
      * Handle alert deactivation from email link (no login required)
      */
     public static function handle_alert_deactivation() {
-        if (!isset($_GET['action']) || $_GET['action'] !== 'srt_deactivate_alert') {
+        if (!isset($_GET['action']) || $_GET['action'] !== 'ftt_deactivate_alert') {
             return;
         }
         
@@ -567,7 +567,7 @@ class FTT_Price_Tracking {
         error_log("SRT: Price check complete - Flights: $flights_checked, Valid prices: $prices_recorded, Duration: {$duration}s");
         
         // Log to activity log
-        $log = get_option('srt_cron_log', array());
+        $log = get_option('ftt_cron_log', array());
         $log_entry = array(
             'timestamp' => current_time('mysql'),
             'type' => $source,
@@ -583,13 +583,13 @@ class FTT_Price_Tracking {
         if (count($log) > 20) {
             $log = array_slice($log, -20);
         }
-        update_option('srt_cron_log', $log);
+        update_option('ftt_cron_log', $log);
         
         // Update success tracking
-        update_option('srt_cron_last_run', current_time('mysql'));
-        update_option('srt_cron_last_success', current_time('mysql'));
-        update_option('srt_cron_total_runs', get_option('srt_cron_total_runs', 0) + 1);
-        update_option('srt_cron_last_stats', array(
+        update_option('ftt_cron_last_run', current_time('mysql'));
+        update_option('ftt_cron_last_success', current_time('mysql'));
+        update_option('ftt_cron_total_runs', get_option('ftt_cron_total_runs', 0) + 1);
+        update_option('ftt_cron_last_stats', array(
             'flights_checked' => $flights_checked,
             'prices_recorded' => $prices_recorded,
             'duration' => $duration,
@@ -1081,7 +1081,7 @@ class FTT_Price_Tracking {
         $event_url = get_permalink($event->ID);
         $token = self::generate_alert_token($alert->id, $alert->user_id);
         $unsubscribe_url = add_query_arg(array(
-            'action' => 'srt_deactivate_alert',
+            'action' => 'ftt_deactivate_alert',
             'alert_id' => $alert->id,
             'token' => $token,
         ), home_url());

@@ -105,7 +105,7 @@ class FTT_Pages {
      */
     public static function create_pages() {
         $pages = self::get_page_definitions();
-        $page_ids = get_option('srt_page_ids', array());
+        $page_ids = get_option('ftt_page_ids', array());
         
         foreach ($pages as $key => $page_data) {
             // Check if page already exists by slug
@@ -142,7 +142,7 @@ class FTT_Pages {
                 $page_ids[$key] = $page_id;
                 
                 // Add page meta to identify as plugin page
-                update_post_meta($page_id, '_srt_page', true);
+                update_post_meta($page_id, '_ftt_page', true);
                 
                 // Set dashboard as front page (home page)
                 if ($key === 'dashboard') {
@@ -153,7 +153,7 @@ class FTT_Pages {
         }
         
         // Store page IDs in options
-        update_option('srt_page_ids', $page_ids);
+        update_option('ftt_page_ids', $page_ids);
         
         return $page_ids;
     }
@@ -162,16 +162,16 @@ class FTT_Pages {
      * Delete all plugin pages
      */
     public static function delete_pages() {
-        $page_ids = get_option('srt_page_ids', array());
+        $page_ids = get_option('ftt_page_ids', array());
         
         foreach ($page_ids as $page_id) {
             // Only delete if it's still marked as our page
-            if (get_post_meta($page_id, '_srt_page', true)) {
+            if (get_post_meta($page_id, '_ftt_page', true)) {
                 wp_delete_post($page_id, true);
             }
         }
         
-        delete_option('srt_page_ids');
+        delete_option('ftt_page_ids');
     }
     
     /**
@@ -181,7 +181,7 @@ class FTT_Pages {
      * @return string|false The page URL or false if not found
      */
     public static function get_page_url($page_key) {
-        $page_ids = get_option('srt_page_ids', array());
+        $page_ids = get_option('ftt_page_ids', array());
         
         if (!isset($page_ids[$page_key])) {
             return false;
@@ -199,7 +199,7 @@ class FTT_Pages {
      * @return int|false The page ID or false if not found
      */
     public static function get_page_id($page_key) {
-        $page_ids = get_option('srt_page_ids', array());
+        $page_ids = get_option('ftt_page_ids', array());
         return isset($page_ids[$page_key]) ? $page_ids[$page_key] : false;
     }
     
@@ -209,7 +209,7 @@ class FTT_Pages {
      * @return bool True if all pages exist
      */
     public static function pages_exist() {
-        $page_ids = get_option('srt_page_ids', array());
+        $page_ids = get_option('ftt_page_ids', array());
         $pages = self::get_page_definitions();
         
         if (count($page_ids) !== count($pages)) {
@@ -232,7 +232,7 @@ class FTT_Pages {
      */
     public static function get_missing_pages_notice() {
         $pages = self::get_page_definitions();
-        $page_ids = get_option('srt_page_ids', array());
+        $page_ids = get_option('ftt_page_ids', array());
         $missing = array();
         
         foreach ($pages as $key => $page_data) {
@@ -285,7 +285,7 @@ class FTT_Pages {
      * @return string|null Registration URL or null if page doesn't exist
      */
     public static function get_registration_url() {
-        $page_ids = get_option('srt_page_ids', array());
+        $page_ids = get_option('ftt_page_ids', array());
         
         // Try stored page ID first
         if (isset($page_ids['register']) && get_post($page_ids['register'])) {
@@ -293,7 +293,7 @@ class FTT_Pages {
         }
         
         // Fallback: search for page with registration shortcode
-        $pages = get_pages(array('meta_key' => '_srt_page'));
+        $pages = get_pages(array('meta_key' => '_ftt_page'));
         foreach ($pages as $page) {
             if (has_shortcode($page->post_content, 'ftt_register')) {
                 return get_permalink($page->ID);

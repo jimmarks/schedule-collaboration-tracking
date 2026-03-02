@@ -100,12 +100,12 @@ if (!defined('ABSPATH')) {
     // Show calendar subscription QR code if user is logged in
     if (is_user_logged_in()) :
         $current_user = wp_get_current_user();
-        $user_token = get_user_meta($current_user->ID, 'srt_calendar_token', true);
+        $user_token = get_user_meta($current_user->ID, 'ftt_calendar_token', true);
         
         // Generate token if doesn't exist
         if (empty($user_token)) {
             $user_token = wp_generate_password(32, false);
-            update_user_meta($current_user->ID, 'srt_calendar_token', $user_token);
+            update_user_meta($current_user->ID, 'ftt_calendar_token', $user_token);
         }
         
         $ical_url = add_query_arg(

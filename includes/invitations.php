@@ -103,12 +103,12 @@ class FTT_Invitations {
      * @return string Member code (e.g., M-ABC123)
      */
     public static function get_member_code($member_id) {
-        $code = get_user_meta($member_id, 'srt_member_code', true);
+        $code = get_user_meta($member_id, 'ftt_member_code', true);
         
         if (empty($code)) {
             // Generate new permanent code
             $code = 'M-' . strtoupper(substr(md5($member_id . time()), 0, 6));
-            update_user_meta($member_id, 'srt_member_code', $code);
+            update_user_meta($member_id, 'ftt_member_code', $code);
         }
         
         return $code;
@@ -122,7 +122,7 @@ class FTT_Invitations {
      */
     public static function get_member_by_code($code) {
         $users = get_users(array(
-            'meta_key' => 'srt_member_code',
+            'meta_key' => 'ftt_member_code',
             'meta_value' => $code,
             'number' => 1
         ));
@@ -149,12 +149,12 @@ class FTT_Invitations {
         );
         
         // Store in member's meta
-        $invitations = get_user_meta($member_id, 'srt_invitations', true);
+        $invitations = get_user_meta($member_id, 'ftt_invitations', true);
         if (!is_array($invitations)) {
             $invitations = array();
         }
         $invitations[$code] = $invitation;
-        update_user_meta($member_id, 'srt_invitations', $invitations);
+        update_user_meta($member_id, 'ftt_invitations', $invitations);
         
         return $invitation;
     }
@@ -168,12 +168,12 @@ class FTT_Invitations {
     public static function get_invitation_by_code($code) {
         // Search through all users' invitations
         $users = get_users(array(
-            'meta_key' => 'srt_invitations',
+            'meta_key' => 'ftt_invitations',
             'meta_compare' => 'EXISTS'
         ));
         
         foreach ($users as $user) {
-            $invitations = get_user_meta($user->ID, 'srt_invitations', true);
+            $invitations = get_user_meta($user->ID, 'ftt_invitations', true);
             if (isset($invitations[$code])) {
                 return $invitations[$code];
             }
@@ -192,12 +192,12 @@ class FTT_Invitations {
     public static function update_invitation_status($code, $status, $parent_id = null) {
         // Find the invitation
         $users = get_users(array(
-            'meta_key' => 'srt_invitations',
+            'meta_key' => 'ftt_invitations',
             'meta_compare' => 'EXISTS'
         ));
         
         foreach ($users as $user) {
-            $invitations = get_user_meta($user->ID, 'srt_invitations', true);
+            $invitations = get_user_meta($user->ID, 'ftt_invitations', true);
             if (isset($invitations[$code])) {
                 $invitations[$code]['status'] = $status;
                 
@@ -206,7 +206,7 @@ class FTT_Invitations {
                     $invitations[$code]['used_at'] = current_time('mysql');
                 }
                 
-                update_user_meta($user->ID, 'srt_invitations', $invitations);
+                update_user_meta($user->ID, 'ftt_invitations', $invitations);
                 return true;
             }
         }
@@ -221,7 +221,7 @@ class FTT_Invitations {
      * @return array Invitations with parent details
      */
     public static function get_member_invitations($member_id) {
-        $invitations = get_user_meta($member_id, 'srt_invitations', true);
+        $invitations = get_user_meta($member_id, 'ftt_invitations', true);
         if (!is_array($invitations)) {
             return array();
         }
@@ -250,7 +250,7 @@ class FTT_Invitations {
         }
         
         // Update user meta to remove expired revoked invitations
-        update_user_meta($member_id, 'srt_invitations', $invitations);
+        update_user_meta($member_id, 'ftt_invitations', $invitations);
         
         return $invitations;
     }
@@ -266,7 +266,7 @@ class FTT_Invitations {
         
         // Find parents waiting to link to this email
         $users = get_users(array(
-            'meta_key' => 'srt_pending_child_email',
+            'meta_key' => 'ftt_pending_child_email',
             'meta_value' => $member_email
         ));
         
@@ -275,7 +275,7 @@ class FTT_Invitations {
             FTT_Roles::add_parent_child($parent->ID, $member_id);
             
             // Clear pending status
-            delete_user_meta($parent->ID, 'srt_pending_child_email');
+            delete_user_meta($parent->ID, 'ftt_pending_child_email');
             
             // Send notification
             $subject = sprintf('[%s] Parent Account Linked', get_bloginfo('name'));
@@ -331,12 +331,12 @@ class FTT_Invitations {
         $current_user_id = get_current_user_id();
         
         // First check if the invitation belongs to the current user
-        $invitations = get_user_meta($current_user_id, 'srt_invitations', true);
+        $invitations = get_user_meta($current_user_id, 'ftt_invitations', true);
         
         if (isset($invitations[$code]) && $invitations[$code]['member_id'] == $current_user_id) {
             // User is revoking their own invitation
             $invitations[$code]['status'] = 'revoked';
-            update_user_meta($current_user_id, 'srt_invitations', $invitations);
+            update_user_meta($current_user_id, 'ftt_invitations', $invitations);
             
             return rest_ensure_response(array(
                 'success' => true,
@@ -349,12 +349,12 @@ class FTT_Invitations {
             $children = FTT_Roles::get_children($current_user_id);
             
             foreach ($children as $child) {
-                $child_invitations = get_user_meta($child->ID, 'srt_invitations', true);
+                $child_invitations = get_user_meta($child->ID, 'ftt_invitations', true);
                 
                 if (isset($child_invitations[$code]) && $child_invitations[$code]['member_id'] == $child->ID) {
                     // Parent is revoking their child's invitation
                     $child_invitations[$code]['status'] = 'revoked';
-                    update_user_meta($child->ID, 'srt_invitations', $child_invitations);
+                    update_user_meta($child->ID, 'ftt_invitations', $child_invitations);
                     
                     return rest_ensure_response(array(
                         'success' => true,

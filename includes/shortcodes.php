@@ -147,7 +147,7 @@ class FTT_Shortcodes {
             // Non-admins only see their own events
             if (!$is_admin) {
                 // Check if user is a parent
-                $child_ids = get_user_meta($current_user_id, 'srt_children', true);
+                $child_ids = get_user_meta($current_user_id, 'ftt_children', true);
                 
                 if (!empty($child_ids) && is_array($child_ids)) {
                     // Parent - show their children's events

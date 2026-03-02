@@ -287,7 +287,7 @@ $parents = FTT_Roles::get_parents($current_user->ID);
                         <label for="timezone" class="ftt-setting-label"><?php esc_html_e('Time Zone', 'schedule-collaboration-tracking'); ?></label>
                         <select id="timezone" name="timezone" class="ftt-select-large" style="width: 100%; max-width: 250px;">
                             <?php 
-                            $user_timezone = get_user_meta($current_user->ID, 'srt_timezone', true) ?: wp_timezone_string();
+                            $user_timezone = get_user_meta($current_user->ID, 'ftt_timezone', true) ?: wp_timezone_string();
                             ?>
                             <option value="">Select timezone...</option>
                             <option value="America/New_York" <?php selected($user_timezone, 'America/New_York'); ?>>Eastern Time</option>

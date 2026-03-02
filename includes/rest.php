@@ -1295,7 +1295,7 @@ class FTT_REST {
         
         $preferences = array(
             'home_airport' => get_user_meta($user_id, 'ftt_home_airport', true) ?: '',
-            'timezone' => get_user_meta($user_id, 'srt_timezone', true) ?: wp_timezone_string(),
+            'timezone' => get_user_meta($user_id, 'ftt_timezone', true) ?: wp_timezone_string(),
         );
         
         return rest_ensure_response($preferences);
@@ -1315,7 +1315,7 @@ class FTT_REST {
         }
         
         if ($timezone !== null) {
-            update_user_meta($user_id, 'srt_timezone', sanitize_text_field($timezone));
+            update_user_meta($user_id, 'ftt_timezone', sanitize_text_field($timezone));
         }
         
         return rest_ensure_response(array('success' => true, 'message' => 'Preferences updated'));

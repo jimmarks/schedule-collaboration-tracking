@@ -38,7 +38,7 @@ class FTT_Roles {
      */
     public static function make_member($user_id) {
         update_user_meta($user_id, 'ftt_is_member', true);
-        update_user_meta($user_id, 'srt_member_since', current_time('mysql'));
+        update_user_meta($user_id, 'ftt_member_since', current_time('mysql'));
         
         // Grant event editing capabilities
         $user = get_user_by('id', $user_id);
@@ -85,7 +85,7 @@ class FTT_Roles {
         $parents = self::get_parents($child_id);
         if (!in_array($parent_id, $parents)) {
             $parents[] = $parent_id;
-            update_user_meta($child_id, 'srt_parents', $parents);
+            update_user_meta($child_id, 'ftt_parents', $parents);
         }
         
         // Auto-assign color to child when first added to a parent
@@ -105,7 +105,7 @@ class FTT_Roles {
         // Remove reverse relationship
         $parents = self::get_parents($child_id);
         $parents = array_diff($parents, array($parent_id));
-        update_user_meta($child_id, 'srt_parents', $parents);
+        update_user_meta($child_id, 'ftt_parents', $parents);
     }
     
     /**
@@ -120,7 +120,7 @@ class FTT_Roles {
      * Get parents for a user
      */
     public static function get_parents($user_id) {
-        $parents = get_user_meta($user_id, 'srt_parents', true);
+        $parents = get_user_meta($user_id, 'ftt_parents', true);
         return is_array($parents) ? $parents : array();
     }
     
@@ -189,7 +189,7 @@ class FTT_Roles {
         }
         
         // Handle form submissions
-        if (isset($_POST['ftt_action']) && check_admin_referer('srt_manage_users')) {
+        if (isset($_POST['ftt_action']) && check_admin_referer('ftt_manage_users')) {
             self::handle_admin_actions();
         }
         

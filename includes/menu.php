@@ -91,7 +91,7 @@ class FTT_Menu {
     public static function setup_nav_menu_item($menu_item) {
         // Mark our custom menu items
         if (isset($menu_item->classes) && is_array($menu_item->classes) && in_array('ftt-login-logout-item', $menu_item->classes)) {
-            $menu_item->srt_login_logout = true;
+            $menu_item->ftt_login_logout = true;
         }
         
         return $menu_item;
@@ -180,7 +180,7 @@ class FTT_Menu {
         $display_name = $current_user->display_name;
         
         // Option to show username
-        $show_username = apply_filters('srt_show_username_in_logout', false);
+        $show_username = apply_filters('ftt_show_username_in_logout', false);
         
         if ($show_username && $display_name) {
             $logout_text = sprintf(__('Logout (%s)', 'schedule-collaboration-tracking'), $display_name);

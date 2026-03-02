@@ -42,7 +42,7 @@ class FTT_ICal {
         }
         
         // Check if user exists and token matches
-        $stored_token = get_user_meta($user_id, 'srt_calendar_token', true);
+        $stored_token = get_user_meta($user_id, 'ftt_calendar_token', true);
         
         if ($token !== $stored_token) {
             wp_die('Invalid or expired calendar token. Please generate a new subscription link from the calendar page.', 'Invalid Token', array('response' => 403));
@@ -95,7 +95,7 @@ class FTT_ICal {
         // Filter events by user (unless admin)
         if (!user_can($user_id, 'manage_options')) {
             // Check if user is a parent
-            $child_ids = get_user_meta($user_id, 'srt_children', true);
+            $child_ids = get_user_meta($user_id, 'ftt_children', true);
             
             if (!empty($child_ids) && is_array($child_ids)) {
                 // Parent - show their children's events
@@ -177,7 +177,7 @@ class FTT_ICal {
                 return new WP_Error('auth_required', 'Authentication token required', array('status' => 401));
             }
             
-            $valid_tokens = get_option('srt_calendar_tokens', array());
+            $valid_tokens = get_option('ftt_calendar_tokens', array());
             
             if (!in_array($token, $valid_tokens)) {
                 return new WP_Error('invalid_token', 'Invalid authentication token', array('status' => 403));
@@ -487,10 +487,10 @@ class FTT_ICal {
     public static function generate_calendar_token($request) {
         $token = wp_generate_password(32, false);
         
-        $tokens = get_option('srt_calendar_tokens', array());
+        $tokens = get_option('ftt_calendar_tokens', array());
         $tokens[] = $token;
         
-        update_option('srt_calendar_tokens', $tokens);
+        update_option('ftt_calendar_tokens', $tokens);
         
         return rest_ensure_response(array(
             'success' => true,
@@ -503,12 +503,12 @@ class FTT_ICal {
      * Delete calendar token
      */
     public static function delete_calendar_token($token) {
-        $tokens = get_option('srt_calendar_tokens', array());
+        $tokens = get_option('ftt_calendar_tokens', array());
         $tokens = array_filter($tokens, function($t) use ($token) {
             return $t !== $token;
         });
         
-        update_option('srt_calendar_tokens', array_values($tokens));
+        update_option('ftt_calendar_tokens', array_values($tokens));
         
         return true;
     }
@@ -517,7 +517,7 @@ class FTT_ICal {
      * Get all calendar tokens
      */
     public static function get_calendar_tokens() {
-        return get_option('srt_calendar_tokens', array());
+        return get_option('ftt_calendar_tokens', array());
     }
     
     /**
@@ -527,7 +527,7 @@ class FTT_ICal {
      * @param int $user_id User ID
      */
     public static function invalidate_user_token($user_id) {
-        delete_user_meta($user_id, 'srt_calendar_token');
+        delete_user_meta($user_id, 'ftt_calendar_token');
         error_log("FTT ICAL: Invalidated calendar token for user ID: {$user_id}");
     }
 }

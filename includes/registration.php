@@ -185,10 +185,10 @@ class FTT_Registration {
             
             // Store member-specific info
             if (!empty($_POST['member_instrument'])) {
-                update_user_meta($user_id, 'srt_instrument', sanitize_text_field($_POST['member_instrument']));
+                update_user_meta($user_id, 'ftt_instrument', sanitize_text_field($_POST['member_instrument']));
             }
             if (!empty($_POST['member_section'])) {
-                update_user_meta($user_id, 'srt_section', sanitize_text_field($_POST['member_section']));
+                update_user_meta($user_id, 'ftt_section', sanitize_text_field($_POST['member_section']));
             }
             
             // Check if any parents are waiting to link to this email
@@ -224,7 +224,7 @@ class FTT_Registration {
                     FTT_Roles::add_parent_child($user_id, $member->ID);
                 } else {
                     // Store for later linking
-                    update_user_meta($user_id, 'srt_pending_child_email', $member_email);
+                    update_user_meta($user_id, 'ftt_pending_child_email', $member_email);
                 }
             }
         }

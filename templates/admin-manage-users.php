@@ -60,7 +60,7 @@ $parents = FTT_Roles::get_all_parents();
                                     $parent_names[] = $parent->display_name;
                                 }
                             }
-                            $member_since = get_user_meta($member->ID, 'srt_member_since', true);
+                            $member_since = get_user_meta($member->ID, 'ftt_member_since', true);
                             ?>
                             <tr>
                                 <td><strong><?php echo esc_html($member->display_name); ?></strong></td>

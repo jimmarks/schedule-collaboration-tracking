@@ -31,7 +31,7 @@ if (php_sapi_name() !== 'cli') {
 echo "=== Testing Daily Digest System ===\n\n";
 
 // Check if cron is scheduled
-$timestamp = wp_next_scheduled('srt_daily_digest');
+$timestamp = wp_next_scheduled('ftt_daily_digest');
 if ($timestamp) {
     echo "✅ Daily digest cron is scheduled\n";
     echo "   Next run: " . date('Y-m-d H:i:s', $timestamp) . "\n\n";
@@ -39,7 +39,7 @@ if ($timestamp) {
     echo "❌ Daily digest cron is NOT scheduled\n";
     echo "   Scheduling now...\n";
     $tomorrow_2am = strtotime('tomorrow 2:00am');
-    wp_schedule_event($tomorrow_2am, 'daily_2am', 'srt_daily_digest');
+    wp_schedule_event($tomorrow_2am, 'daily_2am', 'ftt_daily_digest');
     echo "   Scheduled for: " . date('Y-m-d H:i:s', $tomorrow_2am) . "\n\n";
 }
 
@@ -94,7 +94,7 @@ if ($response === 'y') {
     echo "\n=== Triggering Daily Digest ===\n\n";
     
     // Manually trigger the digest
-    do_action('srt_daily_digest');
+    do_action('ftt_daily_digest');
     
     echo "✅ Digest processing complete\n";
     echo "   Check your email and WordPress error logs for results\n";
