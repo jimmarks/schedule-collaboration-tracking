@@ -3,7 +3,7 @@
  * Plugin Name: Family Travel Tracker
  * Plugin URI: https://github.com/jimmarks/schedule-collaboration-tracking
  * Description: Multi-child schedule coordination with travel planning, flight tracking, and shared calendars for families. Perfect for busy parents, co-parenting families, and children's activities.
- * Version: 2.0.49
+ * Version: 2.0.50
  * Author: Jim Marks
  * Author URI: https://github.com/jimmarks
  * License: GPL v2 or later
@@ -114,6 +114,7 @@ class Family_Travel_Tracker {
         add_action('wp_enqueue_scripts', array($this, 'enqueue_scripts'));
         add_action('admin_notices', array('FTT_Pages', 'get_missing_pages_notice'));
         add_action('admin_init', array('FTT_Pages', 'handle_recreate_pages'));
+        add_action('admin_init', array($this, 'run_migrations'));
         
         // Initialize all component classes
         FTT_CPT::init();
@@ -163,6 +164,73 @@ class Family_Travel_Tracker {
      */
     public function deactivate() {
         flush_rewrite_rules();
+    }
+    
+    /**
+     * Run database migrations for version updates
+     */
+    public function run_migrations() {
+        // Get current migration version
+        $migration_version = get_option('ftt_migration_version', '0');
+        
+        // Migration 1: Add user_type to existing parent accounts (v2.0.48+)
+        if (version_compare($migration_version, '1', '<')) {
+            $this->migrate_user_types();
+            update_option('ftt_migration_version', '1');
+        }
+    }
+    
+    /**
+     * Migration: Set user_type for existing parent accounts
+     * Fixes accounts created before v2.0.48
+     */
+    private function migrate_user_types() {
+        global $wpdb;
+        
+        // Find users who have children but no user_type set
+        $users_with_children = $wpdb->get_results("
+            SELECT DISTINCT user_id 
+            FROM {$wpdb->usermeta} 
+            WHERE meta_key = 'ftt_children' 
+            AND meta_value != ''
+        ");
+        
+        $migrated = 0;
+        foreach ($users_with_children as $row) {
+            $user_id = $row->user_id;
+            
+            // Check if user_type already exists
+            $existing_type = get_user_meta($user_id, 'user_type', true);
+            if (empty($existing_type)) {
+                // Set as parent
+                update_user_meta($user_id, 'user_type', 'parent');
+                $migrated++;
+            }
+        }
+        
+        // Also check users who have planned_children (from registration) but no user_type
+        $users_with_planned = $wpdb->get_results("
+            SELECT DISTINCT user_id 
+            FROM {$wpdb->usermeta} 
+            WHERE meta_key = 'planned_children' 
+            AND meta_value > 0
+        ");
+        
+        foreach ($users_with_planned as $row) {
+            $user_id = $row->user_id;
+            
+            // Check if user_type already exists
+            $existing_type = get_user_meta($user_id, 'user_type', true);
+            if (empty($existing_type)) {
+                // Set as parent
+                update_user_meta($user_id, 'user_type', 'parent');
+                $migrated++;
+            }
+        }
+        
+        if ($migrated > 0) {
+            error_log("FTT Migration: Set user_type='parent' for {$migrated} existing users");
+        }
     }
     
     /**
