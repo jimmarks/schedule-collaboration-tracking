@@ -16,6 +16,65 @@ $is_member = $is_logged_in && FTT_Roles::is_member($current_user->ID);
 $is_parent = $is_logged_in && FTT_Roles::is_parent($current_user->ID);
 $is_admin = $is_logged_in && current_user_can('manage_options');
 
+// Handle adult invitation acceptance
+$invite_message = '';
+if ($is_logged_in && isset($_GET['ftt_invite']) && isset($_GET['inviter'])) {
+    $invite_code = sanitize_text_field($_GET['ftt_invite']);
+    $inviter_id = absint($_GET['inviter']);
+    
+    // Get inviter's invitations
+    $invitations = get_user_meta($inviter_id, 'ftt_adult_invitations', true);
+    
+    if (is_array($invitations) && isset($invitations[$invite_code])) {
+        $invitation = $invitations[$invite_code];
+        
+        // Check if expired
+        if ($invitation['expires'] > time()) {
+            // Check if email matches (or skip email check if they're logged in)
+            $link_user = true;
+            
+            if ($link_user) {
+                // Link the two users as co-parents
+                // Add each to the other's parent list
+                $inviter_parents = get_user_meta($inviter_id, 'ftt_parents', true);
+                if (!is_array($inviter_parents)) {
+                    $inviter_parents = [];
+                }
+                if (!in_array($current_user->ID, $inviter_parents)) {
+                    $inviter_parents[] = $current_user->ID;
+                    update_user_meta($inviter_id, 'ftt_parents', $inviter_parents);
+                }
+                
+                $current_parents = get_user_meta($current_user->ID, 'ftt_parents', true);
+                if (!is_array($current_parents)) {
+                    $current_parents = [];
+                }
+                if (!in_array($inviter_id, $current_parents)) {
+                    $current_parents[] = $inviter_id;
+                    update_user_meta($current_user->ID, 'ftt_parents', $current_parents);
+                }
+                
+                // Store relationship
+                update_user_meta($current_user->ID, 'relationship_to_' . $inviter_id, $invitation['relationship']);
+                
+                // Mark invitation as used
+                unset($invitations[$invite_code]);
+                update_user_meta($inviter_id, 'ftt_adult_invitations', $invitations);
+                
+                $inviter = get_userdata($inviter_id);
+                $invite_message = sprintf(
+                    '<div class="ftt-notice ftt-notice-success"><p>✅ You\'re now linked with %s! You can now view and manage their family calendar.</p></div>',
+                    esc_html($inviter->display_name)
+                );
+            }
+        } else {
+            $invite_message = '<div class="ftt-notice ftt-notice-error"><p>This invitation has expired.</p></div>';
+        }
+    } else {
+        $invite_message = '<div class="ftt-notice ftt-notice-error"><p>Invalid invitation code.</p></div>';
+    }
+}
+
 // Get page URLs
 $calendar_url = FTT_Pages::get_page_url('calendar');
 $event_list_url = FTT_Pages::get_page_url('event_list');
@@ -93,6 +152,13 @@ console.log('============================');
             <?php endif; ?>
         </nav>
     </div>
+
+    <?php
+    // Display invitation acceptance message
+    if (!empty($invite_message)) {
+        echo $invite_message;
+    }
+    ?>
 
     <?php if (!$is_logged_in): ?>
         <!-- Public View: Welcome + Register -->
@@ -597,6 +663,33 @@ console.log('============================');
     border-radius: 8px;
     max-width: 500px;
     margin: 0 auto;
+}
+
+/* Notice Messages */
+.ftt-notice {
+    padding: 15px 20px;
+    border-radius: 8px;
+    margin: 20px 30px;
+    border-left: 4px solid;
+}
+.ftt-notice p {
+    margin: 0;
+    font-size: 16px;
+}
+.ftt-notice-success {
+    background: #d4edda;
+    border-color: #28a745;
+    color: #155724;
+}
+.ftt-notice-error {
+    background: #f8d7da;
+    border-color: #dc3545;
+    color: #721c24;
+}
+.ftt-notice-info {
+    background: #d1ecf1;
+    border-color: #17a2b8;
+    color: #0c5460;
 }
 
 /* User Header */
