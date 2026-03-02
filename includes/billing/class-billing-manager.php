@@ -22,6 +22,10 @@ class FTT_Billing_Manager {
         // Restrict access based on subscription
         add_action('init', [__CLASS__, 'check_access']);
         
+        // Show subscription status banners
+        add_action('wp_body_open', [__CLASS__, 'show_subscription_status_banner']);
+        add_action('wp_head', [__CLASS__, 'add_status_banner_styles']);
+        
         // Prevent adding children beyond limit
         add_action('ftt_before_add_child', [__CLASS__, 'check_child_limit'], 10, 2);
         
@@ -492,6 +496,137 @@ class FTT_Billing_Manager {
         ];
         
         return $labels[$status] ?? ucfirst($status);
+    }
+    
+    /**
+     * Add CSS for status banners
+     */
+    public static function add_status_banner_styles() {
+        if (!is_user_logged_in() || current_user_can('manage_options')) {
+            return;
+        }
+        ?>
+        <style>
+            .ftt-subscription-status-banner {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                z-index: 999999;
+                padding: 12px 20px;
+                text-align: center;
+                font-size: 14px;
+                line-height: 1.5;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            .ftt-subscription-status-banner a {
+                color: inherit;
+                text-decoration: underline;
+                font-weight: 600;
+            }
+            .ftt-subscription-status-banner a:hover {
+                text-decoration: none;
+            }
+            .ftt-status-canceled {
+                background: #fff3cd;
+                color: #856404;
+                border-bottom: 2px solid #ffc107;
+            }
+            .ftt-status-trialing {
+                background: #d1ecf1;
+                color: #0c5460;
+                border-bottom: 2px solid #17a2b8;
+            }
+            .ftt-status-past_due {
+                background: #f8d7da;
+                color: #721c24;
+                border-bottom: 2px solid #dc3545;
+            }
+            body.ftt-has-status-banner {
+                padding-top: 50px;
+            }
+        </style>
+        <?php
+    }
+    
+    /**
+     * Show subscription status banner at top of page
+     */
+    public static function show_subscription_status_banner() {
+        // Only show on frontend for logged-in non-admin users
+        if (!is_user_logged_in() || is_admin() || current_user_can('manage_options')) {
+            return;
+        }
+        
+        // Skip if Stripe not configured
+        $stripe_settings = get_option('ftt_stripe_settings', []);
+        if (empty($stripe_settings['secret_key'])) {
+            return;
+        }
+        
+        // Don't show on billing pages
+        if (self::is_billing_page()) {
+            return;
+        }
+        
+        $user_id = get_current_user_id();
+        $status = get_user_meta($user_id, 'ftt_subscription_status', true);
+        $period_end = get_user_meta($user_id, 'ftt_current_period_end', true);
+        $cancel_at_end = get_user_meta($user_id, 'ftt_cancel_at_period_end', true);
+        
+        $banner_html = '';
+        $banner_class = '';
+        
+        // Canceled subscription (still active until period end)
+        if ($status === 'canceled' || ($status === 'active' && $cancel_at_end)) {
+            if (!empty($period_end) && strtotime($period_end) > time()) {
+                $days_remaining = ceil((strtotime($period_end) - time()) / 86400);
+                $end_date = date('F j, Y', strtotime($period_end));
+                
+                $banner_html = sprintf(
+                    __('⚠️ Your subscription has been canceled and will expire on <strong>%s</strong> (%d days remaining). Want to keep your access? <a href="%s">Reactivate your subscription</a>', 'schedule-collaboration-tracking'),
+                    $end_date,
+                    $days_remaining,
+                    home_url('/manage-subscription/')
+                );
+                $banner_class = 'ftt-status-canceled';
+            }
+        }
+        // Trial period
+        elseif ($status === 'trialing') {
+            if (!empty($period_end)) {
+                $days_remaining = ceil((strtotime($period_end) - time()) / 86400);
+                $end_date = date('F j, Y', strtotime($period_end));
+                
+                $banner_html = sprintf(
+                    __('🎉 You\'re in your free trial! It ends on <strong>%s</strong> (%d days remaining). <a href="%s">View billing details</a>', 'schedule-collaboration-tracking'),
+                    $end_date,
+                    $days_remaining,
+                    home_url('/manage-subscription/')
+                );
+                $banner_class = 'ftt-status-trialing';
+            }
+        }
+        // Past due (payment failed)
+        elseif ($status === 'past_due') {
+            $grace_end = get_user_meta($user_id, 'ftt_grace_period_end', true);
+            if (!empty($grace_end) && strtotime($grace_end) > time()) {
+                $days_remaining = ceil((strtotime($grace_end) - time()) / 86400);
+                
+                $banner_html = sprintf(
+                    __('❌ Your payment failed. Please <a href="%s">update your payment method</a> within %d days to avoid losing access.', 'schedule-collaboration-tracking'),
+                    home_url('/manage-subscription/'),
+                    $days_remaining
+                );
+                $banner_class = 'ftt-status-past_due';
+            }
+        }
+        
+        // Display banner if we have content
+        if ($banner_html) {
+            echo '<div class="ftt-subscription-status-banner ' . esc_attr($banner_class) . '">' . $banner_html . '</div>';
+            echo '<script>document.body.classList.add("ftt-has-status-banner");</script>';
+        }
     }
 }
 
