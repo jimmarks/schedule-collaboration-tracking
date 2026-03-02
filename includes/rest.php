@@ -298,6 +298,18 @@ class FTT_REST {
                 'permission_callback' => 'is_user_logged_in',
             ));
             
+            register_rest_route('ftt/v1', '/cancel-invitation', array(
+                'methods'             => 'POST',
+                'callback'            => array(__CLASS__, 'cancel_invitation'),
+                'permission_callback' => 'is_user_logged_in',
+            ));
+            
+            register_rest_route('ftt/v1', '/resend-invitation', array(
+                'methods'             => 'POST',
+                'callback'            => array(__CLASS__, 'resend_invitation'),
+                'permission_callback' => 'is_user_logged_in',
+            ));
+            
             register_rest_route('ftt/v1', '/save-event-preferences', array(
                 'methods'             => 'POST',
                 'callback'            => array(__CLASS__, 'save_event_preferences'),
@@ -1702,9 +1714,14 @@ class FTT_REST {
             return new WP_Error('missing_email', 'Email address is required', ['status' => 400]);
         }
         
+        // Get expiration days from settings
+        $settings = get_option('ftt_settings', array());
+        $expiration_days = isset($settings['invitation_expiration_days']) ? absint($settings['invitation_expiration_days']) : 7;
+        
         // Generate invitation
         $invite_code = wp_generate_password(12, false);
-        $expires = time() + (7 * DAY_IN_SECONDS); // 7 days
+        $created = time();
+        $expires = $created + ($expiration_days * DAY_IN_SECONDS);
         
         // Store invitation data
         $invitations = get_user_meta($user_id, 'ftt_adult_invitations', true);
@@ -1716,7 +1733,8 @@ class FTT_REST {
             'email' => $email,
             'relationship' => $relationship,
             'expires' => $expires,
-            'created' => time(),
+            'created' => $created,
+            'status' => 'pending',
         ];
         
         update_user_meta($user_id, 'ftt_adult_invitations', $invitations);
@@ -1733,9 +1751,10 @@ class FTT_REST {
         $message = sprintf(
             "You've been invited by %s to share access to their family calendar.\n\n" .
             "Click here to accept: %s\n\n" .
-            "This invitation expires in 7 days.",
+            "This invitation expires in %d days.",
             $current_user->display_name,
-            $invite_url
+            $invite_url,
+            $expiration_days
         );
         
         wp_mail($email, $subject, $message);
@@ -1744,6 +1763,96 @@ class FTT_REST {
             'success' => true,
             'invite_url' => $invite_url,
             'message' => 'Invitation sent successfully'
+        ]);
+    }
+    
+    /**
+     * Cancel pending invitation
+     */
+    public static function cancel_invitation($request) {
+        $user_id = get_current_user_id();
+        $params = $request->get_json_params();
+        
+        $invite_code = sanitize_text_field($params['invite_code'] ?? '');
+        
+        if (empty($invite_code)) {
+            return new WP_Error('missing_code', 'Invitation code is required', ['status' => 400]);
+        }
+        
+        // Get invitations
+        $invitations = get_user_meta($user_id, 'ftt_adult_invitations', true);
+        if (!is_array($invitations)) {
+            return new WP_Error('not_found', 'Invitation not found', ['status' => 404]);
+        }
+        
+        // Check if invitation exists
+        if (!isset($invitations[$invite_code])) {
+            return new WP_Error('not_found', 'Invitation not found', ['status' => 404]);
+        }
+        
+        // Remove invitation
+        unset($invitations[$invite_code]);
+        update_user_meta($user_id, 'ftt_adult_invitations', $invitations);
+        
+        return rest_ensure_response([
+            'success' => true,
+            'message' => 'Invitation cancelled successfully'
+        ]);
+    }
+    
+    /**
+     * Resend invitation email
+     */
+    public static function resend_invitation($request) {
+        $user_id = get_current_user_id();
+        $params = $request->get_json_params();
+        
+        $invite_code = sanitize_text_field($params['invite_code'] ?? '');
+        
+        if (empty($invite_code)) {
+            return new WP_Error('missing_code', 'Invitation code is required', ['status' => 400]);
+        }
+        
+        // Get invitations
+        $invitations = get_user_meta($user_id, 'ftt_adult_invitations', true);
+        if (!is_array($invitations) || !isset($invitations[$invite_code])) {
+            return new WP_Error('not_found', 'Invitation not found', ['status' => 404]);
+        }
+        
+        $invite = $invitations[$invite_code];
+        
+        // Check if already expired
+        if ($invite['expires'] < time()) {
+            return new WP_Error('expired', 'Invitation has expired', ['status' => 400]);
+        }
+        
+        // Get expiration days from settings
+        $settings = get_option('ftt_settings', array());
+        $expiration_days = isset($settings['invitation_expiration_days']) ? absint($settings['invitation_expiration_days']) : 7;
+        
+        // Generate invitation URL
+        $invite_url = add_query_arg([
+            'ftt_invite' => $invite_code,
+            'inviter' => $user_id,
+        ], home_url('/ftt-dashboard/'));
+        
+        // Send email
+        $current_user = wp_get_current_user();
+        $subject = sprintf('Family Calendar Invitation from %s (Reminder)', $current_user->display_name);
+        $message = sprintf(
+            "This is a reminder that you've been invited by %s to share access to their family calendar.\n\n" .
+            "Click here to accept: %s\n\n" .
+            "This invitation expires on %s.",
+            $current_user->display_name,
+            $invite_url,
+            date_i18n(get_option('date_format'), $invite['expires'])
+        );
+        
+        wp_mail($invite['email'], $subject, $message);
+        
+        return rest_ensure_response([
+            'success' => true,
+            'message' => 'Invitation resent successfully'
         ]);
     }
     

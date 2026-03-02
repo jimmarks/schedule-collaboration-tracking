@@ -1506,3 +1506,145 @@
         width: 100%;
     }
 }
+
+/* Pending Invitations Styles */
+.ftt-pending-invitations {
+    margin-top: 25px;
+    padding-top: 25px;
+    border-top: 1px solid #e5e5e5;
+}
+
+.ftt-subsection-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 15px;
+    color: #333;
+}
+
+.ftt-invitations-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.ftt-invitation-card {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 15px;
+    background: #fff9e6;
+    border: 1px solid #f0e5c9;
+    border-radius: 6px;
+    transition: all 0.2s;
+}
+
+.ftt-invitation-card:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.ftt-invitation-icon {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f0e5c9;
+    border-radius: 50%;
+    color: #b8860b;
+}
+
+.ftt-invitation-icon .dashicons {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+}
+
+.ftt-invitation-info {
+    flex-grow: 1;
+}
+
+.ftt-invitation-email {
+    font-weight: 600;
+    font-size: 14px;
+    margin: 0 0 4px 0;
+    color: #333;
+}
+
+.ftt-invitation-relationship {
+    font-size: 13px;
+    color: #666;
+    margin: 0 0 6px 0;
+    text-transform: capitalize;
+}
+
+.ftt-invitation-meta {
+    font-size: 12px;
+    color: #888;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.ftt-invitation-separator {
+    color: #ccc;
+}
+
+.ftt-invitation-expires.ftt-expiring-soon {
+    color: #d63638;
+    font-weight: 600;
+}
+
+.ftt-invitation-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.ftt-invitation-actions .button {
+    min-width: 32px;
+    height: 32px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.ftt-invitation-actions .dashicons {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+}
+
+.ftt-resend-invite:hover {
+    background: #2271b1;
+    color: white;
+}
+
+@media (max-width: 768px) {
+    .ftt-invitation-card {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+    
+    .ftt-invitation-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
+    
+    .ftt-invitation-meta {
+        flex-wrap: wrap;
+    }
+}
+
+/* Spinning animation for resend button */
+.spinning {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}

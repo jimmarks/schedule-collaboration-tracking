@@ -129,6 +129,65 @@ $parents = FTT_Roles::get_parents($current_user->ID);
                 </div>
             <?php endif; ?>
         </div>
+        
+        <!-- Pending Invitations -->
+        <?php
+        $invitations = get_user_meta($current_user->ID, 'ftt_adult_invitations', true);
+        if (is_array($invitations) && !empty($invitations)):
+            // Filter out expired or accepted invitations
+            $pending = array_filter($invitations, function($inv) {
+                return isset($inv['status']) && $inv['status'] === 'pending' && $inv['expires'] > time();
+            });
+            
+            if (!empty($pending)):
+        ?>
+        <div class="ftt-pending-invitations">
+            <h3 class="ftt-subsection-title">⏳ <?php esc_html_e('Pending Invitations', 'schedule-collaboration-tracking'); ?></h3>
+            <div class="ftt-invitations-list">
+                <?php foreach ($pending as $code => $invite): 
+                    $days_since = floor((time() - $invite['created']) / DAY_IN_SECONDS);
+                    $days_until_expire = floor(($invite['expires'] - time()) / DAY_IN_SECONDS);
+                    $expire_date = date_i18n(get_option('date_format'), $invite['expires']);
+                ?>
+                <div class="ftt-invitation-card" data-invite-code="<?php echo esc_attr($code); ?>">
+                    <div class="ftt-invitation-icon">
+                        <span class="dashicons dashicons-email"></span>
+                    </div>
+                    <div class="ftt-invitation-info">
+                        <p class="ftt-invitation-email"><?php echo esc_html($invite['email']); ?></p>
+                        <p class="ftt-invitation-relationship"><?php echo esc_html($invite['relationship']); ?></p>
+                        <p class="ftt-invitation-meta">
+                            <span class="ftt-invitation-sent">
+                                <?php printf(esc_html__('Sent %d day(s) ago', 'schedule-collaboration-tracking'), $days_since); ?>
+                            </span>
+                            <span class="ftt-invitation-separator">•</span>
+                            <span class="ftt-invitation-expires <?php echo $days_until_expire <= 1 ? 'ftt-expiring-soon' : ''; ?>">
+                                <?php 
+                                if ($days_until_expire == 0) {
+                                    esc_html_e('Expires today', 'schedule-collaboration-tracking');
+                                } else {
+                                    printf(esc_html__('Expires in %d day(s)', 'schedule-collaboration-tracking'), $days_until_expire);
+                                }
+                                ?>
+                            </span>
+                        </p>
+                    </div>
+                    <div class="ftt-invitation-actions">
+                        <button type="button" class="button button-small ftt-resend-invite" data-invite-code="<?php echo esc_attr($code); ?>" title="<?php esc_attr_e('Resend invitation email', 'schedule-collaboration-tracking'); ?>">
+                            <span class="dashicons dashicons-update"></span>
+                        </button>
+                        <button type="button" class="button button-small button-link-delete ftt-cancel-invite" data-invite-code="<?php echo esc_attr($code); ?>" title="<?php esc_attr_e('Cancel invitation', 'schedule-collaboration-tracking'); ?>">
+                            <span class="dashicons dashicons-no"></span>
+                        </button>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+        <?php 
+            endif;
+        endif; 
+        ?>
     </div>
 
     <!-- Event Preferences Section -->

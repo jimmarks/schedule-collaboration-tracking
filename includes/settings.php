@@ -102,6 +102,14 @@ class FTT_Settings {
             'ftt_general_section'
         );
         
+        add_settings_field(
+            'invitation_expiration_days',
+            __('Adult Invitation Expiration', 'schedule-collaboration-tracking'),
+            array(__CLASS__, 'render_invitation_expiration_field'),
+            'ftt-settings-general',
+            'ftt_general_section'
+        );
+        
         // TAB 2: API KEYS
         add_settings_section(
             'ftt_api_section',
@@ -265,6 +273,10 @@ class FTT_Settings {
         }
         if (isset($input['notification_from_name'])) {
             $sanitized['notification_from_name'] = sanitize_text_field($input['notification_from_name']);
+        }
+        if (isset($input['invitation_expiration_days'])) {
+            $days = absint($input['invitation_expiration_days']);
+            $sanitized['invitation_expiration_days'] = max(1, min(90, $days)); // Between 1 and 90 days
         }
         if (isset($input['geocoding_provider'])) {
             $sanitized['geocoding_provider'] = in_array($input['geocoding_provider'], array('none', 'mapbox', 'google')) ? 
@@ -450,6 +462,20 @@ class FTT_Settings {
         <input type="text" name="ftt_settings[notification_from_name]" value="<?php echo esc_attr($value); ?>" class="regular-text" placeholder="<?php echo esc_attr($default); ?>">
         <p class="description">
             <?php esc_html_e('Name to display as the email sender. Leave blank to use site name.', 'schedule-collaboration-tracking'); ?>
+        </p>
+        <?php
+    }
+    
+    /**
+     * Render invitation expiration field
+     */
+    public static function render_invitation_expiration_field() {
+        $settings = get_option('ftt_settings', array());
+        $value = $settings['invitation_expiration_days'] ?? 7;
+        ?>
+        <input type="number" name="ftt_settings[invitation_expiration_days]" value="<?php echo esc_attr($value); ?>" min="1" max="90" class="small-text"> <?php esc_html_e('days', 'schedule-collaboration-tracking'); ?>
+        <p class="description">
+            <?php esc_html_e('Number of days before adult invitations expire. Default is 7 days.', 'schedule-collaboration-tracking'); ?>
         </p>
         <?php
     }

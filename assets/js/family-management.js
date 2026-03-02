@@ -251,6 +251,70 @@ jQuery(document).ready(function($) {
         });
     });
     
+    // Cancel Invitation
+    $(document).on('click', '.ftt-cancel-invite', function() {
+        var inviteCode = $(this).data('invite-code');
+        
+        if (!confirm('Are you sure you want to cancel this invitation?')) {
+            return;
+        }
+        
+        console.log('Canceling invitation:', inviteCode);
+        
+        $.ajax({
+            url: '/wp-json/ftt/v1/cancel-invitation',
+            method: 'POST',
+            beforeSend: function(xhr) {
+                xhr.setRequestHeader('X-WP-Nonce', fttFamilyMgmt.nonce);
+            },
+            contentType: 'application/json',
+            data: JSON.stringify({ invite_code: inviteCode }),
+            success: function(response) {
+                console.log('Invitation cancelled:', response);
+                location.reload();
+            },
+            error: function(xhr) {
+                console.error('Error canceling invitation:', xhr.responseJSON);
+                alert(xhr.responseJSON?.message || 'Failed to cancel invitation');
+            }
+        });
+    });
+    
+    // Resend Invitation
+    $(document).on('click', '.ftt-resend-invite', function() {
+        var inviteCode = $(this).data('invite-code');
+        var $button = $(this);
+        var originalHtml = $button.html();
+        
+        console.log('Resending invitation:', inviteCode);
+        
+        // Show loading state
+        $button.prop('disabled', true).html('<span class="dashicons dashicons-update spinning"></span>');
+        
+        $.ajax({
+            url: '/wp-json/ftt/v1/resend-invitation',
+            method: 'POST',
+            beforeSend: function(xhr) {
+                xhr.setRequestHeader('X-WP-Nonce', fttFamilyMgmt.nonce);
+            },
+            contentType: 'application/json',
+            data: JSON.stringify({ invite_code: inviteCode }),
+            success: function(response) {
+                console.log('Invitation resent:', response);
+                $button.html('<span class="dashicons dashicons-yes"></span>');
+                
+                setTimeout(function() {
+                    $button.prop('disabled', false).html(originalHtml);
+                }, 2000);
+            },
+            error: function(xhr) {
+                console.error('Error resending invitation:', xhr.responseJSON);
+                alert(xhr.responseJSON?.message || 'Failed to resend invitation');
+                $button.prop('disabled', false).html(originalHtml);
+            }
+        });
+    });
+    
     // Close Modal (both X button and Cancel button)
     $('.ftt-modal-close, .ftt-modal-close-x').on('click', function() {
         $(this).closest('.ftt-modal').fadeOut();
