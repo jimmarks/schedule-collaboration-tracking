@@ -146,22 +146,24 @@ $parents = FTT_Roles::get_parents($current_user->ID);
                 <h3 class="ftt-subsection-title">
                     ⏳ <?php esc_html_e('Pending Invitations', 'schedule-collaboration-tracking'); ?>
                     <span class="ftt-count-badge"><?php echo count($pending); ?></span>
+                    <span class="dashicons dashicons-arrow-down-alt2 ftt-toggle-icon"></span>
                 </h3>
-                <span class="dashicons dashicons-arrow-down-alt2 ftt-toggle-icon"></span>
             </div>
             <div class="ftt-invitations-list">
-                <?php foreach ($pending as $code => $invite): 
+                <?php 
+                foreach ($pending as $code => $invite): 
                     $days_since = floor((time() - $invite['created']) / DAY_IN_SECONDS);
                     $days_until_expire = floor(($invite['expires'] - time()) / DAY_IN_SECONDS);
                     $expire_date = date_i18n(get_option('date_format'), $invite['expires']);
+                    
+                    // Format relationship with proper capitalization
+                    $relationship = ucwords(str_replace('_', '-', $invite['relationship']));
                 ?>
                 <div class="ftt-invitation-card" data-invite-code="<?php echo esc_attr($code); ?>">
-                    <div class="ftt-invitation-icon">
-                        <span class="dashicons dashicons-email"></span>
-                    </div>
                     <div class="ftt-invitation-info">
-                        <p class="ftt-invitation-email"><?php echo esc_html($invite['email']); ?></p>
-                        <p class="ftt-invitation-relationship"><?php echo esc_html($invite['relationship']); ?></p>
+                        <p class="ftt-invitation-main">
+                            <strong><?php echo esc_html($relationship); ?></strong> - <?php echo esc_html($invite['email']); ?>
+                        </p>
                         <p class="ftt-invitation-meta">
                             <span class="ftt-invitation-sent">
                                 <?php printf(esc_html__('Sent %d day(s) ago', 'schedule-collaboration-tracking'), $days_since); ?>
