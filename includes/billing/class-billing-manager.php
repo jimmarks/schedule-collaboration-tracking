@@ -86,16 +86,22 @@ class FTT_Billing_Manager {
         $access_denied = get_user_meta($user_id, 'ftt_access_denied', true);
         if ($access_denied) {
             error_log('FTT BILLING DEBUG: Access manually denied by admin - redirecting to /pricing/');
-            wp_redirect(home_url('/pricing/'));
+            wp_redirect(add_query_arg('reason', 'admin_denied', home_url('/pricing/')));
             exit;
         }
         
         // Block access for invalid subscription statuses
         $blocked_statuses = ['suspended', 'incomplete', 'incomplete_expired'];
         
-        if (empty($status) || in_array($status, $blocked_statuses)) {
+        if (empty($status)) {
+            error_log('FTT BILLING DEBUG: No subscription - redirecting to /pricing/');
+            wp_redirect(add_query_arg('reason', 'no_subscription', home_url('/pricing/')));
+            exit;
+        }
+        
+        if (in_array($status, $blocked_statuses)) {
             error_log('FTT BILLING DEBUG: Invalid subscription status - redirecting to /pricing/');
-            wp_redirect(home_url('/pricing/'));
+            wp_redirect(add_query_arg('reason', $status, home_url('/pricing/')));
             exit;
         }
         
@@ -103,7 +109,7 @@ class FTT_Billing_Manager {
         $period_end = get_user_meta($user_id, 'ftt_current_period_end', true);
         if (!empty($period_end) && strtotime($period_end) < time()) {
             error_log('FTT BILLING DEBUG: Subscription period ended - redirecting to /pricing/');
-            wp_redirect(home_url('/pricing/'));
+            wp_redirect(add_query_arg('reason', 'expired', home_url('/pricing/')));
             exit;
         }
         

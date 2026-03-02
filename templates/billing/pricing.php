@@ -32,7 +32,45 @@ if ($user_id) {
 
 // Show access denied notice if redirected
 $access_denied_notice = '';
-if (isset($_GET['access_denied']) && $_GET['access_denied'] == '1') {
+if (isset($_GET['reason'])) {
+    $reason = sanitize_text_field($_GET['reason']);
+    $messages = array(
+        'admin_denied' => array(
+            'title' => __('Access Denied', 'schedule-collaboration-tracking'),
+            'message' => __('Your account access has been restricted by an administrator. Please contact support for assistance.', 'schedule-collaboration-tracking')
+        ),
+        'no_subscription' => array(
+            'title' => __('Subscription Required', 'schedule-collaboration-tracking'),
+            'message' => __('You need an active subscription to access Family Travel Tracker. Please select a plan below to get started.', 'schedule-collaboration-tracking')
+        ),
+        'suspended' => array(
+            'title' => __('Subscription Suspended', 'schedule-collaboration-tracking'),
+            'message' => __('Your subscription has been suspended. Please contact support or update your payment method to restore access.', 'schedule-collaboration-tracking')
+        ),
+        'incomplete' => array(
+            'title' => __('Payment Incomplete', 'schedule-collaboration-tracking'),
+            'message' => __('Your subscription payment could not be completed. Please update your payment method below.', 'schedule-collaboration-tracking')
+        ),
+        'incomplete_expired' => array(
+            'title' => __('Payment Expired', 'schedule-collaboration-tracking'),
+            'message' => __('Your payment attempt has expired. Please select a plan below to continue.', 'schedule-collaboration-tracking')
+        ),
+        'expired' => array(
+            'title' => __('Subscription Expired', 'schedule-collaboration-tracking'),
+            'message' => __('Your subscription has expired. Please renew your subscription below to continue using Family Travel Tracker.', 'schedule-collaboration-tracking')
+        )
+    );
+    
+    if (isset($messages[$reason])) {
+        $msg = $messages[$reason];
+        $access_denied_notice = '<div class="ftt-notice ftt-notice-error" style="margin: 20px auto; max-width: 800px; padding: 15px 20px; background: #fee; border: 1px solid #c33; border-radius: 4px; color: #c33; text-align: center;">
+            <strong>' . esc_html($msg['title']) . ':</strong> ' . esc_html($msg['message']) . '
+        </div>';
+    }
+}
+
+// Backward compatibility with old access_denied parameter
+if (isset($_GET['access_denied']) && $_GET['access_denied'] == '1' && empty($access_denied_notice)) {
     $access_denied_notice = '<div class="ftt-notice ftt-notice-error" style="margin: 20px auto; max-width: 800px; padding: 15px 20px; background: #fee; border: 1px solid #c33; border-radius: 4px; color: #c33; text-align: center;">
         <strong>' . esc_html__('Access Denied', 'schedule-collaboration-tracking') . ':</strong> ' . 
         esc_html__('Your account access has been restricted. Please contact support or select a subscription plan below.', 'schedule-collaboration-tracking') . '
