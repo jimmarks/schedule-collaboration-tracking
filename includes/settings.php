@@ -144,6 +144,21 @@ class FTT_Settings {
         
         // TAB 3: EVENTS
         add_settings_section(
+            'ftt_event_categories_section',
+            __('Event Categories', 'schedule-collaboration-tracking'),
+            array(__CLASS__, 'render_event_categories_section'),
+            'ftt-settings-events'
+        );
+        
+        add_settings_field(
+            'event_categories',
+            __('Manage Categories', 'schedule-collaboration-tracking'),
+            array(__CLASS__, 'render_event_categories_field'),
+            'ftt-settings-events',
+            'ftt_event_categories_section'
+        );
+        
+        add_settings_section(
             'ftt_event_types_section',
             __('Event Types', 'schedule-collaboration-tracking'),
             array(__CLASS__, 'render_event_types_section'),
@@ -152,7 +167,7 @@ class FTT_Settings {
         
         add_settings_field(
             'event_types',
-            __('Custom Event Types', 'schedule-collaboration-tracking'),
+            __('Manage Event Types', 'schedule-collaboration-tracking'),
             array(__CLASS__, 'render_event_types_field'),
             'ftt-settings-events',
             'ftt_event_types_section'
@@ -316,45 +331,17 @@ class FTT_Settings {
     }
     
     /**
+     * Render event categories section description
+     */
+    public static function render_event_categories_section() {
+        echo '<p>' . esc_html__('Manage event categories that organize your event types. Users can filter their calendar by these categories.', 'schedule-collaboration-tracking') . '</p>';
+    }
+    
+    /**
      * Render event types section description
      */
     public static function render_event_types_section() {
-        echo '<p>' . esc_html__('Customize the event types used in your schedule. Each type can have a custom label and color for the calendar.', 'schedule-collaboration-tracking') . '</p>';
-        
-        // Display built-in event categories and types
-        echo '<div class="ftt-event-categories-reference" style="background: #f9f9f9; padding: 20px; border-radius: 5px; margin: 20px 0;">';
-        echo '<h3 style="margin-top: 0;">' . esc_html__('Built-in Event Types by Category', 'schedule-collaboration-tracking') . '</h3>';
-        echo '<p style="color: #666;">' . esc_html__('These are the default event types organized by category. Users can choose which categories to show on their calendar.', 'schedule-collaboration-tracking') . '</p>';
-        
-        $categories = FTT_CPT::get_event_categories();
-        $event_types = FTT_CPT::get_event_types();
-        
-        echo '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 15px;">';
-        
-        foreach ($categories as $cat_key => $category) {
-            echo '<div style="background: white; padding: 15px; border-radius: 5px; border-left: 4px solid #2271b1;">';
-            echo '<h4 style="margin: 0 0 10px 0; display: flex; align-items: center; gap: 8px;">';
-            echo '<span style="font-size: 24px;">' . $category['icon'] . '</span>';
-            echo '<span>' . esc_html($category['label']) . '</span>';
-            echo '<span style="background: #2271b1; color: white; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: normal;">' . count($category['types']) . '</span>';
-            echo '</h4>';
-            echo '<ul style="margin: 0; padding-left: 20px; list-style: disc;">';
-            
-            foreach ($category['types'] as $type_key) {
-                if (isset($event_types[$type_key])) {
-                    echo '<li style="margin: 5px 0; color: #666; font-size: 13px;">';
-                    echo '<code style="background: #f0f0f0; padding: 2px 6px; border-radius: 3px; font-size: 12px;">' . esc_html($type_key) . '</code> ';
-                    echo '— ' . esc_html($event_types[$type_key]);
-                    echo '</li>';
-                }
-            }
-            
-            echo '</ul>';
-            echo '</div>';
-        }
-        
-        echo '</div>';
-        echo '</div>';
+        echo '<p>' . esc_html__('Manage event types available on your site. Assign each type to a category and customize colors.', 'schedule-collaboration-tracking') . '</p>';
     }
     
     /**
@@ -515,21 +502,97 @@ class FTT_Settings {
     }
     
     /**
+     * Render event categories field
+     */
+    public static function render_event_categories_field() {
+        $settings = get_option('ftt_settings', array());
+        $categories = $settings['event_categories'] ?? self::get_default_event_categories();
+        ?>
+        <style>
+            .ftt-category-row { margin-bottom: 15px; display: flex; align-items: center; gap: 10px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; background: #f9f9f9; }
+            .ftt-category-row input[type="text"].category-label { width: 250px; }
+            .ftt-category-row input[type="text"].category-icon { width: 60px; text-align: center; font-size: 18px; }
+            .ftt-category-key { width: 150px; font-family: monospace; color: #666; font-weight: 500; }
+            .ftt-category-remove { color: #dc3232; cursor: pointer; text-decoration: none; padding: 0 10px; }
+            .ftt-category-remove:hover { color: #a00; }
+            #ftt-add-category { margin-top: 10px; }
+            .ftt-categories-container { margin-bottom: 20px; }
+        </style>
+        <div class="ftt-categories-container" id="ftt-categories-container">
+            <?php foreach ($categories as $key => $category) : ?>
+                <div class="ftt-category-row" data-key="<?php echo esc_attr($key); ?>">
+                    <span class="ftt-category-key"><?php echo esc_html($key); ?></span>
+                    <input type="text" 
+                           name="ftt_settings[event_categories][<?php echo esc_attr($key); ?>][label]" 
+                           value="<?php echo esc_attr($category['label']); ?>" 
+                           placeholder="Category Label"
+                           class="category-label">
+                    <input type="text" 
+                           name="ftt_settings[event_categories][<?php echo esc_attr($key); ?>][icon]" 
+                           value="<?php echo esc_attr($category['icon']); ?>" 
+                           placeholder="📚"
+                           class="category-icon"
+                           title="Use an emoji or icon">
+                    <a href="#" class="ftt-category-remove" onclick="return fttRemoveCategory(this);">✕ Remove</a>
+                </div>
+            <?php endforeach; ?>
+        </div>
+        <button type="button" id="ftt-add-category" class="button">+ Add Category</button>
+        <p class="description"><?php esc_html_e('Manage event categories. Use emojis or symbols for icons. Key names should be lowercase with underscores (e.g., my_category).', 'schedule-collaboration-tracking'); ?></p>
+        
+        <script>
+        jQuery(document).ready(function($) {
+            // Add new category
+            $('#ftt-add-category').on('click', function() {
+                var key = prompt('Enter category key (lowercase with underscores, e.g., "my_category"):');
+                if (!key) return;
+                
+                key = key.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+                
+                if ($('.ftt-category-row[data-key="' + key + '"]').length > 0) {
+                    alert('Category key already exists!');
+                    return;
+                }
+                
+                var row = $('<div class="ftt-category-row" data-key="' + key + '">' +
+                    '<span class="ftt-category-key">' + key + '</span>' +
+                    '<input type="text" name="ftt_settings[event_categories][' + key + '][label]" value="" placeholder="Category Label" class="category-label">' +
+                    '<input type="text" name="ftt_settings[event_categories][' + key + '][icon]" value="📁" placeholder="📚" class="category-icon" title="Use an emoji or icon">' +
+                    '<a href="#" class="ftt-category-remove" onclick="return fttRemoveCategory(this);">✕ Remove</a>' +
+                    '</div>');
+                
+                $('#ftt-categories-container').append(row);
+            });
+        });
+        
+        function fttRemoveCategory(el) {
+            if (confirm('Remove this category? Event types using this category will need to be reassigned.')) {
+                jQuery(el).closest('.ftt-category-row').remove();
+            }
+            return false;
+        }
+        </script>
+        <?php
+    }
+    
+    /**
      * Render event types field
      */
     public static function render_event_types_field() {
         $settings = get_option('ftt_settings', array());
         $event_types = $settings['event_types'] ?? self::get_default_event_types();
+        $categories = $settings['event_categories'] ?? self::get_default_event_categories();
         
         wp_enqueue_style('wp-color-picker');
         wp_enqueue_script('wp-color-picker');
         ?>
         <style>
-            .ftt-event-type-row { margin-bottom: 15px; display: flex; align-items: center; gap: 10px; }
-            .ftt-event-type-row input[type="text"] { width: 200px; }
+            .ftt-event-type-row { margin-bottom: 15px; display: flex; align-items: center; gap: 10px; padding: 8px; border: 1px solid #e0e0e0; border-radius: 4px; background: #fafafa; }
+            .ftt-event-type-row input[type="text"].type-label { width: 200px; }
+            .ftt-event-type-row select.type-category { width: 150px; }
             .ftt-event-type-row .wp-picker-container { display: inline-block; }
-            .ftt-event-type-key { width: 150px; font-family: monospace; color: #666; }
-            .ftt-event-type-remove { color: #dc3232; cursor: pointer; text-decoration: none; }
+            .ftt-event-type-key { width: 150px; font-family: monospace; color: #666; font-weight: 500; }
+            .ftt-event-type-remove { color: #dc3232; cursor: pointer; text-decoration: none; padding: 0 10px; }
             .ftt-event-type-remove:hover { color: #a00; }
             #ftt-add-event-type { margin-top: 10px; }
         </style>
@@ -540,7 +603,16 @@ class FTT_Settings {
                     <input type="text" 
                            name="ftt_settings[event_types][<?php echo esc_attr($key); ?>][label]" 
                            value="<?php echo esc_attr($type['label']); ?>" 
-                           placeholder="Event Type Label">
+                           placeholder="Event Type Label"
+                           class="type-label">
+                    <select name="ftt_settings[event_types][<?php echo esc_attr($key); ?>][category]" class="type-category">
+                        <option value=""><?php esc_html_e('No Category', 'schedule-collaboration-tracking'); ?></option>
+                        <?php foreach ($categories as $cat_key => $category) : ?>
+                            <option value="<?php echo esc_attr($cat_key); ?>" <?php selected($type['category'] ?? '', $cat_key); ?>>
+                                <?php echo esc_html($category['icon'] . ' ' . $category['label']); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
                     <input type="text" 
                            name="ftt_settings[event_types][<?php echo esc_attr($key); ?>][color]" 
                            value="<?php echo esc_attr($type['color']); ?>" 
@@ -550,9 +622,13 @@ class FTT_Settings {
             <?php endforeach; ?>
         </div>
         <button type="button" id="ftt-add-event-type" class="button">+ Add Event Type</button>
-        <p class="description"><?php esc_html_e('Customize event types and their calendar colors. Key names should be lowercase with underscores (e.g., camp_weekend).', 'schedule-collaboration-tracking'); ?></p>
+        <p class="description"><?php esc_html_e('Customize event types, assign them to categories, and set their calendar colors. Key names should be lowercase with underscores (e.g., camp_weekend).', 'schedule-collaboration-tracking'); ?></p>
         
         <script>
+        var fttCategoriesOptions = <?php echo json_encode(array_map(function($key, $cat) {
+            return array('key' => $key, 'label' => $cat['icon'] . ' ' . $cat['label']);
+        }, array_keys($categories), $categories)); ?>;
+        
         jQuery(document).ready(function($) {
             // Initialize color pickers
             $('.ftt-color-picker').wpColorPicker();
@@ -569,9 +645,16 @@ class FTT_Settings {
                     return;
                 }
                 
+                // Build category options
+                var categoryOptions = '<option value="">No Category</option>';
+                fttCategoriesOptions.forEach(function(cat) {
+                    categoryOptions += '<option value="' + cat.key + '">' + cat.label + '</option>';
+                });
+                
                 var row = $('<div class="ftt-event-type-row" data-key="' + key + '">' +
                     '<span class="ftt-event-type-key">' + key + '</span>' +
-                    '<input type="text" name="ftt_settings[event_types][' + key + '][label]" value="" placeholder="Event Type Label">' +
+                    '<input type="text" name="ftt_settings[event_types][' + key + '][label]" value="" placeholder="Event Type Label" class="type-label">' +
+                    '<select name="ftt_settings[event_types][' + key + '][category]" class="type-category">' + categoryOptions + '</select>' +
                     '<input type="text" name="ftt_settings[event_types][' + key + '][color]" value="#2196F3" class="ftt-color-picker">' +
                     '<a href="#" class="ftt-event-type-remove" onclick="return fttRemoveEventType(this);">✕ Remove</a>' +
                     '</div>');
@@ -592,106 +675,177 @@ class FTT_Settings {
     }
     
     /**
+     * Get default event categories
+     */
+    public static function get_default_event_categories() {
+        return array(
+            'education' => array(
+                'label' => __('Education', 'schedule-collaboration-tracking'),
+                'icon' => '🎓',
+            ),
+            'sports' => array(
+                'label' => __('Sports & Activities', 'schedule-collaboration-tracking'),
+                'icon' => '⚽',
+            ),
+            'arts' => array(
+                'label' => __('Arts & Music', 'schedule-collaboration-tracking'),
+                'icon' => '🎨',
+            ),
+            'health' => array(
+                'label' => __('Health & Medical', 'schedule-collaboration-tracking'),
+                'icon' => '⚕️',
+            ),
+            'social' => array(
+                'label' => __('Social & Family', 'schedule-collaboration-tracking'),
+                'icon' => '👨‍👩‍👧‍👦',
+            ),
+            'transportation' => array(
+                'label' => __('Transportation & Travel', 'schedule-collaboration-tracking'),
+                'icon' => '✈️',
+            ),
+            'administrative' => array(
+                'label' => __('Administrative', 'schedule-collaboration-tracking'),
+                'icon' => '📋',
+            ),
+            'travel' => array(
+                'label' => __('Travel & Vacation', 'schedule-collaboration-tracking'),
+                'icon' => '🏖️',
+            ),
+        );
+    }
+    
+    /**
      * Get default event types
      */
     public static function get_default_event_types() {
         return array(
-            // Activity-specific events
-            'move_in' => array(
-                'label' => __('Move In', 'schedule-collaboration-tracking'),
-                'color' => '#4CAF50',
-            ),
-            'move_out' => array(
-                'label' => __('Move Out', 'schedule-collaboration-tracking'),
-                'color' => '#F44336',
-            ),
-            'camp_weekend' => array(
-                'label' => __('Camp Weekend', 'schedule-collaboration-tracking'),
-                'color' => '#2196F3',
-            ),
-            'rehearsal_block' => array(
-                'label' => __('Rehearsal Block', 'schedule-collaboration-tracking'),
-                'color' => '#9C27B0',
-            ),
-            'travel_day' => array(
-                'label' => __('Travel Day', 'schedule-collaboration-tracking'),
-                'color' => '#FF9800',
-            ),
-            'performance_day' => array(
-                'label' => __('Performance Day', 'schedule-collaboration-tracking'),
-                'color' => '#E91E63',
-            ),
-            'housing_checkin' => array(
-                'label' => __('Housing Check-In', 'schedule-collaboration-tracking'),
-                'color' => '#00BCD4',
-            ),
-            
-            // General summer events
-            'summer_camp' => array(
-                'label' => __('Summer Camp', 'schedule-collaboration-tracking'),
-                'color' => '#4DB6AC',
-            ),
-            'sports_camp' => array(
-                'label' => __('Sports Camp', 'schedule-collaboration-tracking'),
-                'color' => '#66BB6A',
-            ),
-            'music_camp' => array(
-                'label' => __('Music Camp', 'schedule-collaboration-tracking'),
-                'color' => '#AB47BC',
+            // Education category
+            'graduation' => array(
+                'label' => __('Graduation', 'schedule-collaboration-tracking'),
+                'color' => '#7E57C2',
+                'category' => 'education',
             ),
             'college_visit' => array(
                 'label' => __('College Visit', 'schedule-collaboration-tracking'),
                 'color' => '#5C6BC0',
+                'category' => 'education',
             ),
             'college_orientation' => array(
                 'label' => __('College Orientation', 'schedule-collaboration-tracking'),
                 'color' => '#42A5F5',
+                'category' => 'education',
             ),
             'internship' => array(
                 'label' => __('Internship', 'schedule-collaboration-tracking'),
                 'color' => '#26A69A',
+                'category' => 'education',
             ),
             'volunteer_work' => array(
                 'label' => __('Volunteer Work', 'schedule-collaboration-tracking'),
                 'color' => '#66BB6A',
+                'category' => 'education',
             ),
+            
+            // Sports & Activities category
+            'camp_weekend' => array(
+                'label' => __('Camp Weekend', 'schedule-collaboration-tracking'),
+                'color' => '#2196F3',
+                'category' => 'sports',
+            ),
+            'sports_camp' => array(
+                'label' => __('Sports Camp', 'schedule-collaboration-tracking'),
+                'color' => '#66BB6A',
+                'category' => 'sports',
+            ),
+            'summer_camp' => array(
+                'label' => __('Summer Camp', 'schedule-collaboration-tracking'),
+                'color' => '#4DB6AC',
+                'category' => 'sports',
+            ),
+            
+            // Arts & Music category
+            'rehearsal_block' => array(
+                'label' => __('Rehearsal Block', 'schedule-collaboration-tracking'),
+                'color' => '#9C27B0',
+                'category' => 'arts',
+            ),
+            'performance_day' => array(
+                'label' => __('Performance Day', 'schedule-collaboration-tracking'),
+                'color' => '#E91E63',
+                'category' => 'arts',
+            ),
+            'music_camp' => array(
+                'label' => __('Music Camp', 'schedule-collaboration-tracking'),
+                'color' => '#AB47BC',
+                'category' => 'arts',
+            ),
+            
+            // Health & Medical category
+            'medical' => array(
+                'label' => __('Medical Appointment', 'schedule-collaboration-tracking'),
+                'color' => '#EF5350',
+                'category' => 'health',
+            ),
+            
+            // Social & Family category
             'family_vacation' => array(
                 'label' => __('Family Vacation', 'schedule-collaboration-tracking'),
                 'color' => '#29B6F6',
+                'category' => 'social',
             ),
             'family_reunion' => array(
                 'label' => __('Family Reunion', 'schedule-collaboration-tracking'),
                 'color' => '#FFA726',
+                'category' => 'social',
             ),
             'birthday' => array(
                 'label' => __('Birthday', 'schedule-collaboration-tracking'),
                 'color' => '#FF7043',
-            ),
-            'graduation' => array(
-                'label' => __('Graduation', 'schedule-collaboration-tracking'),
-                'color' => '#7E57C2',
+                'category' => 'social',
             ),
             
-            // Administrative
-            'medical' => array(
-                'label' => __('Medical Appointment', 'schedule-collaboration-tracking'),
-                'color' => '#EF5350',
+            // Transportation & Travel category
+            'move_in' => array(
+                'label' => __('Move In', 'schedule-collaboration-tracking'),
+                'color' => '#4CAF50',
+                'category' => 'transportation',
             ),
+            'move_out' => array(
+                'label' => __('Move Out', 'schedule-collaboration-tracking'),
+                'color' => '#F44336',
+                'category' => 'transportation',
+            ),
+            'travel_day' => array(
+                'label' => __('Travel Day', 'schedule-collaboration-tracking'),
+                'color' => '#FF9800',
+                'category' => 'transportation',
+            ),
+            'housing_checkin' => array(
+                'label' => __('Housing Check-In', 'schedule-collaboration-tracking'),
+                'color' => '#00BCD4',
+                'category' => 'transportation',
+            ),
+            
+            // Administrative category
             'uniform_fitting' => array(
                 'label' => __('Uniform/Fitting', 'schedule-collaboration-tracking'),
                 'color' => '#607D8B',
+                'category' => 'administrative',
             ),
             'admin_deadline' => array(
                 'label' => __('Deadline', 'schedule-collaboration-tracking'),
                 'color' => '#F44336',
+                'category' => 'administrative',
             ),
             'meeting' => array(
                 'label' => __('Meeting', 'schedule-collaboration-tracking'),
                 'color' => '#78909C',
+                'category' => 'administrative',
             ),
             'other' => array(
                 'label' => __('Other', 'schedule-collaboration-tracking'),
                 'color' => '#9E9E9E',
+                'category' => 'administrative',
             ),
         );
     }
