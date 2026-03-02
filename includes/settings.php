@@ -320,6 +320,41 @@ class FTT_Settings {
      */
     public static function render_event_types_section() {
         echo '<p>' . esc_html__('Customize the event types used in your schedule. Each type can have a custom label and color for the calendar.', 'schedule-collaboration-tracking') . '</p>';
+        
+        // Display built-in event categories and types
+        echo '<div class="ftt-event-categories-reference" style="background: #f9f9f9; padding: 20px; border-radius: 5px; margin: 20px 0;">';
+        echo '<h3 style="margin-top: 0;">' . esc_html__('Built-in Event Types by Category', 'schedule-collaboration-tracking') . '</h3>';
+        echo '<p style="color: #666;">' . esc_html__('These are the default event types organized by category. Users can choose which categories to show on their calendar.', 'schedule-collaboration-tracking') . '</p>';
+        
+        $categories = FTT_CPT::get_event_categories();
+        $event_types = FTT_CPT::get_event_types();
+        
+        echo '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 15px;">';
+        
+        foreach ($categories as $cat_key => $category) {
+            echo '<div style="background: white; padding: 15px; border-radius: 5px; border-left: 4px solid #2271b1;">';
+            echo '<h4 style="margin: 0 0 10px 0; display: flex; align-items: center; gap: 8px;">';
+            echo '<span style="font-size: 24px;">' . $category['icon'] . '</span>';
+            echo '<span>' . esc_html($category['label']) . '</span>';
+            echo '<span style="background: #2271b1; color: white; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: normal;">' . count($category['types']) . '</span>';
+            echo '</h4>';
+            echo '<ul style="margin: 0; padding-left: 20px; list-style: disc;">';
+            
+            foreach ($category['types'] as $type_key) {
+                if (isset($event_types[$type_key])) {
+                    echo '<li style="margin: 5px 0; color: #666; font-size: 13px;">';
+                    echo '<code style="background: #f0f0f0; padding: 2px 6px; border-radius: 3px; font-size: 12px;">' . esc_html($type_key) . '</code> ';
+                    echo '— ' . esc_html($event_types[$type_key]);
+                    echo '</li>';
+                }
+            }
+            
+            echo '</ul>';
+            echo '</div>';
+        }
+        
+        echo '</div>';
+        echo '</div>';
     }
     
     /**

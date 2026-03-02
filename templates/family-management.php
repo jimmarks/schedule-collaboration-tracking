@@ -146,18 +146,32 @@ $parents = FTT_Roles::get_parents($current_user->ID);
             }
             
             $categories = FTT_CPT::get_event_categories();
+            $event_types = FTT_CPT::get_event_types();
+            
             foreach ($categories as $cat_key => $category):
                 $is_checked = empty($user_preferences) || in_array($cat_key, $user_preferences);
             ?>
-                <label class="ftt-category-checkbox">
-                    <input type="checkbox" 
-                           name="visible_categories[]" 
-                           value="<?php echo esc_attr($cat_key); ?>"
-                           <?php checked($is_checked); ?>>
-                    <span class="ftt-category-icon"><?php echo $category['icon']; ?></span>
-                    <span class="ftt-category-label"><?php echo esc_html($category['label']); ?></span>
-                    <span class="ftt-category-count"><?php echo count($category['types']); ?> types</span>
-                </label>
+                <div class="ftt-category-checkbox-wrapper">
+                    <label class="ftt-category-checkbox">
+                        <input type="checkbox" 
+                               name="visible_categories[]" 
+                               value="<?php echo esc_attr($cat_key); ?>"
+                               <?php checked($is_checked); ?>>
+                        <span class="ftt-category-icon"><?php echo $category['icon']; ?></span>
+                        <span class="ftt-category-label"><?php echo esc_html($category['label']); ?></span>
+                        <span class="ftt-category-count"><?php echo count($category['types']); ?> types</span>
+                        <button type="button" class="ftt-category-expand" data-category="<?php echo esc_attr($cat_key); ?>">▼</button>
+                    </label>
+                    <div class="ftt-category-types-list" id="ftt-types-<?php echo esc_attr($cat_key); ?>" style="display: none;">
+                        <ul>
+                            <?php foreach ($category['types'] as $type_key): 
+                                if (isset($event_types[$type_key])): ?>
+                                    <li><strong><?php echo esc_html($event_types[$type_key]); ?></strong> <code><?php echo esc_html($type_key); ?></code></li>
+                                <?php endif; 
+                            endforeach; ?>
+                        </ul>
+                    </div>
+                </div>
             <?php endforeach; ?>
             
             <div class="ftt-form-actions">
@@ -417,6 +431,67 @@ $parents = FTT_Roles::get_parents($current_user->ID);
 .ftt-category-count {
     font-size: 12px;
     color: #999;
+}
+
+.ftt-category-expand {
+    background: none;
+    border: none;
+    color: #666;
+    cursor: pointer;
+    padding: 5px;
+    font-size: 12px;
+    transition: transform 0.2s;
+    margin-left: auto;
+}
+
+.ftt-category-expand.expanded {
+    transform: rotate(180deg);
+}
+
+.ftt-category-checkbox-wrapper {
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.ftt-category-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 15px;
+    border: none;
+    margin: 0;
+}
+
+.ftt-category-types-list {
+    background: #f9f9f9;
+    border-top: 1px solid #e0e0e0;
+    padding: 0 15px 15px 15px;
+}
+
+.ftt-category-types-list ul {
+    margin: 10px 0 0 0;
+    padding-left: 35px;
+    list-style: disc;
+}
+
+.ftt-category-types-list li {
+    margin: 8px 0;
+    font-size: 13px;
+    color: #666;
+}
+
+.ftt-category-types-list strong {
+    color: #333;
+}
+
+.ftt-category-types-list code {
+    background: #e0e0e0;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 11px;
+    color: #666;
+    margin-left: 5px;
 }
 
 .ftt-form-actions {

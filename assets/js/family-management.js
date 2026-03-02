@@ -1,6 +1,16 @@
 jQuery(document).ready(function($) {
     console.log('FTT FAMILY MANAGEMENT: jQuery ready');
     
+    // Toggle category types list
+    $('.ftt-category-expand').on('click', function(e) {
+        e.preventDefault();
+        var category = $(this).data('category');
+        var typesList = $('#ftt-types-' + category);
+        
+        $(this).toggleClass('expanded');
+        typesList.slideToggle(200);
+    });
+    
     // Add Child Modal
     $('#ftt-add-child-btn').on('click', function() {
         $('#ftt-child-modal-title').text('Add Child');
