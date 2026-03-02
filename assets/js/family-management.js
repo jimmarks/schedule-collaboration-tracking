@@ -271,7 +271,7 @@ jQuery(document).ready(function($) {
         console.log('Form data:', formData);
         
         $.ajax({
-            url: '/wp-json/ftt/v1/save-user-preferences',
+            url: '/wp-json/ftt/v1/user-preferences',
             method: 'POST',
             beforeSend: function(xhr) {
                 xhr.setRequestHeader('X-WP-Nonce', fttFamilyMgmt.nonce);
