@@ -161,6 +161,10 @@ class FTT_Registration {
         // Disable admin toolbar on frontend for this user
         update_user_meta($user_id, 'show_admin_bar_front', 'false');
         
+        // Store user type (parent or member)
+        update_user_meta($user_id, 'user_type', $user_type);
+        error_log('FTT DEBUG: Stored user_type: ' . $user_type);
+        
         // Store phone
         if (!empty($phone)) {
             update_user_meta($user_id, 'phone', $phone);

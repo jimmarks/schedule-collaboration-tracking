@@ -122,8 +122,16 @@ class FTT_Roles {
     
     /**
      * Check if user is a parent
+     * Returns true if user registered as parent OR has children linked
      */
     public static function is_parent($user_id) {
+        // Check if registered as parent
+        $user_type = get_user_meta($user_id, 'user_type', true);
+        if ($user_type === 'parent') {
+            return true;
+        }
+        
+        // Also check if they have children linked (legacy check)
         $children = self::get_children($user_id);
         return !empty($children);
     }
