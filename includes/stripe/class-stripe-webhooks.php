@@ -244,6 +244,12 @@ class FTT_Stripe_Webhooks {
         update_user_meta($user_id, 'ftt_current_period_end', date('Y-m-d H:i:s', $subscription->current_period_end));
         update_user_meta($user_id, 'ftt_cancel_at_period_end', $subscription->cancel_at_period_end);
         
+        // Invalidate calendar token if subscription is now invalid
+        $blocked_statuses = ['suspended', 'incomplete', 'incomplete_expired', 'unpaid'];
+        if (in_array($status, $blocked_statuses) && class_exists('FTT_Billing_Manager')) {
+            FTT_Billing_Manager::invalidate_calendar_access($user_id);
+        }
+        
         do_action('ftt_subscription_updated', $user_id, $subscription);
     }
     
@@ -264,6 +270,11 @@ class FTT_Stripe_Webhooks {
         $user_id = $users[0]->ID;
         
         update_user_meta($user_id, 'ftt_subscription_status', 'canceled');
+        
+        // Invalidate calendar token when subscription is fully deleted
+        if (class_exists('FTT_Billing_Manager')) {
+            FTT_Billing_Manager::invalidate_calendar_access($user_id);
+        }
         
         // Send cancellation confirmation email
         self::send_cancellation_email($user_id);

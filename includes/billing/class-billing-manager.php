@@ -82,11 +82,27 @@ class FTT_Billing_Manager {
         
         error_log('FTT BILLING DEBUG: Subscription status: ' . ($status ?: 'EMPTY'));
         
+        // Check for admin-imposed access denial
+        $access_denied = get_user_meta($user_id, 'ftt_access_denied', true);
+        if ($access_denied) {
+            error_log('FTT BILLING DEBUG: Access manually denied by admin - redirecting to /pricing/');
+            wp_redirect(home_url('/pricing/'));
+            exit;
+        }
+        
         // Block access for invalid subscription statuses
         $blocked_statuses = ['suspended', 'incomplete', 'incomplete_expired'];
         
         if (empty($status) || in_array($status, $blocked_statuses)) {
             error_log('FTT BILLING DEBUG: Invalid subscription status - redirecting to /pricing/');
+            wp_redirect(home_url('/pricing/'));
+            exit;
+        }
+        
+        // Check if subscription period has ended (for canceled or active subscriptions)
+        $period_end = get_user_meta($user_id, 'ftt_current_period_end', true);
+        if (!empty($period_end) && strtotime($period_end) < time()) {
+            error_log('FTT BILLING DEBUG: Subscription period ended - redirecting to /pricing/');
             wp_redirect(home_url('/pricing/'));
             exit;
         }
@@ -372,6 +388,9 @@ class FTT_Billing_Manager {
                 // Suspend access
                 update_user_meta($user->ID, 'ftt_subscription_status', 'suspended');
                 
+                // Invalidate calendar token
+                self::invalidate_calendar_access($user->ID);
+                
                 // Send final notice
                 self::send_grace_period_expired_email($user->ID);
                 
@@ -395,6 +414,17 @@ class FTT_Billing_Manager {
         $message .= "Questions? Reply to this email.\n";
         
         wp_mail($user->user_email, $subject, $message);
+    }
+    
+    /**
+     * Invalidate calendar access when subscription becomes invalid
+     *
+     * @param int $user_id User ID
+     */
+    public static function invalidate_calendar_access($user_id) {
+        if (class_exists('FTT_ICal')) {
+            FTT_ICal::invalidate_user_token($user_id);
+        }
     }
     
     /**

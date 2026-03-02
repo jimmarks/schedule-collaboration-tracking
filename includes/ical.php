@@ -48,6 +48,33 @@ class FTT_ICal {
             wp_die('Invalid or expired calendar token. Please generate a new subscription link from the calendar page.', 'Invalid Token', array('response' => 403));
         }
         
+        // Check if Stripe is configured and validate subscription
+        $stripe_settings = get_option('ftt_stripe_settings', []);
+        if (!empty($stripe_settings['secret_key']) && !empty($stripe_settings['price_base_monthly'])) {
+            // Skip check for admins
+            if (!user_can($user_id, 'manage_options')) {
+                // Check for admin-imposed access denial
+                $access_denied = get_user_meta($user_id, 'ftt_access_denied', true);
+                if ($access_denied) {
+                    wp_die('Calendar access denied. Please contact support.', 'Access Denied', array('response' => 403));
+                }
+                
+                // Check subscription status
+                $status = get_user_meta($user_id, 'ftt_subscription_status', true);
+                $blocked_statuses = ['suspended', 'incomplete', 'incomplete_expired'];
+                
+                if (empty($status) || in_array($status, $blocked_statuses)) {
+                    wp_die('Calendar access requires an active subscription. Please visit the website to upgrade.', 'Subscription Required', array('response' => 402));
+                }
+                
+                // Check if subscription period has ended
+                $period_end = get_user_meta($user_id, 'ftt_current_period_end', true);
+                if (!empty($period_end) && strtotime($period_end) < time()) {
+                    wp_die('Calendar access expired. Please renew your subscription at the website.', 'Subscription Expired', array('response' => 402));
+                }
+            }
+        }
+        
         // Valid token - generate calendar feed
         // Get user to filter events
         $user = get_userdata($user_id);
@@ -491,6 +518,17 @@ class FTT_ICal {
      */
     public static function get_calendar_tokens() {
         return get_option('srt_calendar_tokens', array());
+    }
+    
+    /**
+     * Invalidate user's calendar token
+     * Called when subscription becomes invalid
+     *
+     * @param int $user_id User ID
+     */
+    public static function invalidate_user_token($user_id) {
+        delete_user_meta($user_id, 'srt_calendar_token');
+        error_log("FTT ICAL: Invalidated calendar token for user ID: {$user_id}");
     }
 }
 

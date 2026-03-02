@@ -276,6 +276,17 @@ class FTT_Roles {
                 </td>
             </tr>
         </table>
+        
+        <h2><?php esc_html_e('Subscription Access', 'schedule-collaboration-tracking'); ?></h2>
+        <table class="form-table">
+            <tr>
+                <th><label for="ftt_access_denied"><?php esc_html_e('Deny Access', 'schedule-collaboration-tracking'); ?></label></th>
+                <td>
+                    <input type="checkbox" name="ftt_access_denied" id="ftt_access_denied" value="1" <?php checked(get_user_meta($user->ID, 'ftt_access_denied', true)); ?>>
+                    <p class="description"><?php esc_html_e('Check to manually deny site access regardless of subscription status. User will be redirected to pricing page.', 'schedule-collaboration-tracking'); ?></p>
+                </td>
+            </tr>
+        </table>
         <?php
     }
     
@@ -291,6 +302,18 @@ class FTT_Roles {
         if (isset($_POST['ftt_home_airport'])) {
             $airport = strtoupper(sanitize_text_field($_POST['ftt_home_airport']));
             update_user_meta($user_id, 'ftt_home_airport', $airport);
+        }
+        
+        // Access denial override
+        if (isset($_POST['ftt_access_denied'])) {
+            update_user_meta($user_id, 'ftt_access_denied', true);
+            
+            // Invalidate calendar token when access is denied
+            if (class_exists('FTT_Billing_Manager')) {
+                FTT_Billing_Manager::invalidate_calendar_access($user_id);
+            }
+        } else {
+            delete_user_meta($user_id, 'ftt_access_denied');
         }
         
         // Member status
