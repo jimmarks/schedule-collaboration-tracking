@@ -27,6 +27,10 @@ class FTT_Roles {
         add_action('edit_user_profile', array(__CLASS__, 'show_user_profile_fields'));
         add_action('personal_options_update', array(__CLASS__, 'save_user_profile_fields'));
         add_action('edit_user_profile_update', array(__CLASS__, 'save_user_profile_fields'));
+        
+        // Add custom columns to admin users list
+        add_filter('manage_users_columns', array(__CLASS__, 'add_user_columns'));
+        add_filter('manage_users_custom_column', array(__CLASS__, 'populate_user_columns'), 10, 3);
     }
     
     /**
@@ -386,7 +390,110 @@ class FTT_Roles {
         
         return update_user_meta($user_id, 'ftt_home_airport', $airport_code);
     }
+    
+    /**
+     * Add custom columns to users list
+     *
+     * @param array $columns Existing columns
+     * @return array Modified columns
+     */
+    public static function add_user_columns($columns) {
+        $columns['linked_adults'] = __('Linked Adults', 'schedule-collaboration-tracking');
+        $columns['linked_children'] = __('Linked Children', 'schedule-collaboration-tracking');
+        $columns['billing_status'] = __('Billing Status', 'schedule-collaboration-tracking');
+        $columns['next_billing'] = __('Next Billing', 'schedule-collaboration-tracking');
+        return $columns;
+    }
+    
+    /**
+     * Populate custom user columns
+     *
+     * @param string $output Custom column output
+     * @param string $column_name Column identifier
+     * @param int $user_id User ID
+     * @return string Column content
+     */
+    public static function populate_user_columns($output, $column_name, $user_id) {
+        switch ($column_name) {
+            case 'linked_adults':
+                $parents = self::get_parents($user_id);
+                if (!empty($parents)) {
+                    $names = array();
+                    foreach ($parents as $parent_id) {
+                        $parent = get_userdata($parent_id);
+                        if ($parent) {
+                            $names[] = esc_html($parent->display_name);
+                        }
+                    }
+                    $output = implode(', ', $names);
+                } else {
+                    $output = '—';
+                }
+                break;
+                
+            case 'linked_children':
+                $children = self::get_children($user_id);
+                if (!empty($children)) {
+                    $names = array();
+                    foreach ($children as $child_id) {
+                        $child = get_userdata($child_id);
+                        if ($child) {
+                            $names[] = esc_html($child->display_name);
+                        }
+                    }
+                    $output = implode(', ', $names);
+                } else {
+                    $output = '—';
+                }
+                break;
+                
+            case 'billing_status':
+                if (class_exists('FTT_Billing_Manager')) {
+                    $billing = FTT_Billing_Manager::get_billing_summary($user_id);
+                    if ($billing && !empty($billing['status'])) {
+                        $status_class = 'ftt-status-' . esc_attr($billing['status']);
+                        $status_label = esc_html($billing['status_label']);
+                        $output = '<span class="' . $status_class . '">' . $status_label . '</span>';
+                        
+                        if ($billing['in_trial']) {
+                            $output .= '<br><small>' . sprintf(__('Trial (%d days left)', 'schedule-collaboration-tracking'), $billing['days_until_charge']) . '</small>';
+                        }
+                    } else {
+                        $output = '—';
+                    }
+                } else {
+                    $output = '—';
+                }
+                break;
+                
+            case 'next_billing':
+                if (class_exists('FTT_Billing_Manager')) {
+                    $billing = FTT_Billing_Manager::get_billing_summary($user_id);
+                    if ($billing && !empty($billing['next_billing_date'])) {
+                        if ($billing['in_trial']) {
+                            $output = '<span style="color: #2196F3;">' . esc_html($billing['next_billing_date']) . '</span>';
+                            $output .= '<br><small>' . __('(First charge)', 'schedule-collaboration-tracking') . '</small>';
+                        } else {
+                            $output = esc_html($billing['next_billing_date']);
+                        }
+                        
+                        // Show amount
+                        if (!empty($billing['total_price'])) {
+                            $output .= '<br><small>' . esc_html($billing['total_price']) . '</small>';
+                        }
+                    } else {
+                        $output = '—';
+                    }
+                } else {
+                    $output = '—';
+                }
+                break;
+        }
+        
+        return $output;
+    }
 }
+
 
 // Initialize
 FTT_Roles::init();
