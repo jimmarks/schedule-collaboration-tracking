@@ -104,6 +104,7 @@ if (isset($_GET['checkemail']) && $_GET['checkemail'] === 'confirm') {
             </div>
             
             <input type="hidden" name="redirect_to" value="<?php echo esc_attr($redirect_to); ?>" />
+            <input type="hidden" name="ftt_custom_login" value="1" />
             <input type="hidden" name="testcookie" value="1" />
             
             <?php
