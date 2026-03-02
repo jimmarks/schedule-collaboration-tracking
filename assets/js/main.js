@@ -29,7 +29,7 @@
         loadAirportData: function() {
             const self = this;
             $.ajax({
-                url: srtData.pluginUrl + '/assets/js/airports.json',
+                url: fttData.pluginUrl + '/assets/js/airports.json',
                 dataType: 'json',
                 async: false, // Load synchronously to ensure data is available
                 success: function(data) {
@@ -327,9 +327,9 @@
                 params.append('member_id', memberSelector.value);
             }
             
-            return fetch(srtData.restUrl + 'events?' + params.toString(), {
+            return fetch(fttData.restUrl + 'events?' + params.toString(), {
                 headers: {
-                    'X-WP-Nonce': srtData.nonce
+                    'X-WP-Nonce': fttData.nonce
                 }
             })
             .then(response => response.json());
@@ -339,9 +339,9 @@
          * Fetch single event
          */
         fetchEvent: function(eventId) {
-            return fetch(srtData.restUrl + 'events/' + eventId, {
+            return fetch(fttData.restUrl + 'events/' + eventId, {
                 headers: {
-                    'X-WP-Nonce': srtData.nonce
+                    'X-WP-Nonce': fttData.nonce
                 }
             })
             .then(response => response.json());
@@ -455,13 +455,13 @@
             }
             
             const method = eventId ? 'PUT' : 'POST';
-            const url = eventId ? srtData.restUrl + 'events/' + eventId : srtData.restUrl + 'events';
+            const url = eventId ? fttData.restUrl + 'events/' + eventId : fttData.restUrl + 'events';
             
             fetch(url, {
                 method: method,
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-WP-Nonce': srtData.nonce
+                    'X-WP-Nonce': fttData.nonce
                 },
                 body: JSON.stringify(formData)
             })
@@ -489,10 +489,10 @@
          * Delete event
          */
         deleteEvent: function(eventId) {
-            fetch(srtData.restUrl + 'events/' + eventId, {
+            fetch(fttData.restUrl + 'events/' + eventId, {
                 method: 'DELETE',
                 headers: {
-                    'X-WP-Nonce': srtData.nonce
+                    'X-WP-Nonce': fttData.nonce
                 }
             })
             .then(response => response.json())
@@ -844,9 +844,9 @@
                 this.loadLinkedFlights();
             }
             
-            fetch(srtData.restUrl + 'dashboard', {
+            fetch(fttData.restUrl + 'dashboard', {
                 headers: {
-                    'X-WP-Nonce': srtData.nonce
+                    'X-WP-Nonce': fttData.nonce
                 }
             })
             .then(response => {
@@ -884,10 +884,10 @@
             console.log('🔧 Loading user preferences...');
             
             $.ajax({
-                url: srtData.restUrl + 'user-preferences',
+                url: fttData.restUrl + 'user-preferences',
                 method: 'GET',
                 beforeSend: function(xhr) {
-                    xhr.setRequestHeader('X-WP-Nonce', srtData.nonce);
+                    xhr.setRequestHeader('X-WP-Nonce', fttData.nonce);
                 },
                 success: function(data) {
                     console.log('✅ Preferences loaded:', data);
@@ -911,10 +911,10 @@
                 console.log('💾 Saving preferences:', preferences);
                 
                 $.ajax({
-                    url: srtData.restUrl + 'user-preferences',
+                    url: fttData.restUrl + 'user-preferences',
                     method: 'POST',
                     beforeSend: function(xhr) {
-                        xhr.setRequestHeader('X-WP-Nonce', srtData.nonce);
+                        xhr.setRequestHeader('X-WP-Nonce', fttData.nonce);
                     },
                     data: JSON.stringify(preferences),
                     contentType: 'application/json',
@@ -947,10 +947,10 @@
             const container = $('#ftt-user-alerts');
             
             $.ajax({
-                url: srtData.restUrl + 'my-alerts',
+                url: fttData.restUrl + 'my-alerts',
                 method: 'GET',
                 beforeSend: function(xhr) {
-                    xhr.setRequestHeader('X-WP-Nonce', srtData.nonce);
+                    xhr.setRequestHeader('X-WP-Nonce', fttData.nonce);
                 },
                 success: function(alerts) {
                     if (alerts.length === 0) {
@@ -1005,10 +1005,10 @@
          */
         deleteAlert: function(alertId) {
             $.ajax({
-                url: srtData.restUrl + 'price-alerts/' + alertId,
+                url: fttData.restUrl + 'price-alerts/' + alertId,
                 method: 'DELETE',
                 beforeSend: function(xhr) {
-                    xhr.setRequestHeader('X-WP-Nonce', srtData.nonce);
+                    xhr.setRequestHeader('X-WP-Nonce', fttData.nonce);
                 },
                 success: function() {
                     // Reload alerts
@@ -1133,7 +1133,7 @@
                             <p><strong>To:</strong> ${this.escapeHtml(leg.arrive_location || 'TBD')} ${leg.arrive_airport ? '(' + leg.arrive_airport + ')' : ''}</p>
                             ${leg.airline ? '<p><strong>Airline:</strong> ' + this.escapeHtml(leg.airline) + ' ' + this.escapeHtml(leg.flight_number) + '</p>' : ''}
                             ${leg.booked ? '<p class="ftt-booked">✓ Booked</p>' : '<p class="ftt-not-booked">✗ Not Booked</p>'}
-                            ${needsAirports ? '<div class="ftt-missing-airports" style="background: #fff3cd; border: 1px solid #ffc107; padding: 10px; margin: 10px 0; border-radius: 4px;"><p style="margin: 0; color: #856404;"><strong>⚠️ Missing Airport Codes</strong><br>Add 3-letter airport codes (e.g., BDL, BWI) to search flights and track prices. <a href="' + (srtData.eventFormUrl ? srtData.eventFormUrl + (srtData.eventFormUrl.includes('?') ? '&' : '?') + 'event_id=' + event.id : '#') + '" style="color: #0073aa;">Edit Event</a></p></div>' : ''}
+                            ${needsAirports ? '<div class="ftt-missing-airports" style="background: #fff3cd; border: 1px solid #ffc107; padding: 10px; margin: 10px 0; border-radius: 4px;"><p style="margin: 0; color: #856404;"><strong>⚠️ Missing Airport Codes</strong><br>Add 3-letter airport codes (e.g., BDL, BWI) to search flights and track prices. <a href="' + (fttData.eventFormUrl ? fttData.eventFormUrl + (fttData.eventFormUrl.includes('?') ? '&' : '?') + 'event_id=' + event.id : '#') + '" style="color: #0073aa;">Edit Event</a></p></div>' : ''}
                             ${canSearch ? this.generateFlightSearchLinks(leg, event, departDate, legIndex) : ''}
                             ${canSearch ? '<div class="ftt-price-info" id="ftt-price-info-' + legIndex + '"></div>' : ''}
                         </div>
@@ -1141,8 +1141,8 @@
                 });
             }
             
-            if (srtData.isAdmin) {
-                const eventFormUrl = srtData.eventFormUrl || '';
+            if (fttData.isAdmin) {
+                const eventFormUrl = fttData.eventFormUrl || '';
                 if (eventFormUrl) {
                     const separator = eventFormUrl.includes('?') ? '&' : '?';
                     html += `<p><a href="${eventFormUrl}${separator}event_id=${event.id}" class="button">Edit Event</a></p>`;
@@ -1312,10 +1312,10 @@
                 
                 // Create alert via REST API
                 $.ajax({
-                    url: srtData.restUrl + 'price-alerts',
+                    url: fttData.restUrl + 'price-alerts',
                     method: 'POST',
                     beforeSend: function(xhr) {
-                        xhr.setRequestHeader('X-WP-Nonce', srtData.nonce);
+                        xhr.setRequestHeader('X-WP-Nonce', fttData.nonce);
                     },
                     data: JSON.stringify(payload),
                     contentType: 'application/json',
@@ -1397,19 +1397,19 @@
             const locationInput = document.getElementById('location_name');
             if (!locationInput) return;
             
-            const provider = srtData.geocodingProvider || 'none';
+            const provider = fttData.geocodingProvider || 'none';
             
             if (provider === 'none') {
                 console.log('Address autocomplete disabled.');
                 return;
             }
             
-            if (provider === 'google' && srtData.googlePlacesApiKey) {
+            if (provider === 'google' && fttData.googlePlacesApiKey) {
                 this.initGooglePlacesAutocomplete(locationInput);
                 return;
             }
             
-            if (provider === 'mapbox' && srtData.mapboxApiKey) {
+            if (provider === 'mapbox' && fttData.mapboxApiKey) {
                 this.initMapboxSearch(locationInput);
                 return;
             }
@@ -1460,7 +1460,7 @@
             // Load Google Places library
             if (typeof google === 'undefined' || typeof google.maps === 'undefined') {
                 const script = document.createElement('script');
-                script.src = `https://maps.googleapis.com/maps/api/js?key=${srtData.googlePlacesApiKey}&libraries=places&callback=initGoogleAutocomplete`;
+                script.src = `https://maps.googleapis.com/maps/api/js?key=${fttData.googlePlacesApiKey}&libraries=places&callback=initGoogleAutocomplete`;
                 script.async = true;
                 script.defer = true;
                 document.head.appendChild(script);
@@ -1521,7 +1521,7 @@
          * Search Mapbox places
          */
         searchMapboxPlaces: function(query, resultsContainer) {
-            const apiKey = srtData.mapboxApiKey;
+            const apiKey = fttData.mapboxApiKey;
             // Remove type restrictions to allow searching for any location (schools, venues, etc.)
             const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${apiKey}&limit=8`;
             
@@ -1692,10 +1692,10 @@
             console.log('🔍 SRT Price Check Request:', requestData);
             
             $.ajax({
-                url: srtData.restUrl + 'check-price',
+                url: fttData.restUrl + 'check-price',
                 method: 'POST',
                 beforeSend: function(xhr) {
-                    xhr.setRequestHeader('X-WP-Nonce', srtData.nonce);
+                    xhr.setRequestHeader('X-WP-Nonce', fttData.nonce);
                 },
                 data: JSON.stringify(requestData),
                 contentType: 'application/json',
@@ -1814,10 +1814,10 @@
             console.log('🔍 Loading price history:', { eventId, legIndex });
             
             $.ajax({
-                url: srtData.restUrl + 'price-history',
+                url: fttData.restUrl + 'price-history',
                 method: 'GET',
                 beforeSend: function(xhr) {
-                    xhr.setRequestHeader('X-WP-Nonce', srtData.nonce);
+                    xhr.setRequestHeader('X-WP-Nonce', fttData.nonce);
                 },
                 data: {
                     event_id: eventId,
@@ -2030,10 +2030,10 @@
             const self = this;
             
             $.ajax({
-                url: srtData.restUrl + 'flight-groups',
+                url: fttData.restUrl + 'flight-groups',
                 method: 'GET',
                 beforeSend: function(xhr) {
-                    xhr.setRequestHeader('X-WP-Nonce', srtData.nonce);
+                    xhr.setRequestHeader('X-WP-Nonce', fttData.nonce);
                 },
                 success: function(groups) {
                     self.renderLinkedFlights(groups);
@@ -2139,7 +2139,7 @@
             const self = this;
             
             $.ajax({
-                url: srtData.restUrl + 'link-flights',
+                url: fttData.restUrl + 'link-flights',
                 method: 'POST',
                 contentType: 'application/json',
                 data: JSON.stringify({
@@ -2147,7 +2147,7 @@
                     leg_indices: legIndices
                 }),
                 beforeSend: function(xhr) {
-                    xhr.setRequestHeader('X-WP-Nonce', srtData.nonce);
+                    xhr.setRequestHeader('X-WP-Nonce', fttData.nonce);
                 },
                 success: function(response) {
                     console.log('Flights linked:', response);
@@ -2169,16 +2169,16 @@
             
             // Get all legs in the group first
             $.ajax({
-                url: srtData.restUrl + 'flight-group/' + groupId,
+                url: fttData.restUrl + 'flight-group/' + groupId,
                 method: 'GET',
                 beforeSend: function(xhr) {
-                    xhr.setRequestHeader('X-WP-Nonce', srtData.nonce);
+                    xhr.setRequestHeader('X-WP-Nonce', fttData.nonce);
                 },
                 success: function(group) {
                     // Unlink each leg
                     const promises = group.legs.map(legData => {
                         return $.ajax({
-                            url: srtData.restUrl + 'unlink-flight',
+                            url: fttData.restUrl + 'unlink-flight',
                             method: 'POST',
                             contentType: 'application/json',
                             data: JSON.stringify({
@@ -2186,7 +2186,7 @@
                                 leg_index: legData.leg_index
                             }),
                             beforeSend: function(xhr) {
-                                xhr.setRequestHeader('X-WP-Nonce', srtData.nonce);
+                                xhr.setRequestHeader('X-WP-Nonce', fttData.nonce);
                             }
                         });
                     });
@@ -2216,10 +2216,10 @@
             if (!container) return;
             
             $.ajax({
-                url: srtData.restUrl + 'invitations',
+                url: fttData.restUrl + 'invitations',
                 method: 'GET',
                 beforeSend: function(xhr) {
-                    xhr.setRequestHeader('X-WP-Nonce', srtData.nonce);
+                    xhr.setRequestHeader('X-WP-Nonce', fttData.nonce);
                 },
                 success: function(data) {
                     console.log('Invitations loaded:', data);
@@ -2297,17 +2297,17 @@
             button.prop('disabled', true).text('Generating...');
             
             $.ajax({
-                url: srtData.restUrl + 'invite/generate',
+                url: fttData.restUrl + 'invite/generate',
                 method: 'POST',
                 beforeSend: function(xhr) {
-                    xhr.setRequestHeader('X-WP-Nonce', srtData.nonce);
+                    xhr.setRequestHeader('X-WP-Nonce', fttData.nonce);
                 },
                 success: function(response) {
                     console.log('Invitation generated:', response);
                     
                     // Fetch registration page URL from backend
                     $.ajax({
-                        url: srtData.restUrl + 'registration-url',
+                        url: fttData.restUrl + 'registration-url',
                         method: 'GET',
                         success: function(urlResponse) {
                             const code = response.invitation.code;
@@ -2419,10 +2419,10 @@
             }
             
             $.ajax({
-                url: srtData.restUrl + 'invite/' + code + '/revoke',
+                url: fttData.restUrl + 'invite/' + code + '/revoke',
                 method: 'POST',
                 beforeSend: function(xhr) {
-                    xhr.setRequestHeader('X-WP-Nonce', srtData.nonce);
+                    xhr.setRequestHeader('X-WP-Nonce', fttData.nonce);
                 },
                 success: function(response) {
                     console.log('Invitation revoked:', response);
@@ -2443,12 +2443,12 @@
             messageEl.removeClass('success error').text('Linking...').show();
             
             $.ajax({
-                url: srtData.restUrl + 'invite/accept',
+                url: fttData.restUrl + 'invite/accept',
                 method: 'POST',
                 contentType: 'application/json',
                 data: JSON.stringify({ code: code }),
                 beforeSend: function(xhr) {
-                    xhr.setRequestHeader('X-WP-Nonce', srtData.nonce);
+                    xhr.setRequestHeader('X-WP-Nonce', fttData.nonce);
                 },
                 success: function(response) {
                     console.log('Code accepted:', response);
