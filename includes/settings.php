@@ -734,133 +734,332 @@ class FTT_Settings {
      */
     public static function get_default_event_types() {
         return array(
-            // Education category
-            'graduation' => array(
-                'label' => __('Graduation', 'schedule-collaboration-tracking'),
-                'color' => '#7E57C2',
+            // Education
+            'school_event' => array(
+                'label' => __('School Event', 'schedule-collaboration-tracking'),
+                'color' => '#2196F3',
                 'category' => 'education',
             ),
-            'college_visit' => array(
-                'label' => __('College Visit', 'schedule-collaboration-tracking'),
-                'color' => '#5C6BC0',
+            'parent_teacher' => array(
+                'label' => __('Parent-Teacher Conference', 'schedule-collaboration-tracking'),
+                'color' => '#1976D2',
                 'category' => 'education',
             ),
-            'college_orientation' => array(
-                'label' => __('College Orientation', 'schedule-collaboration-tracking'),
+            'exam' => array(
+                'label' => __('Exam/Test', 'schedule-collaboration-tracking'),
+                'color' => '#1565C0',
+                'category' => 'education',
+            ),
+            'field_trip' => array(
+                'label' => __('Field Trip', 'schedule-collaboration-tracking'),
                 'color' => '#42A5F5',
                 'category' => 'education',
             ),
-            'internship' => array(
-                'label' => __('Internship', 'schedule-collaboration-tracking'),
-                'color' => '#26A69A',
+            'graduation' => array(
+                'label' => __('Graduation', 'schedule-collaboration-tracking'),
+                'color' => '#64B5F6',
                 'category' => 'education',
             ),
-            'volunteer_work' => array(
-                'label' => __('Volunteer Work', 'schedule-collaboration-tracking'),
-                'color' => '#66BB6A',
+            'tutoring' => array(
+                'label' => __('Tutoring', 'schedule-collaboration-tracking'),
+                'color' => '#1E88E5',
+                'category' => 'education',
+            ),
+            'study_group' => array(
+                'label' => __('Study Group', 'schedule-collaboration-tracking'),
+                'color' => '#0D47A1',
+                'category' => 'education',
+            ),
+            'science_fair' => array(
+                'label' => __('Science Fair', 'schedule-collaboration-tracking'),
+                'color' => '#2979FF',
+                'category' => 'education',
+            ),
+            'school_play' => array(
+                'label' => __('School Play', 'schedule-collaboration-tracking'),
+                'color' => '#448AFF',
+                'category' => 'education',
+            ),
+            'open_house' => array(
+                'label' => __('Open House', 'schedule-collaboration-tracking'),
+                'color' => '#82B1FF',
                 'category' => 'education',
             ),
             
-            // Sports & Activities category
-            'camp_weekend' => array(
-                'label' => __('Camp Weekend', 'schedule-collaboration-tracking'),
-                'color' => '#2196F3',
+            // Sports
+            'sports_practice' => array(
+                'label' => __('Sports Practice', 'schedule-collaboration-tracking'),
+                'color' => '#4CAF50',
                 'category' => 'sports',
             ),
-            'sports_camp' => array(
-                'label' => __('Sports Camp', 'schedule-collaboration-tracking'),
+            'sports_game' => array(
+                'label' => __('Sports Game', 'schedule-collaboration-tracking'),
+                'color' => '#388E3C',
+                'category' => 'sports',
+            ),
+            'tournament' => array(
+                'label' => __('Tournament', 'schedule-collaboration-tracking'),
+                'color' => '#2E7D32',
+                'category' => 'sports',
+            ),
+            'team_meeting' => array(
+                'label' => __('Team Meeting', 'schedule-collaboration-tracking'),
                 'color' => '#66BB6A',
                 'category' => 'sports',
             ),
-            'summer_camp' => array(
-                'label' => __('Summer Camp', 'schedule-collaboration-tracking'),
-                'color' => '#4DB6AC',
+            'sports_physical' => array(
+                'label' => __('Sports Physical', 'schedule-collaboration-tracking'),
+                'color' => '#1B5E20',
+                'category' => 'sports',
+            ),
+            'equipment_fitting' => array(
+                'label' => __('Equipment Fitting', 'schedule-collaboration-tracking'),
+                'color' => '#43A047',
+                'category' => 'sports',
+            ),
+            'awards_ceremony' => array(
+                'label' => __('Awards Ceremony', 'schedule-collaboration-tracking'),
+                'color' => '#81C784',
                 'category' => 'sports',
             ),
             
-            // Arts & Music category
-            'rehearsal_block' => array(
-                'label' => __('Rehearsal Block', 'schedule-collaboration-tracking'),
+            // Arts & Music
+            'music_lesson' => array(
+                'label' => __('Music Lesson', 'schedule-collaboration-tracking'),
                 'color' => '#9C27B0',
                 'category' => 'arts',
             ),
-            'performance_day' => array(
-                'label' => __('Performance Day', 'schedule-collaboration-tracking'),
-                'color' => '#E91E63',
+            'music_performance' => array(
+                'label' => __('Music Performance', 'schedule-collaboration-tracking'),
+                'color' => '#7B1FA2',
                 'category' => 'arts',
             ),
-            'music_camp' => array(
-                'label' => __('Music Camp', 'schedule-collaboration-tracking'),
+            'dance_class' => array(
+                'label' => __('Dance Class', 'schedule-collaboration-tracking'),
                 'color' => '#AB47BC',
                 'category' => 'arts',
             ),
+            'dance_recital' => array(
+                'label' => __('Dance Recital', 'schedule-collaboration-tracking'),
+                'color' => '#8E24AA',
+                'category' => 'arts',
+            ),
+            'art_class' => array(
+                'label' => __('Art Class', 'schedule-collaboration-tracking'),
+                'color' => '#BA68C8',
+                'category' => 'arts',
+            ),
+            'theater_rehearsal' => array(
+                'label' => __('Theater Rehearsal', 'schedule-collaboration-tracking'),
+                'color' => '#CE93D8',
+                'category' => 'arts',
+            ),
+            'theater_performance' => array(
+                'label' => __('Theater Performance', 'schedule-collaboration-tracking'),
+                'color' => '#6A1B9A',
+                'category' => 'arts',
+            ),
+            'club_meeting' => array(
+                'label' => __('Club Meeting', 'schedule-collaboration-tracking'),
+                'color' => '#E1BEE7',
+                'category' => 'arts',
+            ),
+            'art_show' => array(
+                'label' => __('Art Show', 'schedule-collaboration-tracking'),
+                'color' => '#D81B60',
+                'category' => 'arts',
+            ),
+            'photography_class' => array(
+                'label' => __('Photography Class', 'schedule-collaboration-tracking'),
+                'color' => '#AD1457',
+                'category' => 'arts',
+            ),
+            'pottery_class' => array(
+                'label' => __('Pottery Class', 'schedule-collaboration-tracking'),
+                'color' => '#F48FB1',
+                'category' => 'arts',
+            ),
+            'voice_lesson' => array(
+                'label' => __('Voice Lesson', 'schedule-collaboration-tracking'),
+                'color' => '#880E4F',
+                'category' => 'arts',
+            ),
+            'instrument_rental' => array(
+                'label' => __('Instrument Rental', 'schedule-collaboration-tracking'),
+                'color' => '#F8BBD0',
+                'category' => 'arts',
+            ),
             
-            // Health & Medical category
-            'medical' => array(
-                'label' => __('Medical Appointment', 'schedule-collaboration-tracking'),
+            // Health
+            'doctor_appointment' => array(
+                'label' => __('Doctor Appointment', 'schedule-collaboration-tracking'),
+                'color' => '#F44336',
+                'category' => 'health',
+            ),
+            'dentist' => array(
+                'label' => __('Dentist', 'schedule-collaboration-tracking'),
+                'color' => '#E53935',
+                'category' => 'health',
+            ),
+            'orthodontist' => array(
+                'label' => __('Orthodontist', 'schedule-collaboration-tracking'),
+                'color' => '#D32F2F',
+                'category' => 'health',
+            ),
+            'therapist' => array(
+                'label' => __('Therapist/Counselor', 'schedule-collaboration-tracking'),
                 'color' => '#EF5350',
                 'category' => 'health',
             ),
-            
-            // Social & Family category
-            'family_vacation' => array(
-                'label' => __('Family Vacation', 'schedule-collaboration-tracking'),
-                'color' => '#29B6F6',
-                'category' => 'social',
+            'medication_reminder' => array(
+                'label' => __('Medication Reminder', 'schedule-collaboration-tracking'),
+                'color' => '#FF5252',
+                'category' => 'health',
             ),
-            'family_reunion' => array(
-                'label' => __('Family Reunion', 'schedule-collaboration-tracking'),
-                'color' => '#FFA726',
-                'category' => 'social',
-            ),
-            'birthday' => array(
-                'label' => __('Birthday', 'schedule-collaboration-tracking'),
-                'color' => '#FF7043',
-                'category' => 'social',
+            'vaccination' => array(
+                'label' => __('Vaccination', 'schedule-collaboration-tracking'),
+                'color' => '#C62828',
+                'category' => 'health',
             ),
             
-            // Transportation & Travel category
-            'move_in' => array(
-                'label' => __('Move In', 'schedule-collaboration-tracking'),
-                'color' => '#4CAF50',
+            // Social
+            'birthday_party' => array(
+                'label' => __('Birthday Party', 'schedule-collaboration-tracking'),
+                'color' => '#FF9800',
+                'category' => 'social',
+            ),
+            'playdate' => array(
+                'label' => __('Playdate', 'schedule-collaboration-tracking'),
+                'color' => '#FB8C00',
+                'category' => 'social',
+            ),
+            'family_gathering' => array(
+                'label' => __('Family Gathering', 'schedule-collaboration-tracking'),
+                'color' => '#F57C00',
+                'category' => 'social',
+            ),
+            'sleepover' => array(
+                'label' => __('Sleepover', 'schedule-collaboration-tracking'),
+                'color' => '#FFB74D',
+                'category' => 'social',
+            ),
+            'school_dance' => array(
+                'label' => __('School Dance', 'schedule-collaboration-tracking'),
+                'color' => '#EF6C00',
+                'category' => 'social',
+            ),
+            'prom' => array(
+                'label' => __('Prom', 'schedule-collaboration-tracking'),
+                'color' => '#E65100',
+                'category' => 'social',
+            ),
+            'homecoming' => array(
+                'label' => __('Homecoming', 'schedule-collaboration-tracking'),
+                'color' => '#FF6F00',
+                'category' => 'social',
+            ),
+            'holiday_party' => array(
+                'label' => __('Holiday Party', 'schedule-collaboration-tracking'),
+                'color' => '#FF8A65',
+                'category' => 'social',
+            ),
+            'summer_bbq' => array(
+                'label' => __('Summer BBQ', 'schedule-collaboration-tracking'),
+                'color' => '#FFAB91',
+                'category' => 'social',
+            ),
+            
+            // Transportation
+            'pickup' => array(
+                'label' => __('Pickup', 'schedule-collaboration-tracking'),
+                'color' => '#607D8B',
                 'category' => 'transportation',
             ),
-            'move_out' => array(
-                'label' => __('Move Out', 'schedule-collaboration-tracking'),
-                'color' => '#F44336',
+            'dropoff' => array(
+                'label' => __('Drop-off', 'schedule-collaboration-tracking'),
+                'color' => '#546E7A',
                 'category' => 'transportation',
             ),
+            'carpool' => array(
+                'label' => __('Carpool', 'schedule-collaboration-tracking'),
+                'color' => '#455A64',
+                'category' => 'transportation',
+            ),
+            'bus_schedule' => array(
+                'label' => __('Bus Schedule', 'schedule-collaboration-tracking'),
+                'color' => '#78909C',
+                'category' => 'transportation',
+            ),
+            'rideshare' => array(
+                'label' => __('Rideshare', 'schedule-collaboration-tracking'),
+                'color' => '#37474F',
+                'category' => 'transportation',
+            ),
+            'train_subway' => array(
+                'label' => __('Train/Subway', 'schedule-collaboration-tracking'),
+                'color' => '#90A4AE',
+                'category' => 'transportation',
+            ),
+            
+            // Administrative
+            'registration_deadline' => array(
+                'label' => __('Registration Deadline', 'schedule-collaboration-tracking'),
+                'color' => '#795548',
+                'category' => 'administrative',
+            ),
+            'payment_due' => array(
+                'label' => __('Payment Due', 'schedule-collaboration-tracking'),
+                'color' => '#6D4C41',
+                'category' => 'administrative',
+            ),
+            'forms_due' => array(
+                'label' => __('Forms Due', 'schedule-collaboration-tracking'),
+                'color' => '#5D4037',
+                'category' => 'administrative',
+            ),
+            'college_visit' => array(
+                'label' => __('College Visit', 'schedule-collaboration-tracking'),
+                'color' => '#8D6E63',
+                'category' => 'administrative',
+            ),
+            'college_application' => array(
+                'label' => __('College Application', 'schedule-collaboration-tracking'),
+                'color' => '#A1887F',
+                'category' => 'administrative',
+            ),
+            'insurance_deadline' => array(
+                'label' => __('Insurance Deadline', 'schedule-collaboration-tracking'),
+                'color' => '#4E342E',
+                'category' => 'administrative',
+            ),
+            'scholarship_application' => array(
+                'label' => __('Scholarship Application', 'schedule-collaboration-tracking'),
+                'color' => '#BCAAA4',
+                'category' => 'administrative',
+            ),
+            'financial_aid_forms' => array(
+                'label' => __('Financial Aid Forms', 'schedule-collaboration-tracking'),
+                'color' => '#D7CCC8',
+                'category' => 'administrative',
+            ),
+            
+            // Travel
             'travel_day' => array(
                 'label' => __('Travel Day', 'schedule-collaboration-tracking'),
-                'color' => '#FF9800',
-                'category' => 'transportation',
-            ),
-            'housing_checkin' => array(
-                'label' => __('Housing Check-In', 'schedule-collaboration-tracking'),
                 'color' => '#00BCD4',
-                'category' => 'transportation',
+                'category' => 'travel',
+            ),
+            'flight_only' => array(
+                'label' => __('Flight Only', 'schedule-collaboration-tracking'),
+                'color' => '#0097A7',
+                'category' => 'travel',
             ),
             
-            // Administrative category
-            'uniform_fitting' => array(
-                'label' => __('Uniform/Fitting', 'schedule-collaboration-tracking'),
-                'color' => '#607D8B',
-                'category' => 'administrative',
-            ),
-            'admin_deadline' => array(
-                'label' => __('Deadline', 'schedule-collaboration-tracking'),
-                'color' => '#F44336',
-                'category' => 'administrative',
-            ),
-            'meeting' => array(
-                'label' => __('Meeting', 'schedule-collaboration-tracking'),
-                'color' => '#78909C',
-                'category' => 'administrative',
-            ),
+            // Other
             'other' => array(
                 'label' => __('Other', 'schedule-collaboration-tracking'),
                 'color' => '#9E9E9E',
-                'category' => 'administrative',
+                'category' => '',
             ),
         );
     }
