@@ -303,6 +303,14 @@ class FTT_Registration {
             return $user;
         }
         
+        // Skip hCaptcha check for wp-login.php (admin login)
+        // Only apply to custom FTT login forms
+        $is_wp_login = (strpos($_SERVER['SCRIPT_NAME'], 'wp-login.php') !== false);
+        if ($is_wp_login) {
+            error_log('FTT: Skipping hCaptcha for wp-login.php');
+            return $user;
+        }
+        
         // Check if hCaptcha is enabled
         $settings = get_option('ftt_settings', array());
         $enable_hcaptcha = $settings['enable_hcaptcha'] ?? false;
@@ -311,10 +319,13 @@ class FTT_Registration {
             return $user;
         }
         
+        error_log('FTT: Verifying hCaptcha for custom login form');
+        
         // Verify hCaptcha response
         $hcaptcha_response = isset($_POST['h-captcha-response']) ? $_POST['h-captcha-response'] : '';
         
         if (empty($hcaptcha_response)) {
+            error_log('FTT: hCaptcha response missing');
             return new WP_Error(
                 'hcaptcha_error',
                 __('<strong>ERROR</strong>: Please complete the captcha verification.', 'schedule-collaboration-tracking')
@@ -324,12 +335,14 @@ class FTT_Registration {
         $verification = self::verify_hcaptcha($hcaptcha_response);
         
         if (!$verification['success']) {
+            error_log('FTT: hCaptcha verification failed');
             return new WP_Error(
                 'hcaptcha_error',
                 __('<strong>ERROR</strong>: Captcha verification failed. Please try again.', 'schedule-collaboration-tracking')
             );
         }
         
+        error_log('FTT: hCaptcha verification SUCCESS');
         return $user;
     }
     
