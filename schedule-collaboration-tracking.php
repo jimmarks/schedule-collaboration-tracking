@@ -3,7 +3,7 @@
  * Plugin Name: Family Travel Tracker
  * Plugin URI: https://github.com/jimmarks/schedule-collaboration-tracking
  * Description: Multi-child schedule coordination with travel planning, flight tracking, and shared calendars for families. Perfect for busy parents, co-parenting families, and children's activities.
- * Version: 2.0.70
+ * Version: 2.0.71
  * Author: Jim Marks
  * Author URI: https://github.com/jimmarks
  * License: GPL v2 or later
@@ -19,7 +19,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('FTT_VERSION', '2.0.69');
+define('FTT_VERSION', '2.0.71');
 define('FTT_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('FTT_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('FTT_PLUGIN_BASENAME', plugin_basename(__FILE__));
@@ -348,11 +348,14 @@ class Family_Travel_Tracker {
             return;
         }
         
+        // Enqueue dashicons for front-end use
+        wp_enqueue_style('dashicons');
+        
         // Enqueue styles
         wp_enqueue_style(
             'ftt-styles',
             FTT_PLUGIN_URL . 'assets/css/styles.css',
-            array(),
+            array('dashicons'),
             FTT_VERSION
         );
         
