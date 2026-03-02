@@ -30,9 +30,20 @@ if ($user_id) {
     }
 }
 
+// Show access denied notice if redirected
+$access_denied_notice = '';
+if (isset($_GET['access_denied']) && $_GET['access_denied'] == '1') {
+    $access_denied_notice = '<div class="ftt-notice ftt-notice-error" style="margin: 20px auto; max-width: 800px; padding: 15px 20px; background: #fee; border: 1px solid #c33; border-radius: 4px; color: #c33; text-align: center;">
+        <strong>' . esc_html__('Access Denied', 'schedule-collaboration-tracking') . ':</strong> ' . 
+        esc_html__('Your account access has been restricted. Please contact support or select a subscription plan below.', 'schedule-collaboration-tracking') . '
+    </div>';
+}
+
 $settings = get_option('ftt_stripe_settings', []);
 $trial_days = $settings['trial_days'] ?? 14;
 ?>
+
+<?php echo $access_denied_notice; ?>
 
 <div class="ftt-pricing-container">
     <div class="ftt-pricing-header">

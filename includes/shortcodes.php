@@ -221,6 +221,16 @@ class FTT_Shortcodes {
     public static function custom_login_redirect($redirect_to, $request, $user) {
         // Check if this is a post-registration redirect
         if (isset($user->ID)) {
+            // Check if access has been denied by admin
+            $access_denied = get_user_meta($user->ID, 'ftt_access_denied', true);
+            if ($access_denied) {
+                // Invalidate calendar access
+                if (class_exists('FTT_Billing_Manager')) {
+                    FTT_Billing_Manager::invalidate_calendar_access($user->ID);
+                }
+                return add_query_arg('access_denied', '1', home_url('/pricing/'));
+            }
+            
             $stored_redirect = get_transient('ftt_post_registration_redirect_' . $user->ID);
             if ($stored_redirect) {
                 error_log('FTT DEBUG: custom_login_redirect found stored redirect: ' . $stored_redirect);
