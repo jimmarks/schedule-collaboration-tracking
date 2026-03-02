@@ -82,9 +82,11 @@ class FTT_Billing_Manager {
         
         error_log('FTT BILLING DEBUG: Subscription status: ' . ($status ?: 'EMPTY'));
         
-        // No subscription - redirect to pricing
-        if (empty($status)) {
-            error_log('FTT BILLING DEBUG: No subscription - redirecting to /pricing/');
+        // Block access for invalid subscription statuses
+        $blocked_statuses = ['suspended', 'incomplete', 'incomplete_expired'];
+        
+        if (empty($status) || in_array($status, $blocked_statuses)) {
+            error_log('FTT BILLING DEBUG: Invalid subscription status - redirecting to /pricing/');
             wp_redirect(home_url('/pricing/'));
             exit;
         }
