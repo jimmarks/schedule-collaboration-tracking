@@ -90,6 +90,13 @@ class FTT_Pages {
                 'menu_order' => 10,
                 'description' => 'Checkout cancellation page',
             ),
+            'family_management' => array(
+                'title' => 'Manage Family',
+                'shortcode' => '[ftt_family_management]',
+                'slug' => 'manage-family',
+                'menu_order' => 11,
+                'description' => 'Manage children, co-parents, and family settings',
+            ),
         );
     }
     
