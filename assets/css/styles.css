@@ -1519,27 +1519,49 @@
     align-items: center;
     justify-content: space-between;
     margin-bottom: 12px;
+    cursor: pointer;
+    padding: 4px 0;
+    user-select: none;
+}
+
+.ftt-subsection-header:hover {
+    opacity: 0.8;
 }
 
 .ftt-subsection-title {
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 600;
     margin: 0;
     color: #333;
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
-.ftt-toggle-pending-invitations {
-    background: none;
-    border: none;
-    cursor: pointer;
-    font-size: 14px;
-    padding: 4px 8px;
+.ftt-count-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    background: #f0e5c9;
+    color: #b8860b;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.ftt-toggle-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
     color: #666;
-    transition: transform 0.2s;
+    transition: transform 0.2s ease;
 }
 
-.ftt-toggle-pending-invitations.expanded {
-    transform: rotate(-180deg);
+.ftt-subsection-header.expanded .ftt-toggle-icon {
+    transform: rotate(180deg);
 }
 
 .ftt-invitations-list {

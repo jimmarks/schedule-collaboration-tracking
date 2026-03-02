@@ -2,7 +2,7 @@ jQuery(document).ready(function($) {
     console.log('FTT FAMILY MANAGEMENT: jQuery ready');
     
     // Toggle pending invitations
-    $('.ftt-toggle-pending-invitations').on('click', function(e) {
+    $(document).on('click', '.ftt-toggle-pending-invitations', function(e) {
         e.preventDefault();
         $(this).toggleClass('expanded');
         $('.ftt-invitations-list').slideToggle(200);

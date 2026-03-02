@@ -142,9 +142,12 @@ $parents = FTT_Roles::get_parents($current_user->ID);
             if (!empty($pending)):
         ?>
         <div class="ftt-pending-invitations">
-            <div class="ftt-subsection-header">
-                <h3 class="ftt-subsection-title">⏳ <?php esc_html_e('Pending Invitations', 'schedule-collaboration-tracking'); ?></h3>
-                <button type="button" class="ftt-toggle-pending-invitations">▼</button>
+            <div class="ftt-subsection-header ftt-toggle-pending-invitations">
+                <h3 class="ftt-subsection-title">
+                    ⏳ <?php esc_html_e('Pending Invitations', 'schedule-collaboration-tracking'); ?>
+                    <span class="ftt-count-badge"><?php echo count($pending); ?></span>
+                </h3>
+                <span class="dashicons dashicons-arrow-down-alt2 ftt-toggle-icon"></span>
             </div>
             <div class="ftt-invitations-list">
                 <?php foreach ($pending as $code => $invite): 
