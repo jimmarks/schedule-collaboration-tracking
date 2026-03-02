@@ -585,6 +585,9 @@ class FTT_Shortcodes {
             return self::render_login_form();
         }
         
+        // Enqueue dashicons for front-end
+        wp_enqueue_style('dashicons');
+        
         // Enqueue family management JavaScript with jQuery dependency
         wp_enqueue_script(
             'ftt-family-management',
