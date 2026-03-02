@@ -239,40 +239,54 @@ class FTT_Roles {
             return;
         }
         ?>
-        <h2><?php esc_html_e('Child/Student Information', 'schedule-collaboration-tracking'); ?></h2>
+        <h2><?php esc_html_e('Family Travel Tracker Settings', 'schedule-collaboration-tracking'); ?></h2>
         <table class="form-table">
             <tr>
-                <th><label for="ftt_is_member"><?php esc_html_e('Member', 'schedule-collaboration-tracking'); ?></label></th>
+                <th><label for="ftt_is_member"><?php esc_html_e('Is Child/Traveler', 'schedule-collaboration-tracking'); ?></label></th>
                 <td>
                     <input type="checkbox" name="ftt_is_member" id="ftt_is_member" value="1" <?php checked(self::is_member($user->ID)); ?>>
-                    <p class="description"><?php esc_html_e('Check if this user is an active member.', 'schedule-collaboration-tracking'); ?></p>
+                    <p class="description"><?php esc_html_e('Check if this user is a child/traveler who will have events and travel tracked.', 'schedule-collaboration-tracking'); ?></p>
                 </td>
             </tr>
             <tr>
-                <th><label><?php esc_html_e('Parent/Guardian Of', 'schedule-collaboration-tracking'); ?></label></th>
+                <th><label for="ftt_parent_of"><?php esc_html_e('Parent/Guardian Of', 'schedule-collaboration-tracking'); ?></label></th>
                 <td>
                     <?php
                     $children = self::get_children($user->ID);
-                    $all_users = get_users(array('orderby' => 'display_name'));
+                    // Only show members (children/travelers) and exclude admins
+                    $all_users = get_users(array(
+                        'orderby' => 'display_name',
+                        'meta_query' => array(
+                            array(
+                                'key' => 'ftt_is_member',
+                                'value' => '1',
+                                'compare' => '='
+                            )
+                        )
+                    ));
                     ?>
-                    <select name="srt_parent_of[]" multiple style="height: 150px; width: 100%;">
-                        <?php foreach ($all_users as $u) : ?>
-                            <?php if ($u->ID !== $user->ID) : ?>
-                                <option value="<?php echo esc_attr($u->ID); ?>" <?php selected(in_array($u->ID, $children)); ?>>
-                                    <?php echo esc_html($u->display_name . ' (' . $u->user_email . ')'); ?>
-                                </option>
-                            <?php endif; ?>
-                        <?php endforeach; ?>
-                    </select>
-                    <p class="description"><?php esc_html_e('Hold Ctrl (Cmd on Mac) to select multiple. This user will receive price alerts for selected members.', 'schedule-collaboration-tracking'); ?></p>
+                    <?php if (!empty($all_users)) : ?>
+                        <select name="ftt_parent_of[]" id="ftt_parent_of" multiple style="height: 200px; width: 100%; max-width: 500px;">
+                            <?php foreach ($all_users as $u) : ?>
+                                <?php if ($u->ID !== $user->ID) : ?>
+                                    <option value="<?php echo esc_attr($u->ID); ?>" <?php selected(in_array($u->ID, $children)); ?>>
+                                        <?php echo esc_html($u->display_name . ' (' . $u->user_email . ')'); ?>
+                                    </option>
+                                <?php endif; ?>
+                            <?php endforeach; ?>
+                        </select>
+                        <p class="description"><?php esc_html_e('Hold Ctrl (Cmd on Mac) to select multiple children. This parent will see events and receive price alerts for selected children.', 'schedule-collaboration-tracking'); ?></p>
+                    <?php else : ?>
+                        <p class="description" style="color: #666;"><?php esc_html_e('No children/travelers found. Check the "Is Child/Traveler" box on user profiles to make them available here.', 'schedule-collaboration-tracking'); ?></p>
+                    <?php endif; ?>
                 </td>
             </tr>
             
             <tr>
                 <th><label for="ftt_home_airport"><?php esc_html_e('Home Airport', 'schedule-collaboration-tracking'); ?></label></th>
                 <td>
-                    <input type="text" name="ftt_home_airport" id="ftt_home_airport" value="<?php echo esc_attr(get_user_meta($user->ID, 'ftt_home_airport', true)); ?>" class="regular-text" maxlength="3" placeholder="ORD" style="text-transform: uppercase;">
-                    <p class="description"><?php esc_html_e('Your primary airport (IATA code, e.g., ORD, JFK, LAX). Used as default for event forms.', 'schedule-collaboration-tracking'); ?></p>
+                    <input type="text" name="ftt_home_airport" id="ftt_home_airport" value="<?php echo esc_attr(get_user_meta($user->ID, 'ftt_home_airport', true)); ?>" class="regular-text" maxlength="3" placeholder="ORD" style="text-transform: uppercase; width: 100px;">
+                    <p class="description"><?php esc_html_e('3-letter IATA airport code (e.g., ORD, JFK, LAX). Used as default for event forms and price tracking.', 'schedule-collaboration-tracking'); ?></p>
                 </td>
             </tr>
         </table>
