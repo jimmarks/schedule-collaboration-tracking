@@ -10,10 +10,28 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-// If user is already logged in, redirect to dashboard
+// If user is already logged in, show message or redirect based on context
 if (is_user_logged_in()) {
-    wp_redirect(home_url('/ftt-dashboard/'));
-    exit;
+    // Check if we're in a shortcode rendering context (ob_get_level > 1)
+    // If so, return message instead of redirecting to avoid breaking page render
+    if (ob_get_level() > 1) {
+        ?>
+        <div class="ftt-login-wrapper">
+            <div class="ftt-login-container">
+                <div class="ftt-login-message ftt-success">
+                    <span class="dashicons dashicons-yes-alt"></span>
+                    <p><?php esc_html_e('You are already logged in.', 'schedule-collaboration-tracking'); ?></p>
+                    <p><a href="<?php echo esc_url(home_url('/ftt-dashboard/')); ?>" class="ftt-btn ftt-btn-primary"><?php esc_html_e('Go to Dashboard', 'schedule-collaboration-tracking'); ?></a></p>
+                </div>
+            </div>
+        </div>
+        <?php
+        return;
+    } else {
+        // Direct page access - safe to redirect
+        wp_redirect(home_url('/ftt-dashboard/'));
+        exit;
+    }
 }
 
 // Get redirect destination
