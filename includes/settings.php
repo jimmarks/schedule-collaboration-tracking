@@ -280,6 +280,20 @@ class FTT_Settings {
             $sanitized['serpapi_api_key'] = sanitize_text_field($input['serpapi_api_key']);
         }
         
+        // Sanitize event categories
+        if (isset($input['event_categories']) && is_array($input['event_categories'])) {
+            $sanitized['event_categories'] = array();
+            foreach ($input['event_categories'] as $key => $category) {
+                if (!empty($category['label'])) {
+                    $sanitized_key = sanitize_key($key);
+                    $sanitized['event_categories'][$sanitized_key] = array(
+                        'label' => sanitize_text_field($category['label']),
+                        'icon' => wp_kses_post($category['icon'] ?? '📁'),
+                    );
+                }
+            }
+        }
+        
         // Sanitize event types
         if (isset($input['event_types']) && is_array($input['event_types'])) {
             $sanitized['event_types'] = array();
@@ -289,6 +303,7 @@ class FTT_Settings {
                     $sanitized['event_types'][$sanitized_key] = array(
                         'label' => sanitize_text_field($type['label']),
                         'color' => sanitize_hex_color($type['color'] ?? '#2196F3'),
+                        'category' => !empty($type['category']) ? sanitize_key($type['category']) : '',
                     );
                 }
             }
