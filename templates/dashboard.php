@@ -333,59 +333,6 @@ console.log('============================');
                     </div>
                 </div>
                 
-                <!-- My Settings Section -->
-                <div class="ftt-dashboard-section">
-                    <h4><span class="dashicons dashicons-admin-settings"></span> <?php esc_html_e('My Settings', 'schedule-collaboration-tracking'); ?></h4>
-                    <div class="ftt-dashboard-content">
-                        <div class="ftt-settings-grid">
-                            <form id="ftt-user-preferences-form" class="ftt-preferences-form" style="display: contents;">
-                                <div class="ftt-setting-card">
-                                    <div class="ftt-setting-icon">
-                                        <span class="dashicons dashicons-airplane"></span>
-                                    </div>
-                                    <div class="ftt-setting-content">
-                                        <label for="home_airport" class="ftt-setting-label"><?php esc_html_e('Home Airport', 'schedule-collaboration-tracking'); ?></label>
-                                        <input type="text" 
-                                               id="home_airport" 
-                                               name="home_airport" 
-                                               placeholder="e.g., BDL" 
-                                               maxlength="3"
-                                               style="text-transform: uppercase; width: 100%; max-width: 150px;"
-                                               class="ftt-input-large">
-                                        <small class="ftt-help-text"><?php esc_html_e('Your nearest airport (3-letter code)', 'schedule-collaboration-tracking'); ?></small>
-                                    </div>
-                                </div>
-                                
-                                <div class="ftt-setting-card">
-                                    <div class="ftt-setting-icon">
-                                        <span class="dashicons dashicons-clock"></span>
-                                    </div>
-                                    <div class="ftt-setting-content">
-                                        <label for="timezone" class="ftt-setting-label"><?php esc_html_e('Time Zone', 'schedule-collaboration-tracking'); ?></label>
-                                        <select id="timezone" name="timezone" class="ftt-select-large" style="width: 100%; max-width: 250px;">
-                                            <option value="">Select timezone...</option>
-                                            <option value="America/New_York">Eastern Time</option>
-                                            <option value="America/Chicago">Central Time</option>
-                                            <option value="America/Denver">Mountain Time</option>
-                                            <option value="America/Los_Angeles">Pacific Time</option>
-                                            <option value="America/Anchorage">Alaska Time</option>
-                                            <option value="Pacific/Honolulu">Hawaii Time</option>
-                                        </select>
-                                        <small class="ftt-help-text"><?php esc_html_e('For accurate event times', 'schedule-collaboration-tracking'); ?></small>
-                                    </div>
-                                </div>
-                                
-                                <div class="ftt-setting-card ftt-setting-action">
-                                    <button type="submit" class="button button-primary button-large">
-                                        <span class="dashicons dashicons-yes"></span> <?php esc_html_e('Save Preferences', 'schedule-collaboration-tracking'); ?>
-                                    </button>
-                                    <span id="ftt-preferences-message" class="ftt-message"></span>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-                
                 <!-- My Price Alerts Section -->
                 <div class="ftt-dashboard-section">
                     <h4><span class="dashicons dashicons-bell"></span> <?php esc_html_e('My Price Alerts', 'schedule-collaboration-tracking'); ?></h4>
@@ -455,59 +402,6 @@ console.log('============================');
                     <h4>📅 <?php esc_html_e('Upcoming Travel (Next 30 Days)', 'schedule-collaboration-tracking'); ?></h4>
                     <div id="ftt-upcoming-travel" class="ftt-dashboard-content">
                         <div class="ftt-loading"></div>
-                    </div>
-                </div>
-                
-                <!-- My Settings Section -->
-                <div class="ftt-dashboard-section">
-                    <h4><span class="dashicons dashicons-admin-settings"></span> <?php esc_html_e('My Settings', 'schedule-collaboration-tracking'); ?></h4>
-                    <div class="ftt-dashboard-content">
-                        <div class="ftt-settings-grid">
-                            <form id="ftt-user-preferences-form" class="ftt-preferences-form" style="display: contents;">
-                                <div class="ftt-setting-card">
-                                    <div class="ftt-setting-icon">
-                                        <span class="dashicons dashicons-airplane"></span>
-                                    </div>
-                                    <div class="ftt-setting-content">
-                                        <label for="home_airport" class="ftt-setting-label"><?php esc_html_e('Home Airport', 'schedule-collaboration-tracking'); ?></label>
-                                        <input type="text" 
-                                               id="home_airport" 
-                                               name="home_airport" 
-                                               placeholder="e.g., BDL" 
-                                               maxlength="3"
-                                               style="text-transform: uppercase; width: 100%; max-width: 150px;"
-                                               class="ftt-input-large">
-                                        <small class="ftt-help-text"><?php esc_html_e('Your nearest airport (3-letter code)', 'schedule-collaboration-tracking'); ?></small>
-                                    </div>
-                                </div>
-                                
-                                <div class="ftt-setting-card">
-                                    <div class="ftt-setting-icon">
-                                        <span class="dashicons dashicons-clock"></span>
-                                    </div>
-                                    <div class="ftt-setting-content">
-                                        <label for="timezone" class="ftt-setting-label"><?php esc_html_e('Time Zone', 'schedule-collaboration-tracking'); ?></label>
-                                        <select id="timezone" name="timezone" class="ftt-select-large" style="width: 100%; max-width: 250px;">
-                                            <option value="">Select timezone...</option>
-                                            <option value="America/New_York">Eastern Time</option>
-                                            <option value="America/Chicago">Central Time</option>
-                                            <option value="America/Denver">Mountain Time</option>
-                                            <option value="America/Los_Angeles">Pacific Time</option>
-                                            <option value="America/Anchorage">Alaska Time</option>
-                                            <option value="Pacific/Honolulu">Hawaii Time</option>
-                                        </select>
-                                        <small class="ftt-help-text"><?php esc_html_e('For accurate event times', 'schedule-collaboration-tracking'); ?></small>
-                                    </div>
-                                </div>
-                                
-                                <div class="ftt-setting-card ftt-setting-action">
-                                    <button type="submit" class="button button-primary button-large">
-                                        <span class="dashicons dashicons-yes"></span> <?php esc_html_e('Save Preferences', 'schedule-collaboration-tracking'); ?>
-                                    </button>
-                                    <span id="ftt-preferences-message" class="ftt-message"></span>
-                                </div>
-                            </form>
-                        </div>
                     </div>
                 </div>
                 
