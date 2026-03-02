@@ -251,6 +251,123 @@ $parents = FTT_Roles::get_parents($current_user->ID);
             </div>
         </form>
     </div>
+
+    <!-- My Settings Section -->
+    <div class="ftt-management-section ftt-settings-section">
+        <div class="ftt-section-header">
+            <h2>⚙️ <?php esc_html_e('My Settings', 'schedule-collaboration-tracking'); ?></h2>
+            <p class="ftt-section-description"><?php esc_html_e('Personal preferences for travel and scheduling', 'schedule-collaboration-tracking'); ?></p>
+        </div>
+
+        <form id="ftt-user-preferences-form" class="ftt-user-preferences-form">
+            <div class="ftt-settings-grid">
+                <div class="ftt-setting-card">
+                    <div class="ftt-setting-icon">
+                        <span class="dashicons dashicons-airplane"></span>
+                    </div>
+                    <div class="ftt-setting-content">
+                        <label for="home_airport" class="ftt-setting-label"><?php esc_html_e('Home Airport', 'schedule-collaboration-tracking'); ?></label>
+                        <input type="text" 
+                               id="home_airport" 
+                               name="home_airport" 
+                               value="<?php echo esc_attr(get_user_meta($current_user->ID, 'ftt_home_airport', true)); ?>"
+                               placeholder="e.g., BDL" 
+                               maxlength="3"
+                               style="text-transform: uppercase; width: 100%; max-width: 150px;"
+                               class="ftt-input-large">
+                        <small class="ftt-help-text"><?php esc_html_e('Your nearest airport (3-letter code)', 'schedule-collaboration-tracking'); ?></small>
+                    </div>
+                </div>
+                
+                <div class="ftt-setting-card">
+                    <div class="ftt-setting-icon">
+                        <span class="dashicons dashicons-clock"></span>
+                    </div>
+                    <div class="ftt-setting-content">
+                        <label for="timezone" class="ftt-setting-label"><?php esc_html_e('Time Zone', 'schedule-collaboration-tracking'); ?></label>
+                        <select id="timezone" name="timezone" class="ftt-select-large" style="width: 100%; max-width: 250px;">
+                            <?php 
+                            $user_timezone = get_user_meta($current_user->ID, 'srt_timezone', true) ?: wp_timezone_string();
+                            ?>
+                            <option value="">Select timezone...</option>
+                            <option value="America/New_York" <?php selected($user_timezone, 'America/New_York'); ?>>Eastern Time</option>
+                            <option value="America/Chicago" <?php selected($user_timezone, 'America/Chicago'); ?>>Central Time</option>
+                            <option value="America/Denver" <?php selected($user_timezone, 'America/Denver'); ?>>Mountain Time</option>
+                            <option value="America/Los_Angeles" <?php selected($user_timezone, 'America/Los_Angeles'); ?>>Pacific Time</option>
+                            <option value="America/Anchorage" <?php selected($user_timezone, 'America/Anchorage'); ?>>Alaska Time</option>
+                            <option value="Pacific/Honolulu" <?php selected($user_timezone, 'Pacific/Honolulu'); ?>>Hawaii Time</option>
+                        </select>
+                        <small class="ftt-help-text"><?php esc_html_e('For accurate event times', 'schedule-collaboration-tracking'); ?></small>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="ftt-form-actions">
+                <button type="submit" class="button button-primary button-large">
+                    <span class="dashicons dashicons-yes"></span> <?php esc_html_e('Save Settings', 'schedule-collaboration-tracking'); ?>
+                </button>
+                <span id="ftt-settings-message" class="ftt-message"></span>
+            </div>
+        </form>
+    </div>
+
+    <!-- Subscription Management Section -->
+    <?php if (class_exists('FTT_Billing_Manager')): 
+        $billing = FTT_Billing_Manager::get_billing_summary($current_user->ID);
+        if ($billing && !empty($billing['status'])):
+    ?>
+    <div class="ftt-management-section ftt-subscription-section">
+        <div class="ftt-section-header">
+            <h2>💳 <?php esc_html_e('Subscription', 'schedule-collaboration-tracking'); ?></h2>
+            <p class="ftt-section-description"><?php esc_html_e('Manage your subscription and billing', 'schedule-collaboration-tracking'); ?></p>
+        </div>
+
+        <div class="ftt-subscription-summary">
+            <div class="ftt-subscription-status <?php echo esc_attr('status-' . $billing['status']); ?>">
+                <div class="ftt-status-badge">
+                    <?php echo esc_html($billing['status_label']); ?>
+                </div>
+                
+                <?php if ($billing['in_trial']): ?>
+                    <p class="ftt-trial-info">
+                        <?php printf(esc_html__('Trial ends in %d days', 'schedule-collaboration-tracking'), $billing['days_until_charge']); ?>
+                    </p>
+                <?php endif; ?>
+            </div>
+
+            <div class="ftt-subscription-details">
+                <div class="ftt-detail-row">
+                    <span class="ftt-detail-label"><?php esc_html_e('Plan:', 'schedule-collaboration-tracking'); ?></span>
+                    <span class="ftt-detail-value">
+                        <?php echo esc_html($billing['total_price'] . '/' . $billing['period']); ?>
+                    </span>
+                </div>
+                
+                <div class="ftt-detail-row">
+                    <span class="ftt-detail-label"><?php esc_html_e('Children:', 'schedule-collaboration-tracking'); ?></span>
+                    <span class="ftt-detail-value">
+                        <?php printf(esc_html__('%d of %d', 'schedule-collaboration-tracking'), $billing['children_count'], $billing['allowed_children']); ?>
+                    </span>
+                </div>
+                
+                <?php if (!$billing['in_trial']): ?>
+                <div class="ftt-detail-row">
+                    <span class="ftt-detail-label"><?php esc_html_e('Next Billing:', 'schedule-collaboration-tracking'); ?></span>
+                    <span class="ftt-detail-value">
+                        <?php echo esc_html($billing['next_billing_date']); ?>
+                    </span>
+                </div>
+                <?php endif; ?>
+            </div>
+
+            <div class="ftt-subscription-actions">
+                <a href="<?php echo esc_url(home_url('/manage-subscription/')); ?>" class="button button-primary">
+                    <?php esc_html_e('Manage Subscription', 'schedule-collaboration-tracking'); ?>
+                </a>
+            </div>
+        </div>
+    </div>
+    <?php endif; endif; ?>
 </div>
 
 <!-- Add/Edit Child Modal -->

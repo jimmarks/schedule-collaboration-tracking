@@ -257,6 +257,49 @@ jQuery(document).ready(function($) {
             }
         });
     });
+
+    // Save User Settings (Home Airport and Timezone)
+    $('#ftt-user-preferences-form').on('submit', function(e) {
+        e.preventDefault();
+        console.log('Saving user settings');
+        
+        var formData = {
+            home_airport: $('#home_airport').val(),
+            timezone: $('#timezone').val()
+        };
+        
+        console.log('Form data:', formData);
+        
+        $.ajax({
+            url: '/wp-json/ftt/v1/save-user-preferences',
+            method: 'POST',
+            beforeSend: function(xhr) {
+                xhr.setRequestHeader('X-WP-Nonce', fttFamilyMgmt.nonce);
+            },
+            contentType: 'application/json',
+            data: JSON.stringify(formData),
+            success: function(response) {
+                console.log('Settings saved:', response);
+                $('#ftt-settings-message')
+                    .removeClass('error')
+                    .addClass('success')
+                    .text('Settings saved successfully!')
+                    .fadeIn();
+                
+                setTimeout(function() {
+                    $('#ftt-settings-message').fadeOut();
+                }, 3000);
+            },
+            error: function(xhr) {
+                console.error('Error saving settings:', xhr.responseJSON);
+                $('#ftt-settings-message')
+                    .removeClass('success')
+                    .addClass('error')
+                    .text('Failed to save settings')
+                    .fadeIn();
+            }
+        });
+    });
     
     // Cancel Invitation
     $(document).on('click', '.ftt-cancel-invite', function() {
