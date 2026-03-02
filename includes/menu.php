@@ -111,39 +111,37 @@ class FTT_Menu {
         $mode = $settings['login_menu_mode'] ?? 'both';
         $is_logged_in = is_user_logged_in();
         
-        // Parse menu items
-        $items_array = explode('</li>', $items);
-        $new_items = array();
+        // Check if our login/logout item exists in the menu
+        if (strpos($items, 'ftt-login-logout-item') === false) {
+            return $items;
+        }
         
-        foreach ($items_array as $item) {
-            if (empty($item)) {
-                continue;
+        // Use regex to find and replace the login/logout menu item
+        // Match the entire <li> element with class ftt-login-logout-item
+        $pattern = '/<li[^>]*\bftt-login-logout-item\b[^>]*>.*?<\/li>/s';
+        
+        $replacement = '';
+        
+        // Determine what to show based on mode
+        if ($mode === 'login_only') {
+            // Only show if NOT logged in
+            if (!$is_logged_in) {
+                $replacement = self::generate_login_item();
             }
-            
-            // Check if this is our login/logout item
-            if (strpos($item, 'ftt-login-logout-item') !== false) {
-                // Determine what to show
-                if ($mode === 'login_only') {
-                    // Only show if NOT logged in
-                    if (!$is_logged_in) {
-                        $new_items[] = self::generate_login_item();
-                    }
-                    // Skip adding item if logged in
-                } else {
-                    // Show login or logout based on status
-                    if ($is_logged_in) {
-                        $new_items[] = self::generate_logout_item();
-                    } else {
-                        $new_items[] = self::generate_login_item();
-                    }
-                }
+            // If logged in, replacement stays empty (removes the item)
+        } else {
+            // Show login or logout based on status
+            if ($is_logged_in) {
+                $replacement = self::generate_logout_item();
             } else {
-                // Regular menu item, keep it
-                $new_items[] = $item . '</li>';
+                $replacement = self::generate_login_item();
             }
         }
         
-        return implode('', $new_items);
+        // Replace all instances of the login/logout menu item
+        $items = preg_replace($pattern, $replacement, $items);
+        
+        return $items;
     }
     
     /**
