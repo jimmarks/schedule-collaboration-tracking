@@ -557,6 +557,9 @@ class FTT_Shortcodes {
             return self::render_login_form();
         }
         
+        // Enqueue jQuery for the family management page
+        wp_enqueue_script('jquery');
+        
         ob_start();
         include FTT_PLUGIN_DIR . 'templates/family-management.php';
         return ob_get_clean();
