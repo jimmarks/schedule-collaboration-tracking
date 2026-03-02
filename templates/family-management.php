@@ -142,7 +142,10 @@ $parents = FTT_Roles::get_parents($current_user->ID);
             if (!empty($pending)):
         ?>
         <div class="ftt-pending-invitations">
-            <h3 class="ftt-subsection-title">⏳ <?php esc_html_e('Pending Invitations', 'schedule-collaboration-tracking'); ?></h3>
+            <div class="ftt-subsection-header">
+                <h3 class="ftt-subsection-title">⏳ <?php esc_html_e('Pending Invitations', 'schedule-collaboration-tracking'); ?></h3>
+                <button type="button" class="ftt-toggle-pending-invitations">▼</button>
+            </div>
             <div class="ftt-invitations-list">
                 <?php foreach ($pending as $code => $invite): 
                     $days_since = floor((time() - $invite['created']) / DAY_IN_SECONDS);
@@ -175,9 +178,11 @@ $parents = FTT_Roles::get_parents($current_user->ID);
                     <div class="ftt-invitation-actions">
                         <button type="button" class="button button-small ftt-resend-invite" data-invite-code="<?php echo esc_attr($code); ?>" title="<?php esc_attr_e('Resend invitation email', 'schedule-collaboration-tracking'); ?>">
                             <span class="dashicons dashicons-update"></span>
+                            <?php esc_html_e('Resend', 'schedule-collaboration-tracking'); ?>
                         </button>
                         <button type="button" class="button button-small button-link-delete ftt-cancel-invite" data-invite-code="<?php echo esc_attr($code); ?>" title="<?php esc_attr_e('Cancel invitation', 'schedule-collaboration-tracking'); ?>">
                             <span class="dashicons dashicons-no"></span>
+                            <?php esc_html_e('Cancel', 'schedule-collaboration-tracking'); ?>
                         </button>
                     </div>
                 </div>

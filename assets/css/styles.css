@@ -1509,43 +1509,64 @@
 
 /* Pending Invitations Styles */
 .ftt-pending-invitations {
-    margin-top: 25px;
-    padding-top: 25px;
+    margin-top: 20px;
+    padding-top: 20px;
     border-top: 1px solid #e5e5e5;
+}
+
+.ftt-subsection-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
 }
 
 .ftt-subsection-title {
     font-size: 16px;
     font-weight: 600;
-    margin-bottom: 15px;
+    margin: 0;
     color: #333;
+}
+
+.ftt-toggle-pending-invitations {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 4px 8px;
+    color: #666;
+    transition: transform 0.2s;
+}
+
+.ftt-toggle-pending-invitations.expanded {
+    transform: rotate(-180deg);
 }
 
 .ftt-invitations-list {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 8px;
 }
 
 .ftt-invitation-card {
     display: flex;
     align-items: center;
-    gap: 15px;
-    padding: 15px;
+    gap: 10px;
+    padding: 10px;
     background: #fff9e6;
     border: 1px solid #f0e5c9;
-    border-radius: 6px;
+    border-radius: 4px;
     transition: all 0.2s;
 }
 
 .ftt-invitation-card:hover {
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
 }
 
 .ftt-invitation-icon {
     flex-shrink: 0;
-    width: 40px;
-    height: 40px;
+    width: 32px;
+    height: 32px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1555,9 +1576,9 @@
 }
 
 .ftt-invitation-icon .dashicons {
-    font-size: 20px;
-    width: 20px;
-    height: 20px;
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
 }
 
 .ftt-invitation-info {
@@ -1566,25 +1587,25 @@
 
 .ftt-invitation-email {
     font-weight: 600;
-    font-size: 14px;
-    margin: 0 0 4px 0;
+    font-size: 13px;
+    margin: 0 0 3px 0;
     color: #333;
 }
 
 .ftt-invitation-relationship {
-    font-size: 13px;
+    font-size: 12px;
     color: #666;
-    margin: 0 0 6px 0;
+    margin: 0 0 4px 0;
     text-transform: capitalize;
 }
 
 .ftt-invitation-meta {
-    font-size: 12px;
+    font-size: 11px;
     color: #888;
     margin: 0;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 5px;
 }
 
 .ftt-invitation-separator {
@@ -1603,18 +1624,20 @@
 }
 
 .ftt-invitation-actions .button {
-    min-width: 32px;
-    height: 32px;
-    padding: 0;
+    height: 28px;
+    padding: 0 8px;
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: 4px;
+    font-size: 12px;
+    line-height: 1;
 }
 
 .ftt-invitation-actions .dashicons {
-    font-size: 18px;
-    width: 18px;
-    height: 18px;
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
 }
 
 .ftt-resend-invite:hover {

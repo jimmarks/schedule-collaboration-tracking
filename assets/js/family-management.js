@@ -1,6 +1,13 @@
 jQuery(document).ready(function($) {
     console.log('FTT FAMILY MANAGEMENT: jQuery ready');
     
+    // Toggle pending invitations
+    $('.ftt-toggle-pending-invitations').on('click', function(e) {
+        e.preventDefault();
+        $(this).toggleClass('expanded');
+        $('.ftt-invitations-list').slideToggle(200);
+    });
+    
     // Toggle category types list
     $('.ftt-category-expand').on('click', function(e) {
         e.preventDefault();
@@ -289,7 +296,7 @@ jQuery(document).ready(function($) {
         console.log('Resending invitation:', inviteCode);
         
         // Show loading state
-        $button.prop('disabled', true).html('<span class="dashicons dashicons-update spinning"></span>');
+        $button.prop('disabled', true).html('<span class="dashicons dashicons-update spinning"></span> Sending...');
         
         $.ajax({
             url: '/wp-json/ftt/v1/resend-invitation',
@@ -301,7 +308,7 @@ jQuery(document).ready(function($) {
             data: JSON.stringify({ invite_code: inviteCode }),
             success: function(response) {
                 console.log('Invitation resent:', response);
-                $button.html('<span class="dashicons dashicons-yes"></span>');
+                $button.html('<span class="dashicons dashicons-yes"></span> Sent!');
                 
                 setTimeout(function() {
                     $button.prop('disabled', false).html(originalHtml);
