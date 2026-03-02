@@ -560,7 +560,7 @@ class FTT_Shortcodes {
         // Enqueue family management JavaScript with jQuery dependency
         wp_enqueue_script(
             'ftt-family-management',
-            plugins_url('assets/js/family-management.js', FTT_PLUGIN_FILE),
+            FTT_PLUGIN_URL . 'assets/js/family-management.js',
             array('jquery'),
             FTT_VERSION,
             true // Load in footer
