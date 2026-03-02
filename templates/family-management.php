@@ -175,7 +175,7 @@ $parents = FTT_Roles::get_parents($current_user->ID);
     <div class="ftt-modal-content">
         <div class="ftt-modal-header">
             <h2 id="ftt-child-modal-title"><?php esc_html_e('Add Child', 'schedule-collaboration-tracking'); ?></h2>
-            <button type="button" class="ftt-modal-close">&times;</button>
+            <button type="button" class="ftt-modal-close-x">&times;</button>
         </div>
         <form id="ftt-child-form">
             <input type="hidden" name="child_id" id="ftt-child-id">
@@ -233,7 +233,7 @@ $parents = FTT_Roles::get_parents($current_user->ID);
     <div class="ftt-modal-content">
         <div class="ftt-modal-header">
             <h2><?php esc_html_e('Invite Co-Parent or Guardian', 'schedule-collaboration-tracking'); ?></h2>
-            <button type="button" class="ftt-modal-close">&times;</button>
+            <button type="button" class="ftt-modal-close-x">&times;</button>
         </div>
         <form id="ftt-invite-adult-form">
             <div class="ftt-form-group">
@@ -462,7 +462,7 @@ $parents = FTT_Roles::get_parents($current_user->ID);
     margin: 0;
 }
 
-.ftt-modal-close {
+.ftt-modal-close-x {
     background: none;
     border: none;
     font-size: 28px;
@@ -471,10 +471,16 @@ $parents = FTT_Roles::get_parents($current_user->ID);
     padding: 0;
     width: 30px;
     height: 30px;
+    line-height: 1;
 }
 
-.ftt-modal-close:hover {
+.ftt-modal-close-x:hover {
     color: #333;
+}
+
+.ftt-modal-actions .button {
+    min-width: 100px;
+    white-space: nowrap;
 }
 
 .ftt-modal-content form {

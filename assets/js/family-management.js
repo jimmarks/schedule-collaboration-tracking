@@ -241,8 +241,8 @@ jQuery(document).ready(function($) {
         });
     });
     
-    // Close Modal
-    $('.ftt-modal-close').on('click', function() {
+    // Close Modal (both X button and Cancel button)
+    $('.ftt-modal-close, .ftt-modal-close-x').on('click', function() {
         $(this).closest('.ftt-modal').fadeOut();
     });
     
