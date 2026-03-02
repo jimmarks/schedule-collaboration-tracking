@@ -275,7 +275,10 @@ $parents = FTT_Roles::get_parents($current_user->ID);
                                maxlength="3"
                                style="text-transform: uppercase; width: 100%; max-width: 150px;"
                                class="ftt-input-large">
-                        <small class="ftt-help-text"><?php esc_html_e('Your nearest airport (3-letter code)', 'schedule-collaboration-tracking'); ?></small>
+                        <small class="ftt-help-text">
+                            <?php esc_html_e('Your nearest airport (3-letter code)', 'schedule-collaboration-tracking'); ?> 
+                            | <a href="https://airportcodes.io/" target="_blank" rel="noopener noreferrer"><?php esc_html_e('Look up airport codes', 'schedule-collaboration-tracking'); ?></a>
+                        </small>
                     </div>
                 </div>
                 
