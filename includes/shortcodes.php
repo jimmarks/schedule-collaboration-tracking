@@ -34,6 +34,7 @@ class FTT_Shortcodes {
         // Add login redirect filters
         add_filter('login_redirect', array(__CLASS__, 'custom_login_redirect'), 10, 3);
         add_filter('authenticate', array(__CLASS__, 'custom_authenticate_redirect'), 30, 3);
+        add_action('wp_login_failed', array(__CLASS__, 'login_failed_redirect'));
     }
     
     /**
@@ -256,16 +257,21 @@ class FTT_Shortcodes {
                 // Get the redirect_to parameter if set
                 $redirect_to = isset($_REQUEST['redirect_to']) ? $_REQUEST['redirect_to'] : '';
                 
-                // If redirecting to our dashboard, send them to our login page with error
-                if (strpos($redirect_to, 'sc-dashboard') !== false) {
-                    remove_filter('authenticate', 'wp_authenticate_username_password', 20);
-                    
+                // If redirecting to our dashboard or from our login page, send them to our login page with error
+                if (strpos($redirect_to, 'ftt-dashboard') !== false || strpos($redirect_to, 'ftt-') !== false) {
                     $login_url = home_url('/ftt-login/');
                     
                     if ($user->get_error_code() === 'invalid_username' || $user->get_error_code() === 'incorrect_password') {
                         $login_url = add_query_arg('login', 'failed', $login_url);
                     } elseif ($user->get_error_code() === 'empty_username' || $user->get_error_code() === 'empty_password') {
                         $login_url = add_query_arg('login', 'empty', $login_url);
+                    } else {
+                        $login_url = add_query_arg('login', 'failed', $login_url);
+                    }
+                    
+                    // Store redirect_to for after successful login
+                    if (!empty($redirect_to)) {
+                        wp_cache_set('login_redirect_' . $username, $redirect_to, '', 300);
                     }
                     
                     wp_redirect($login_url);
@@ -275,6 +281,28 @@ class FTT_Shortcodes {
         }
         
         return $user;
+    }
+    
+    /**
+     * Redirect failed logins to custom login page
+     */
+    public static function login_failed_redirect($username) {
+        // Get the referrer to check if it came from our custom login page
+        $referrer = wp_get_referer();
+        
+        // Only redirect if coming from custom login or going to FTT pages
+        if ($referrer && (strpos($referrer, 'ftt-login') !== false || strpos($referrer, 'ftt-') !== false)) {
+            $login_url = home_url('/ftt-login/');
+            $login_url = add_query_arg('login', 'failed', $login_url);
+            
+            // Preserve redirect_to if it exists
+            if (isset($_REQUEST['redirect_to'])) {
+                $login_url = add_query_arg('redirect_to', urlencode($_REQUEST['redirect_to']), $login_url);
+            }
+            
+            wp_redirect($login_url);
+            exit;
+        }
     }
     
     /**
