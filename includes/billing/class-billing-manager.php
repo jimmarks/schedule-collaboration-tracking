@@ -404,9 +404,9 @@ class FTT_Billing_Manager {
     public static function get_billing_summary($user_id) {
         $status = get_user_meta($user_id, 'ftt_subscription_status', true);
         $interval = get_user_meta($user_id, 'ftt_subscription_interval', true);
-        $base_price = get_user_meta($user_id, 'ftt_base_price', true);
+        $base_price = (float) get_user_meta($user_id, 'ftt_base_price', true);
         $addon_quantity = (int) get_user_meta($user_id, 'ftt_addon_quantity', true);
-        $total_price = get_user_meta($user_id, 'ftt_subscription_price', true);
+        $total_price = (float) get_user_meta($user_id, 'ftt_subscription_price', true);
         $children_count = (int) get_user_meta($user_id, 'ftt_children_count', true);
         $trial_end = get_user_meta($user_id, 'ftt_trial_end', true);
         $period_end = get_user_meta($user_id, 'ftt_current_period_end', true);
