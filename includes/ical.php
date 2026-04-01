@@ -50,27 +50,38 @@ class FTT_ICal {
         
         // Check if Stripe is configured and validate subscription
         $stripe_settings = get_option('ftt_stripe_settings', []);
-        if (!empty($stripe_settings['secret_key']) && !empty($stripe_settings['price_base_monthly'])) {
-            // Skip check for admins
-            if (!user_can($user_id, 'manage_options')) {
+        $mode = $stripe_settings['mode'] ?? 'test';
+        $secret_key = $mode === 'live' 
+            ? ($stripe_settings['live_secret_key'] ?? '')
+            : ($stripe_settings['test_secret_key'] ?? '');
+        
+        if (!empty($secret_key) && !empty($stripe_settings['price_base_monthly'])) {
+            // Skip check for admins and billing-exempt users
+            $skip_billing_check = user_can($user_id, 'manage_options')
+                || (class_exists('FTT_Billing_Manager') && FTT_Billing_Manager::is_billing_exempt($user_id));
+            if (!$skip_billing_check) {
                 // Check for admin-imposed access denial
                 $access_denied = get_user_meta($user_id, 'ftt_access_denied', true);
                 if ($access_denied) {
                     wp_die('Calendar access denied. Please contact support.', 'Access Denied', array('response' => 403));
                 }
-                
-                // Check subscription status
-                $status = get_user_meta($user_id, 'ftt_subscription_status', true);
-                $blocked_statuses = ['suspended', 'incomplete', 'incomplete_expired'];
-                
-                if (empty($status) || in_array($status, $blocked_statuses)) {
-                    wp_die('Calendar access requires an active subscription. Please visit the website to upgrade.', 'Subscription Required', array('response' => 402));
-                }
-                
-                // Check if subscription period has ended
-                $period_end = get_user_meta($user_id, 'ftt_current_period_end', true);
-                if (!empty($period_end) && strtotime($period_end) < time()) {
-                    wp_die('Calendar access expired. Please renew your subscription at the website.', 'Subscription Expired', array('response' => 402));
+
+                // v2.1+: use group-based access check (trial, active Stripe subscription, etc.)
+                if (class_exists('FTT_Family_Groups') && method_exists('FTT_Family_Groups', 'user_has_group_access')) {
+                    if (!FTT_Family_Groups::user_has_group_access($user_id)) {
+                        wp_die('Calendar access requires an active subscription. Please visit the website to upgrade.', 'Subscription Required', array('response' => 402));
+                    }
+                } else {
+                    // Legacy fallback: per-user subscription meta
+                    $status = get_user_meta($user_id, 'ftt_subscription_status', true);
+                    $blocked_statuses = ['suspended', 'incomplete', 'incomplete_expired'];
+                    if (empty($status) || in_array($status, $blocked_statuses)) {
+                        wp_die('Calendar access requires an active subscription. Please visit the website to upgrade.', 'Subscription Required', array('response' => 402));
+                    }
+                    $period_end = get_user_meta($user_id, 'ftt_current_period_end', true);
+                    if (!empty($period_end) && strtotime($period_end) < time()) {
+                        wp_die('Calendar access expired. Please renew your subscription at the website.', 'Subscription Expired', array('response' => 402));
+                    }
                 }
             }
         }
@@ -94,38 +105,41 @@ class FTT_ICal {
         
         // Filter events by user (unless admin)
         if (!user_can($user_id, 'manage_options')) {
-            // Check if user is a parent
-            $child_ids = get_user_meta($user_id, 'ftt_children', true);
-            
-            if (!empty($child_ids) && is_array($child_ids)) {
-                // Parent - show their children's events
-                $member_ids = $child_ids;
-                $member_ids[] = $user_id; // Include parent's own events
-                
-                $args['meta_query'] = array(
-                    array(
-                        'key'     => 'member_id',
-                        'value'   => $member_ids,
-                        'compare' => 'IN',
-                    ),
-                );
+            // Collect all member IDs visible to this user across ALL groups
+            $visible_member_ids = array( $user_id );
+
+            if ( class_exists('FTT_Family_Groups') ) {
+                $user_groups = FTT_Family_Groups::get_user_groups( $user_id );
+                foreach ( $user_groups as $group ) {
+                    $members = FTT_Family_Groups::get_group_members( $group->id );
+                    foreach ( $members as $member ) {
+                        $visible_member_ids[] = intval( $member->user_id );
+                    }
+                }
             } else {
-                // Member - show only their events
-                $args['meta_query'] = array(
-                    array(
-                        'key'     => 'member_id',
-                        'value'   => $user_id,
-                        'compare' => '=',
-                    ),
-                );
+                // Fallback: legacy user meta parent-of relationship
+                $child_ids = get_user_meta( $user_id, 'ftt_parent_of', true );
+                if ( !empty($child_ids) && is_array($child_ids) ) {
+                    $visible_member_ids = array_merge( $visible_member_ids, array_map('intval', $child_ids) );
+                }
             }
+
+            $visible_member_ids = array_unique( $visible_member_ids );
+
+            $args['meta_query'] = array(
+                array(
+                    'key'     => 'member_id',
+                    'value'   => $visible_member_ids,
+                    'compare' => 'IN',
+                ),
+            );
         }
         // Admins get all events (no filter)
         
         $events = get_posts($args);
         
-        // Generate iCal content
-        $ical = self::generate_ical($events);
+        // Generate iCal content using this user's personal timezone
+        $ical = self::generate_ical($events, $user_id);
         
         // Set headers for .ics file
         header('Content-Type: text/calendar; charset=utf-8');
@@ -217,9 +231,14 @@ class FTT_ICal {
     /**
      * Generate iCalendar content
      */
-    public static function generate_ical($events) {
-        $settings = get_option('ftt_settings', array());
-        $timezone = $settings['default_timezone'] ?? wp_timezone_string();
+    public static function generate_ical($events, $user_id = 0) {
+        // Use the requesting user's personal timezone when available
+        if ($user_id && class_exists('FTT_User_Profile')) {
+            $timezone = FTT_User_Profile::get_user_timezone($user_id);
+        } else {
+            $settings = get_option('ftt_settings', array());
+            $timezone = $settings['default_timezone'] ?? wp_timezone_string();
+        }
         $site_name = get_bloginfo('name');
         
         // Start iCal file

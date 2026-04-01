@@ -13,6 +13,17 @@ if (!defined('ABSPATH')) {
 
 <div class="ftt-container">
     <div class="ftt-calendar-header">
+        <?php
+        $dashboard_url = FTT_Pages::get_page_url('dashboard');
+        if ($dashboard_url) : ?>
+            <p style="margin-bottom: 20px;">
+                <a href="<?php echo esc_url($dashboard_url); ?>" class="button">
+                    <span class="dashicons dashicons-arrow-left-alt" style="margin-top: 3px;"></span>
+                    <?php esc_html_e('Back to Dashboard', 'schedule-collaboration-tracking'); ?>
+                </a>
+            </p>
+        <?php endif; ?>
+        
         <h2><?php esc_html_e('Family Calendar', 'schedule-collaboration-tracking'); ?></h2>
         
         <?php
@@ -20,22 +31,37 @@ if (!defined('ABSPATH')) {
         $current_user_id = get_current_user_id();
         $children = FTT_Roles::get_children($current_user_id);
         
-        if (!empty($children)) : ?>
-            <div class="ftt-member-selector">
-                <label for="ftt-calendar-member"><?php esc_html_e('View Calendar For:', 'schedule-collaboration-tracking'); ?></label>
-                <select id="ftt-calendar-member" class="ftt-input">
-                    <option value=""><?php esc_html_e('All Children', 'schedule-collaboration-tracking'); ?></option>
-                    <?php foreach ($children as $child_id) :
-                        $child = get_user_by('id', $child_id);
-                        if ($child) : ?>
-                            <option value="<?php echo esc_attr($child_id); ?>">
-                                <?php echo esc_html($child->display_name); ?>
-                            </option>
-                        <?php endif;
-                    endforeach; ?>
+        // Get user's groups (v2.1)
+        $user_groups = array();
+        $selected_group_id = null;
+        if (class_exists('FTT_Family_Groups')) {
+            $user_groups = FTT_Family_Groups::get_user_groups($current_user_id);
+            if (isset($_GET['group']) && !empty($_GET['group'])) {
+                $raw_group = sanitize_text_field(wp_unslash($_GET['group']));
+                if (!ctype_digit($raw_group)) {
+                    $selected_group_id = FTT_Family_Groups::resolve_group_token($raw_group);
+                } else {
+                    $selected_group_id = (int) $raw_group;
+                }
+            }
+        }
+        
+        // Show group selector if user has multiple groups (v2.1)
+        if (!empty($user_groups) && count($user_groups) > 1) : ?>
+            <div class="ftt-group-selector-inline">
+                <label for="ftt-calendar-group"><?php esc_html_e('Group:', 'schedule-collaboration-tracking'); ?></label>
+                <select id="ftt-calendar-group" class="ftt-input">
+                    <option value=""><?php esc_html_e('All Groups', 'schedule-collaboration-tracking'); ?></option>
+                    <?php foreach ($user_groups as $group) : ?>
+                        <option value="<?php echo esc_attr($group->id); ?>" <?php selected($group->id, $selected_group_id); ?>>
+                            <?php echo esc_html($group->name); ?> (<?php echo esc_html($group->child_count); ?> <?php echo $group->child_count == 1 ? 'child' : 'children'; ?>)
+                        </option>
+                    <?php endforeach; ?>
                 </select>
             </div>
         <?php endif; ?>
+        
+
         
         <!-- Event Category Filters -->
         <div class="ftt-event-filters">
@@ -211,11 +237,16 @@ if (!defined('ABSPATH')) {
     
     <?php
     // Child color filter (for parents with multiple children)
-    if (!empty($children) && count($children) > 1 && class_exists('FTT_Child_Colors')) :
+    if (!empty($children) && class_exists('FTT_Child_Colors')) :
         $children_with_colors = FTT_Child_Colors::get_children_with_colors($current_user_id);
         ?>
         <div class="ftt-child-filter">
-            <h3><?php esc_html_e('Show Children', 'schedule-collaboration-tracking'); ?></h3>
+            <div class="ftt-child-filter-header">
+                <h3><?php esc_html_e('Show Children', 'schedule-collaboration-tracking'); ?></h3>
+                <button type="button" id="ftt-select-all-children" class="button button-small">
+                    <?php esc_html_e('Select All', 'schedule-collaboration-tracking'); ?>
+                </button>
+            </div>
             <div class="ftt-filter-list">
                 <?php foreach ($children_with_colors as $child) : ?>
                     <label class="ftt-filter-item">
@@ -495,6 +526,20 @@ if (!defined('ABSPATH')) {
 jQuery(document).ready(function($) {
     console.log('FTT CALENDAR: Filter handlers loaded');
     
+    // Select All Children button
+    $('#ftt-select-all-children').on('click', function() {
+        const allChecked = $('.ftt-child-toggle:checked').length === $('.ftt-child-toggle').length;
+        $('.ftt-child-toggle').prop('checked', !allChecked);
+        
+        // Update button text
+        $(this).text(allChecked ? 'Select All' : 'Deselect All');
+        
+        // Trigger calendar refresh if calendar is loaded
+        if (typeof window.fttCalendar !== 'undefined' && window.fttCalendar.refetchEvents) {
+            window.fttCalendar.refetchEvents();
+        }
+    });
+    
     // Toggle filter panel
     $('#ftt-filter-toggle').on('click', function() {
         $(this).toggleClass('active');
@@ -514,7 +559,7 @@ jQuery(document).ready(function($) {
         
         // Save preferences via REST API
         $.ajax({
-            url: '/wp-json/ftt/v1/save-event-preferences',
+            url: '<?php echo esc_url(rest_url('ftt/v1/save-event-preferences')); ?>',
             method: 'POST',
             beforeSend: function(xhr) {
                 xhr.setRequestHeader('X-WP-Nonce', '<?php echo wp_create_nonce('wp_rest'); ?>');

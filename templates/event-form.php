@@ -40,35 +40,68 @@ $default_airport = get_user_meta($current_user->ID, 'ftt_home_airport', true);
             $children = FTT_Roles::get_children($current_user_id);
             $is_member = FTT_Roles::is_member($current_user_id);
             
-            if (!empty($children) || current_user_can('manage_options')) : ?>
+            if (!empty($children) || current_user_can('manage_options')) :
+                // Build the list of selectable children
+                $selectable_children = array();
+                if (current_user_can('manage_options')) {
+                    $all_members = FTT_Roles::get_all_members();
+                    foreach ($all_members as $member) {
+                        $selectable_children[] = array('id' => $member->ID, 'name' => $member->display_name);
+                    }
+                } elseif (!empty($children)) {
+                    foreach ($children as $child_id) {
+                        $child = get_user_by('id', $child_id);
+                        if ($child) {
+                            $selectable_children[] = array('id' => $child_id, 'name' => $child->display_name);
+                        }
+                    }
+                }
+            ?>
                 <div class="ftt-form-field">
-                    <label for="member_id"><?php esc_html_e('Event For', 'schedule-collaboration-tracking'); ?> *</label>
-                    <select id="member_id" name="member_id" required>
-                        <option value=""><?php esc_html_e('Select Child...', 'schedule-collaboration-tracking'); ?></option>
-                        <?php
-                        // Parents see their children
-                        if (!empty($children)) {
-                            foreach ($children as $child_id) {
-                                $child = get_user_by('id', $child_id);
-                                if ($child) {
-                                    echo '<option value="' . esc_attr($child_id) . '">' . esc_html($child->display_name) . '</option>';
-                                }
-                            }
-                        }
-                        // Admins see all members
-                        if (current_user_can('manage_options')) {
-                            $all_members = FTT_Roles::get_all_members();
-                            foreach ($all_members as $member) {
-                                echo '<option value="' . esc_attr($member->ID) . '">' . esc_html($member->display_name) . '</option>';
-                            }
-                        }
-                        ?>
-                    </select>
-                    <small class="description"><?php esc_html_e('Select which child this event belongs to', 'schedule-collaboration-tracking'); ?></small>
+                    <label><?php esc_html_e('Event For', 'schedule-collaboration-tracking'); ?> *</label>
+                    <div id="ftt-member-checkboxes" class="ftt-member-checkboxes">
+                        <?php if (count($selectable_children) > 1) : ?>
+                        <label class="ftt-member-check ftt-member-check--family">
+                            <input type="checkbox" id="ftt-family-event" value="family">
+                            <span><?php esc_html_e('Family Event (all children)', 'schedule-collaboration-tracking'); ?></span>
+                        </label>
+                        <hr class="ftt-member-divider">
+                        <?php endif; ?>
+                        <?php foreach ($selectable_children as $sc) : ?>
+                        <label class="ftt-member-check">
+                            <input type="checkbox" class="ftt-child-checkbox" value="<?php echo esc_attr($sc['id']); ?>">
+                            <span><?php echo esc_html($sc['name']); ?></span>
+                        </label>
+                        <?php endforeach; ?>
+                    </div>
+                    <small class="description"><?php esc_html_e('Select one or more children, or choose Family Event to attach to all.', 'schedule-collaboration-tracking'); ?></small>
                 </div>
             <?php elseif ($is_member) : ?>
-                <!-- Hidden field for members creating their own events -->
+                <!-- Member creating their own event — no child selector needed -->
                 <input type="hidden" id="member_id" name="member_id" value="<?php echo esc_attr($current_user_id); ?>">
+            <?php endif; ?>
+            
+            <?php
+            // Group selector (v2.1 - Family Groups)
+            $user_groups = FTT_Family_Groups::get_user_groups($current_user_id);
+            $primary_group = get_user_meta($current_user_id, 'ftt_primary_group', true);
+            
+            if (!empty($user_groups)) : ?>
+                <div class="ftt-form-field">
+                    <label for="group_id"><?php esc_html_e('Family Group', 'schedule-collaboration-tracking'); ?> *</label>
+                    <select id="group_id" name="group_id" required>
+                        <?php foreach ($user_groups as $group) : ?>
+                            <option value="<?php echo esc_attr($group->id); ?>" 
+                                    <?php selected($group->id, $primary_group); ?>>
+                                <?php echo esc_html($group->name); ?>
+                                <?php if ($group->id == $primary_group) : ?>
+                                    (Primary)
+                                <?php endif; ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <small class="description"><?php esc_html_e('Select which family group this event belongs to', 'schedule-collaboration-tracking'); ?></small>
+                </div>
             <?php endif; ?>
             
             <div class="ftt-form-field">
@@ -112,16 +145,18 @@ $default_airport = get_user_meta($current_user->ID, 'ftt_home_airport', true);
                 </div>
                 
                 <div class="ftt-form-field">
-                    <label for="event_type"><?php esc_html_e('Event Type', 'schedule-collaboration-tracking'); ?></label>
-                    <select id="event_type" name="event_type">
-                        <?php
-                        $event_types = FTT_CPT::get_event_types();
-                        foreach ($event_types as $key => $label) :
-                            ?>
-                            <option value="<?php echo esc_attr($key); ?>"><?php echo esc_html($label); ?></option>
-                        <?php endforeach; ?>
-                    </select>
+                    <label for="event_type_search"><?php esc_html_e('Event Type', 'schedule-collaboration-tracking'); ?></label>
+                    <div class="ftt-combobox" id="ftt-event-type-combobox">
+                        <input type="text" id="event_type_search" class="ftt-combobox-input" autocomplete="off"
+                               placeholder="<?php esc_attr_e('Type to search or enter custom type…', 'schedule-collaboration-tracking'); ?>">
+                        <input type="hidden" id="event_type" name="event_type">
+                        <ul class="ftt-combobox-list" id="event_type_list" role="listbox"></ul>
+                    </div>
                 </div>
+                <?php
+                $event_types = FTT_CPT::get_event_types();
+                ?>
+                <script>window.fttEventTypes = <?php echo wp_json_encode($event_types); ?>;</script>
             </div>
             
             <div class="ftt-form-field">
@@ -153,55 +188,23 @@ $default_airport = get_user_meta($current_user->ID, 'ftt_home_airport', true);
         </div>
         
         <!-- Travel Information -->
+        <!-- travel_needed, travel_mode, and flight_needed are derived automatically
+             from the travel legs on submit — no manual fields needed here. -->
         <div class="ftt-form-section">
             <h3><?php esc_html_e('Travel Information', 'schedule-collaboration-tracking'); ?></h3>
-            
-            <div class="ftt-form-field">
-                <label>
-                    <input type="checkbox" id="travel_needed" name="travel_needed">
-                    <?php esc_html_e('Travel Needed', 'schedule-collaboration-tracking'); ?>
-                </label>
+            <p class="ftt-form-hint"><?php esc_html_e('Add legs for any travel involved in this event (flights, drives, etc.). Leave empty if no travel is needed.', 'schedule-collaboration-tracking'); ?></p>
+
+            <div id="ftt-travel-legs-container"></div>
+
+            <!-- Flight Link Suggestions -->
+            <div id="ftt-flight-suggestions" class="ftt-flight-suggestions" style="display: none;">
+                <h5><?php esc_html_e('💡 Link Flights for Better Pricing', 'schedule-collaboration-tracking'); ?></h5>
+                <div id="ftt-suggestions-list"></div>
             </div>
-            
-            <div class="ftt-travel-section">
-                <div class="ftt-form-row">
-                    <div class="ftt-form-field">
-                        <label for="travel_mode"><?php esc_html_e('Primary Travel Mode', 'schedule-collaboration-tracking'); ?></label>
-                        <select id="travel_mode" name="travel_mode">
-                            <?php
-                            $travel_modes = FTT_CPT::get_travel_modes();
-                            foreach ($travel_modes as $key => $label) :
-                                ?>
-                                <option value="<?php echo esc_attr($key); ?>"><?php echo esc_html($label); ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    
-                    <div class="ftt-form-field">
-                        <label>
-                            <input type="checkbox" id="flight_needed" name="flight_needed">
-                            <?php esc_html_e('Flight Needed', 'schedule-collaboration-tracking'); ?>
-                        </label>
-                    </div>
-                </div>
-                
-                <div class="ftt-flight-section">
-                    <h4><?php esc_html_e('Travel Legs', 'schedule-collaboration-tracking'); ?></h4>
-                    <p><?php esc_html_e('Add multiple legs for complex itineraries (e.g., Home → Camp, Camp → Show, Show → Home).', 'schedule-collaboration-tracking'); ?></p>
-                    
-                    <div id="ftt-travel-legs-container"></div>
-                    
-                    <!-- Flight Link Suggestions -->
-                    <div id="ftt-flight-suggestions" class="ftt-flight-suggestions" style="display: none;">
-                        <h5><?php esc_html_e('💡 Link Flights for Better Pricing', 'schedule-collaboration-tracking'); ?></h5>
-                        <div id="ftt-suggestions-list"></div>
-                    </div>
-                    
-                    <button type="button" id="ftt-add-travel-leg" class="ftt-add-button">
-                        <?php esc_html_e('+ Add Travel Leg', 'schedule-collaboration-tracking'); ?>
-                    </button>
-                </div>
-            </div>
+
+            <button type="button" id="ftt-add-travel-leg" class="ftt-add-button">
+                <?php esc_html_e('+ Add Travel Leg', 'schedule-collaboration-tracking'); ?>
+            </button>
         </div>
         
         <!-- Form Actions -->

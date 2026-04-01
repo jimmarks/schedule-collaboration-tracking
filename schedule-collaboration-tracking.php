@@ -3,7 +3,7 @@
  * Plugin Name: Family Travel Tracker
  * Plugin URI: https://github.com/jimmarks/schedule-collaboration-tracking
  * Description: Multi-child schedule coordination with travel planning, flight tracking, and shared calendars for families. Perfect for busy parents, co-parenting families, and children's activities.
- * Version: 2.0.97
+ * Version: 2.6.37
  * Author: Jim Marks
  * Author URI: https://github.com/jimmarks
  * License: GPL v2 or later
@@ -19,10 +19,11 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('FTT_VERSION', '2.0.79');
+define('FTT_VERSION', '2.6.37');
 define('FTT_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('FTT_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('FTT_PLUGIN_BASENAME', plugin_basename(__FILE__));
+define('FTT_PLUGIN_FILE', __FILE__);
 
 // Initialize Plugin Update Checker
 require_once FTT_PLUGIN_DIR . 'lib/plugin-update-checker/plugin-update-checker.php';
@@ -81,13 +82,27 @@ class Family_Travel_Tracker {
         require_once FTT_PLUGIN_DIR . 'includes/ical.php';
         require_once FTT_PLUGIN_DIR . 'includes/menu.php';
         require_once FTT_PLUGIN_DIR . 'includes/roles.php';
+        require_once FTT_PLUGIN_DIR . 'includes/class-password-encryption.php';
         require_once FTT_PLUGIN_DIR . 'includes/registration.php';
         require_once FTT_PLUGIN_DIR . 'includes/invitations.php';
         require_once FTT_PLUGIN_DIR . 'includes/price-tracking.php';
+        require_once FTT_PLUGIN_DIR . 'includes/class-api-tracker.php';
         require_once FTT_PLUGIN_DIR . 'includes/cron-setup.php';
         require_once FTT_PLUGIN_DIR . 'includes/flight-linking.php';
         require_once FTT_PLUGIN_DIR . 'includes/class-child-colors.php';
+        require_once FTT_PLUGIN_DIR . 'includes/class-family-groups.php';
+        require_once FTT_PLUGIN_DIR . 'includes/class-groups-migration.php';
+        require_once FTT_PLUGIN_DIR . 'includes/class-migration-admin.php';
+        require_once FTT_PLUGIN_DIR . 'includes/admin-group-management.php';
+        require_once FTT_PLUGIN_DIR . 'includes/event-migration.php';
         require_once FTT_PLUGIN_DIR . 'includes/cors.php';
+        require_once FTT_PLUGIN_DIR . 'includes/class-seo.php';
+        require_once FTT_PLUGIN_DIR . 'includes/class-email-templates.php';
+        require_once FTT_PLUGIN_DIR . 'includes/class-cookie-consent.php';
+        require_once FTT_PLUGIN_DIR . 'includes/class-exit-survey.php';
+        require_once FTT_PLUGIN_DIR . 'includes/class-cookie-scanner.php';
+        require_once FTT_PLUGIN_DIR . 'includes/class-user-profile.php';
+        require_once FTT_PLUGIN_DIR . 'includes/class-external-calendars.php';
         // Domain routing removed - single domain setup (www.familytraveltracker.app only)
         // require_once FTT_PLUGIN_DIR . 'includes/domain-routing.php';
         
@@ -99,6 +114,7 @@ class Family_Travel_Tracker {
             require_once FTT_PLUGIN_DIR . 'includes/stripe/class-stripe-integration.php';
             require_once FTT_PLUGIN_DIR . 'includes/stripe/class-stripe-webhooks.php';
             require_once FTT_PLUGIN_DIR . 'includes/billing/class-billing-manager.php';
+            require_once FTT_PLUGIN_DIR . 'includes/admin-billing-dashboard.php';
         }
     }
     
@@ -128,10 +144,25 @@ class Family_Travel_Tracker {
         FTT_Registration::init();
         FTT_Invitations::init();
         FTT_Price_Tracking::init();
+        FTT_API_Tracker::init();
         FTT_Cron_Setup::init();
         FTT_Flight_Linking::init();
+        FTT_Family_Groups::init();
+        FTT_Migration_Admin::init();
         FTT_CORS::init();
+        FTT_SEO::init();
+        FTT_Email_Templates::init();
+        FTT_Cookie_Consent::init();
+        FTT_Exit_Survey::init();
+        FTT_Cookie_Scanner::init();
+        FTT_User_Profile::init();
+        FTT_External_Calendars::init();
         // FTT_Domain_Routing::init(); // Disabled - single domain setup
+        
+        // Load test/debug tools (only if file exists)
+        if (file_exists(FTT_PLUGIN_DIR . 'test-invite-validation.php')) {
+            require_once FTT_PLUGIN_DIR . 'test-invite-validation.php';
+        }
     }
     
     /**
@@ -177,6 +208,30 @@ class Family_Travel_Tracker {
         if (version_compare($migration_version, '1', '<')) {
             $this->migrate_user_types();
             update_option('ftt_migration_version', '1');
+        }
+
+        // Migration 2: Flush rewrite rules so our sitemap.xml rewrite takes effect
+        // now that the conflicting WP core sitemap is disabled (v2.6.33+)
+        if (version_compare($migration_version, '2', '<')) {
+            flush_rewrite_rules();
+            update_option('ftt_migration_version', '2');
+        }
+
+        // Migration 3: Flush rewrite rules for new llms.txt rewrite rule (v2.6.34+)
+        if (version_compare($migration_version, '3', '<')) {
+            flush_rewrite_rules();
+            update_option('ftt_migration_version', '3');
+        }
+
+        // Migration 4: Add group_token column to ftt_family_groups for opaque URL tokens (v2.6.36+)
+        if (version_compare($migration_version, '4', '<')) {
+            global $wpdb;
+            $table = $wpdb->prefix . 'ftt_family_groups';
+            $col = $wpdb->get_results( "SHOW COLUMNS FROM `{$table}` LIKE 'group_token'" );
+            if ( empty( $col ) ) {
+                $wpdb->query( "ALTER TABLE `{$table}` ADD COLUMN `group_token` VARCHAR(16) NULL UNIQUE AFTER `color`, ADD INDEX `idx_token` (`group_token`)" );
+            }
+            update_option('ftt_migration_version', '4');
         }
     }
     
@@ -328,14 +383,23 @@ class Family_Travel_Tracker {
      * Enqueue scripts and styles
      */
     public function enqueue_scripts() {
-        // Only enqueue on pages with our shortcodes
+        // Only enqueue on pages with our shortcodes or on known FTT pages
         global $post;
         if (!is_a($post, 'WP_Post')) {
             return;
         }
         
+        // Check if this is one of our plugin pages (by page ID)
+        $is_ftt_page = FTT_Pages::is_ftt_page();
+        
+        // Check if page has our shortcodes
         $has_shortcode = false;
-        $shortcodes = array('ftt_calendar', 'ftt_event_form', 'ftt_dashboard', 'ftt_event_list', 'ftt_family_management', 'ftt_login', 'ftt_register');
+        // NOTE: 'ftt_homepage' is intentionally excluded from this list.
+        // The homepage is managed as an Elementor Pro page, giving the site owner
+        // full control over the layout. The plugin template (templates/homepage.php)
+        // is NOT used for the live homepage. The stylesheet is injected directly
+        // inside that template file as a fallback for Elementor-rendered pages.
+        $shortcodes = array('ftt_calendar', 'ftt_event_form', 'ftt_dashboard', 'ftt_event_list', 'ftt_family_management', 'ftt_login', 'ftt_register', 'ftt_groups', 'ftt_onboarding', 'ftt_trial_expired');
         
         foreach ($shortcodes as $shortcode) {
             if (has_shortcode($post->post_content, $shortcode)) {
@@ -344,7 +408,8 @@ class Family_Travel_Tracker {
             }
         }
         
-        if (!$has_shortcode) {
+        // Exit if not an FTT page and no shortcode found
+        if (!$is_ftt_page && !$has_shortcode) {
             return;
         }
         
@@ -367,9 +432,11 @@ class Family_Travel_Tracker {
             FTT_VERSION
         );
         
-        // Add dynamic event type colors
+        // Add dynamic event type colors (fall back to defaults when settings not yet saved)
         $settings = get_option('ftt_settings', array());
-        $event_types = $settings['event_types'] ?? array();
+        $event_types = !empty($settings['event_types'])
+            ? $settings['event_types']
+            : (class_exists('FTT_CPT') ? FTT_CPT::get_default_event_types() : array());
         
         if (!empty($event_types)) {
             $custom_css = '';
@@ -408,16 +475,26 @@ class Family_Travel_Tracker {
         
         // Localize script
         $settings = get_option('ftt_settings', array());
+        $current_uid = get_current_user_id();
         wp_localize_script('ftt-main', 'fttData', array(
             'pluginUrl' => FTT_PLUGIN_URL,
             'restUrl' => rest_url('ftt/v1/'),
             'nonce' => wp_create_nonce('wp_rest'),
             'isAdmin' => current_user_can('edit_posts'),
             'timezone' => wp_timezone_string(),
+            'userTimezone' => FTT_User_Profile::get_user_timezone($current_uid),
+            'userCalendarView' => get_user_meta($current_uid, 'ftt_calendar_view', true) ?: 'month',
             'eventFormUrl' => FTT_Pages::get_page_url('event_form'),
+            'dashboardUrl' => FTT_Pages::get_page_url('dashboard'),
             'geocodingProvider' => $settings['geocoding_provider'] ?? 'none',
             'mapboxApiKey' => $settings['mapbox_api_key'] ?? '',
             'googlePlacesApiKey' => $settings['google_places_api_key'] ?? '',
+            'externalCalendars' => $current_uid ? array_values(
+                array_map(
+                    function( $f ) { return array( 'label' => $f['label'], 'color' => $f['color'] ); },
+                    FTT_External_Calendars::get_feeds( $current_uid )
+                )
+            ) : array(),
         ));
     }
 }

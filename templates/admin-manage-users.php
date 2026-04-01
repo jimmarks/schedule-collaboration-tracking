@@ -12,7 +12,7 @@ if (!defined('ABSPATH')) {
 
 $all_users = get_users(array('orderby' => 'display_name'));
 $members = FTT_Roles::get_all_members();
-$parents = FTT_Roles::get_all_parents();
+$adults  = FTT_Roles::get_all_adults();
 ?>
 
 <div class="wrap">
@@ -23,9 +23,10 @@ $parents = FTT_Roles::get_all_parents();
     <div class="ftt-admin-tabs">
         <nav class="nav-tab-wrapper">
             <a href="#members" class="nav-tab nav-tab-active"><?php esc_html_e('Children', 'schedule-collaboration-tracking'); ?> (<?php echo count($members); ?>)</a>
-            <a href="#parents" class="nav-tab"><?php esc_html_e('Parents', 'schedule-collaboration-tracking'); ?> (<?php echo count($parents); ?>)</a>
+            <a href="#adults" class="nav-tab"><?php esc_html_e('Adults', 'schedule-collaboration-tracking'); ?> (<?php echo count($adults); ?>)</a>
             <a href="#all-users" class="nav-tab"><?php esc_html_e('All Users', 'schedule-collaboration-tracking'); ?></a>
             <a href="#relationships" class="nav-tab"><?php esc_html_e('Manage Relationships', 'schedule-collaboration-tracking'); ?></a>
+            <a href="#billing-overrides" class="nav-tab"><?php esc_html_e('Billing Overrides', 'schedule-collaboration-tracking'); ?></a>
         </nav>
         
         <!-- Members Tab -->
@@ -84,30 +85,31 @@ $parents = FTT_Roles::get_all_parents();
             </table>
         </div>
         
-        <!-- Parents Tab -->
-        <div id="parents" class="tab-content" style="display: none;">
-            <h2><?php esc_html_e('Parents & Guardians', 'schedule-collaboration-tracking'); ?></h2>
-            <p><?php esc_html_e('Users who are parents/guardians of members and receive alerts.', 'schedule-collaboration-tracking'); ?></p>
+        <!-- Adults Tab -->
+        <div id="adults" class="tab-content" style="display: none;">
+            <h2><?php esc_html_e('Adults', 'schedule-collaboration-tracking'); ?></h2>
+            <p><?php esc_html_e('Adult accounts registered in the system. Adults can manage children, book travel, and receive alerts.', 'schedule-collaboration-tracking'); ?></p>
             
             <table class="wp-list-table widefat fixed striped">
                 <thead>
                     <tr>
                         <th><?php esc_html_e('Name', 'schedule-collaboration-tracking'); ?></th>
                         <th><?php esc_html_e('Email', 'schedule-collaboration-tracking'); ?></th>
-                        <th><?php esc_html_e('Role', 'schedule-collaboration-tracking'); ?></th>
-                        <th><?php esc_html_e('Children', 'schedule-collaboration-tracking'); ?></th>
+                        <th><?php esc_html_e('WP Role', 'schedule-collaboration-tracking'); ?></th>
+                        <th><?php esc_html_e('Children Linked', 'schedule-collaboration-tracking'); ?></th>
+                        <th><?php esc_html_e('Member Since', 'schedule-collaboration-tracking'); ?></th>
                         <th><?php esc_html_e('Actions', 'schedule-collaboration-tracking'); ?></th>
                     </tr>
                 </thead>
                 <tbody>
-                    <?php if (empty($parents)) : ?>
+                    <?php if (empty($adults)) : ?>
                         <tr>
-                            <td colspan="5"><?php esc_html_e('No parents found. Add parent relationships by editing user profiles.', 'schedule-collaboration-tracking'); ?></td>
+                            <td colspan="6"><?php esc_html_e('No adult accounts found.', 'schedule-collaboration-tracking'); ?></td>
                         </tr>
                     <?php else : ?>
-                        <?php foreach ($parents as $parent) : ?>
+                        <?php foreach ($adults as $adult) : ?>
                             <?php
-                            $children_list = FTT_Roles::get_children($parent->ID);
+                            $children_list  = FTT_Roles::get_children($adult->ID);
                             $children_names = array();
                             foreach ($children_list as $child_id) {
                                 $child = get_user_by('id', $child_id);
@@ -115,14 +117,16 @@ $parents = FTT_Roles::get_all_parents();
                                     $children_names[] = $child->display_name;
                                 }
                             }
+                            $adult_since = get_user_meta($adult->ID, 'ftt_member_since', true);
                             ?>
                             <tr>
-                                <td><strong><?php echo esc_html($parent->display_name); ?></strong></td>
-                                <td><?php echo esc_html($parent->user_email); ?></td>
-                                <td><?php echo esc_html(implode(', ', $parent->roles)); ?></td>
+                                <td><strong><?php echo esc_html($adult->display_name); ?></strong></td>
+                                <td><?php echo esc_html($adult->user_email); ?></td>
+                                <td><?php echo esc_html(implode(', ', $adult->roles)); ?></td>
                                 <td><?php echo $children_names ? esc_html(implode(', ', $children_names)) : '—'; ?></td>
+                                <td><?php echo $adult_since ? esc_html(date('M j, Y', strtotime($adult_since))) : '—'; ?></td>
                                 <td>
-                                    <a href="<?php echo esc_url(get_edit_user_link($parent->ID)); ?>" class="button button-small"><?php esc_html_e('Edit', 'schedule-collaboration-tracking'); ?></a>
+                                    <a href="<?php echo esc_url(get_edit_user_link($adult->ID)); ?>" class="button button-small"><?php esc_html_e('Edit', 'schedule-collaboration-tracking'); ?></a>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -142,8 +146,8 @@ $parents = FTT_Roles::get_all_parents();
                         <th><?php esc_html_e('Name', 'schedule-collaboration-tracking'); ?></th>
                         <th><?php esc_html_e('Email', 'schedule-collaboration-tracking'); ?></th>
                         <th><?php esc_html_e('Role', 'schedule-collaboration-tracking'); ?></th>
-                        <th><?php esc_html_e('Member?', 'schedule-collaboration-tracking'); ?></th>
-                        <th><?php esc_html_e('Parent?', 'schedule-collaboration-tracking'); ?></th>
+                        <th><?php esc_html_e('Child?', 'schedule-collaboration-tracking'); ?></th>
+                        <th><?php esc_html_e('Adult?', 'schedule-collaboration-tracking'); ?></th>
                         <th><?php esc_html_e('Actions', 'schedule-collaboration-tracking'); ?></th>
                     </tr>
                 </thead>
@@ -154,7 +158,7 @@ $parents = FTT_Roles::get_all_parents();
                             <td><?php echo esc_html($user->user_email); ?></td>
                             <td><?php echo esc_html(implode(', ', $user->roles)); ?></td>
                             <td><?php echo FTT_Roles::is_member($user->ID) ? '✓' : '—'; ?></td>
-                            <td><?php echo FTT_Roles::is_parent($user->ID) ? '✓' : '—'; ?></td>
+                            <td><?php echo FTT_Roles::is_adult($user->ID) ? '✓' : '—'; ?></td>
                             <td>
                                 <a href="<?php echo esc_url(get_edit_user_link($user->ID)); ?>" class="button button-small"><?php esc_html_e('Edit', 'schedule-collaboration-tracking'); ?></a>
                                 <?php if (!FTT_Roles::is_member($user->ID)) : ?>
@@ -174,17 +178,17 @@ $parents = FTT_Roles::get_all_parents();
         
         <!-- Relationships Tab -->
         <div id="relationships" class="tab-content" style="display: none;">
-            <h2><?php esc_html_e('Manage Parent/Child Relationships', 'schedule-collaboration-tracking'); ?></h2>
-            <p><?php esc_html_e('Add or remove parent/guardian relationships.', 'schedule-collaboration-tracking'); ?></p>
+            <h2><?php esc_html_e('Manage Family Relationships', 'schedule-collaboration-tracking'); ?></h2>
+            <p><?php esc_html_e('Link adult accounts to children or remove existing links.', 'schedule-collaboration-tracking'); ?></p>
             
             <div class="card">
-                <h3><?php esc_html_e('Add Parent Relationship', 'schedule-collaboration-tracking'); ?></h3>
+                <h3><?php esc_html_e('Link Adult to Child', 'schedule-collaboration-tracking'); ?></h3>
                 <form method="post">
                     <?php wp_nonce_field('ftt_manage_users'); ?>
                     <input type="hidden" name="ftt_action" value="add_parent">
                     <table class="form-table">
                         <tr>
-                            <th><label for="parent_id"><?php esc_html_e('Parent/Guardian', 'schedule-collaboration-tracking'); ?></label></th>
+                            <th><label for="parent_id"><?php esc_html_e('Adult / Guardian', 'schedule-collaboration-tracking'); ?></label></th>
                             <td>
                                 <select name="parent_id" id="parent_id" required>
                                     <option value=""><?php esc_html_e('Select parent...', 'schedule-collaboration-tracking'); ?></option>
@@ -195,7 +199,7 @@ $parents = FTT_Roles::get_all_parents();
                             </td>
                         </tr>
                         <tr>
-                            <th><label for="child_id"><?php esc_html_e('Child (Member)', 'schedule-collaboration-tracking'); ?></label></th>
+                            <th><label for="child_id"><?php esc_html_e('Child', 'schedule-collaboration-tracking'); ?></label></th>
                             <td>
                                 <select name="child_id" id="child_id" required>
                                     <option value=""><?php esc_html_e('Select member...', 'schedule-collaboration-tracking'); ?></option>
@@ -217,7 +221,7 @@ $parents = FTT_Roles::get_all_parents();
                 <table class="wp-list-table widefat fixed striped">
                     <thead>
                         <tr>
-                            <th><?php esc_html_e('Parent', 'schedule-collaboration-tracking'); ?></th>
+                            <th><?php esc_html_e('Adult', 'schedule-collaboration-tracking'); ?></th>
                             <th><?php esc_html_e('Child', 'schedule-collaboration-tracking'); ?></th>
                             <th><?php esc_html_e('Actions', 'schedule-collaboration-tracking'); ?></th>
                         </tr>
@@ -264,6 +268,128 @@ $parents = FTT_Roles::get_all_parents();
                 </table>
             </div>
         </div>
+
+        <!-- Billing Overrides Tab -->
+        <div id="billing-overrides" class="tab-content" style="display: none;">
+            <h2><?php esc_html_e('Billing Overrides', 'schedule-collaboration-tracking'); ?></h2>
+            <p><?php esc_html_e('Grant or remove billing exemptions. Exempt users and groups bypass subscription checks entirely — no Stripe subscription required.', 'schedule-collaboration-tracking'); ?></p>
+
+            <!-- Per-user exemptions -->
+            <h3><?php esc_html_e('User Exemptions', 'schedule-collaboration-tracking'); ?></h3>
+            <table class="wp-list-table widefat fixed striped">
+                <thead>
+                    <tr>
+                        <th><?php esc_html_e('Name', 'schedule-collaboration-tracking'); ?></th>
+                        <th><?php esc_html_e('Email', 'schedule-collaboration-tracking'); ?></th>
+                        <th style="width:140px;"><?php esc_html_e('Billing Status', 'schedule-collaboration-tracking'); ?></th>
+                        <th style="width:160px;"><?php esc_html_e('Action', 'schedule-collaboration-tracking'); ?></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($all_users as $user) :
+                        // Skip site admins — they're always exempt
+                        if (user_can($user->ID, 'manage_options')) {
+                            continue;
+                        }
+                        $is_exempt = (bool) get_user_meta($user->ID, 'ftt_billing_exempt', true);
+                    ?>
+                        <tr>
+                            <td><strong><?php echo esc_html($user->display_name); ?></strong></td>
+                            <td><?php echo esc_html($user->user_email); ?></td>
+                            <td>
+                                <?php if ($is_exempt) : ?>
+                                    <span style="color:#1d6f42;font-weight:600;">&#10003; <?php esc_html_e('Exempt', 'schedule-collaboration-tracking'); ?></span>
+                                <?php else : ?>
+                                    <span style="color:#666;">&#8212; <?php esc_html_e('Normal', 'schedule-collaboration-tracking'); ?></span>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <form method="post" style="display:inline;">
+                                    <?php wp_nonce_field('ftt_manage_users'); ?>
+                                    <input type="hidden" name="ftt_action" value="toggle_billing_exempt_user">
+                                    <input type="hidden" name="user_id" value="<?php echo esc_attr($user->ID); ?>">
+                                    <input type="hidden" name="exempt_value" value="<?php echo $is_exempt ? '0' : '1'; ?>">
+                                    <?php if ($is_exempt) : ?>
+                                        <button type="submit" class="button button-small"
+                                            onclick="return confirm('<?php esc_attr_e('Remove billing exemption for this user?', 'schedule-collaboration-tracking'); ?>');">
+                                            <?php esc_html_e('Remove Exemption', 'schedule-collaboration-tracking'); ?>
+                                        </button>
+                                    <?php else : ?>
+                                        <button type="submit" class="button button-small button-primary">
+                                            <?php esc_html_e('Grant Exemption', 'schedule-collaboration-tracking'); ?>
+                                        </button>
+                                    <?php endif; ?>
+                                </form>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+
+            <?php if (class_exists('FTT_Family_Groups')) :
+                $all_groups   = FTT_Family_Groups::get_all_groups();
+                $exempt_group_ids = array_map('intval', (array) get_option('ftt_billing_exempt_groups', []));
+            ?>
+            <!-- Per-group exemptions -->
+            <h3 style="margin-top:30px;"><?php esc_html_e('Group Exemptions', 'schedule-collaboration-tracking'); ?></h3>
+            <p><?php esc_html_e('All members of an exempt group bypass billing, regardless of their individual subscription status.', 'schedule-collaboration-tracking'); ?></p>
+
+            <?php if (empty($all_groups)) : ?>
+                <p><?php esc_html_e('No groups found.', 'schedule-collaboration-tracking'); ?></p>
+            <?php else : ?>
+            <table class="wp-list-table widefat fixed striped">
+                <thead>
+                    <tr>
+                        <th><?php esc_html_e('Group Name', 'schedule-collaboration-tracking'); ?></th>
+                        <th><?php esc_html_e('Members', 'schedule-collaboration-tracking'); ?></th>
+                        <th><?php esc_html_e('Subscription Status', 'schedule-collaboration-tracking'); ?></th>
+                        <th style="width:140px;"><?php esc_html_e('Billing Override', 'schedule-collaboration-tracking'); ?></th>
+                        <th style="width:160px;"><?php esc_html_e('Action', 'schedule-collaboration-tracking'); ?></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($all_groups as $group) :
+                        $is_group_exempt  = in_array((int) $group->id, $exempt_group_ids, true);
+                        $member_count = FTT_Family_Groups::get_member_count($group->id);
+                        $status_label = $group->subscription_status ?: __('None', 'schedule-collaboration-tracking');
+                    ?>
+                        <tr>
+                            <td><strong><?php echo esc_html($group->name); ?></strong></td>
+                            <td><?php echo (int) $member_count; ?></td>
+                            <td><?php echo esc_html($status_label); ?></td>
+                            <td>
+                                <?php if ($is_group_exempt) : ?>
+                                    <span style="color:#1d6f42;font-weight:600;">&#10003; <?php esc_html_e('Exempt', 'schedule-collaboration-tracking'); ?></span>
+                                <?php else : ?>
+                                    <span style="color:#666;">&#8212; <?php esc_html_e('Normal', 'schedule-collaboration-tracking'); ?></span>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <form method="post" style="display:inline;">
+                                    <?php wp_nonce_field('ftt_manage_users'); ?>
+                                    <input type="hidden" name="ftt_action" value="toggle_billing_exempt_group">
+                                    <input type="hidden" name="group_id" value="<?php echo esc_attr($group->id); ?>">
+                                    <input type="hidden" name="exempt_value" value="<?php echo $is_group_exempt ? '0' : '1'; ?>">
+                                    <?php if ($is_group_exempt) : ?>
+                                        <button type="submit" class="button button-small"
+                                            onclick="return confirm('<?php esc_attr_e('Remove billing exemption for this group?', 'schedule-collaboration-tracking'); ?>');">
+                                            <?php esc_html_e('Remove Exemption', 'schedule-collaboration-tracking'); ?>
+                                        </button>
+                                    <?php else : ?>
+                                        <button type="submit" class="button button-small button-primary">
+                                            <?php esc_html_e('Grant Exemption', 'schedule-collaboration-tracking'); ?>
+                                        </button>
+                                    <?php endif; ?>
+                                </form>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+            <?php endif; // empty $all_groups ?>
+            <?php endif; // class_exists FTT_Family_Groups ?>
+        </div>
+
     </div>
 </div>
 
@@ -284,16 +410,18 @@ $parents = FTT_Roles::get_all_parents();
 
 <script>
 jQuery(document).ready(function($) {
-    // Tab switching
-    $('.nav-tab').on('click', function(e) {
+    // Tab switching — scoped to .ftt-admin-tabs and only anchor-style hrefs
+    // so that the outer URL-based "Users & Groups" nav tabs are not intercepted.
+    $('.ftt-admin-tabs .nav-tab[href^="#"]').on('click', function(e) {
         e.preventDefault();
         var target = $(this).attr('href');
-        
-        $('.nav-tab').removeClass('nav-tab-active');
+        var $container = $(this).closest('.ftt-admin-tabs');
+
+        $container.find('.nav-tab').removeClass('nav-tab-active');
         $(this).addClass('nav-tab-active');
-        
-        $('.tab-content').hide();
-        $(target).show();
+
+        $container.find('.tab-content').hide();
+        $container.find(target).show();
     });
 });
 </script>

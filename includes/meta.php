@@ -255,10 +255,14 @@ class FTT_Meta {
             return '[]';
         }
         
-        // Decode JSON
-        $legs = json_decode($value, true);
-        
-        if (!is_array($legs)) {
+        // Value may arrive as an already-decoded array (REST API) or as a JSON string
+        if ( is_array( $value ) ) {
+            $legs = $value;
+        } else {
+            $legs = json_decode( $value, true );
+        }
+
+        if ( ! is_array( $legs ) ) {
             return '[]';
         }
         

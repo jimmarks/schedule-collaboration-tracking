@@ -14,6 +14,28 @@ if (!is_user_logged_in()) {
     wp_redirect(home_url('/'));
     exit;
 }
+
+// Only fire the Google Ads conversion snippet once per session
+// (protects against page refresh double-counting).
+$already_tracked = isset($_COOKIE['ftt_ads_conversion_fired']);
+$is_real_checkout = isset($_GET['ftt_checkout']) && $_GET['ftt_checkout'] === 'success';
+?>
+
+<?php if ($is_real_checkout && !$already_tracked): ?>
+<!-- Google tag (gtag.js) event - fires once on successful checkout -->
+<script>
+  gtag('event', 'conversion_event_purchase', {
+      'value': 9.99,
+      'currency': 'USD',
+      'transaction_id': '<?php echo esc_js( sanitize_text_field( $_GET['session_id'] ?? '' ) ); ?>'
+  });
+</script>
+<?php
+    // Set a short-lived cookie so a page refresh doesn't re-fire the event.
+    if (!headers_sent()) {
+        setcookie('ftt_ads_conversion_fired', '1', time() + 300, COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true);
+    }
+endif;
 ?>
 
 <div class="ftt-checkout-success-container">

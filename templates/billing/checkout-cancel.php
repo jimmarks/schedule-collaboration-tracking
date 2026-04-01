@@ -26,7 +26,14 @@ if (!defined('ABSPATH')) {
     
     <div class="ftt-help-section">
         <h3><?php esc_html_e('Have Questions?', 'schedule-collaboration-tracking'); ?></h3>
-        <p><?php esc_html_e('We\'re here to help! Contact us if you have any questions about pricing or features.', 'schedule-collaboration-tracking'); ?></p>
+        <p><?php printf(
+            wp_kses(
+                /* translators: %s: support email address */
+                __( 'We\'re here to help! <a href="mailto:%s">Email us</a> with any questions about pricing or features.', 'schedule-collaboration-tracking' ),
+                [ 'a' => [ 'href' => [] ] ]
+            ),
+            'info@familytraveltracker.app'
+        ); ?></p>
     </div>
     
     <div class="ftt-cta-buttons">

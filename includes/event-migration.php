@@ -21,7 +21,6 @@ class FTT_Event_Migration {
      * Initialize
      */
     public static function init() {
-        add_action('admin_menu', array(__CLASS__, 'add_admin_menu'));
         add_action('admin_post_ftt_migrate_events', array(__CLASS__, 'handle_migration'));
     }
     

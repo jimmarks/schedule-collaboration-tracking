@@ -19,18 +19,97 @@ if (!is_user_logged_in()) {
 }
 
 $current_user = wp_get_current_user();
-$is_parent = FTT_Roles::is_parent($current_user->ID);
-$children = FTT_Roles::get_children($current_user->ID);
-$parents = FTT_Roles::get_parents($current_user->ID);
+
+// Check if managing a specific group (v2.1)
+// Accept an opaque token (preferred) or fall back to a raw integer for legacy links.
+$group_id = null;
+$group    = null;
+$is_group_admin = false;
+
+if ( isset( $_GET['group'] ) && class_exists( 'FTT_Family_Groups' ) ) {
+    $raw = sanitize_text_field( wp_unslash( $_GET['group'] ) );
+
+    // Try token resolution first (non-numeric string is always a token).
+    if ( ! ctype_digit( $raw ) ) {
+        $group_id = FTT_Family_Groups::resolve_group_token( $raw );
+    } else {
+        // Numeric: legacy link — resolve via token to validate it's a real group.
+        $numeric_id = (int) $raw;
+        // Silently accept the legacy numeric ID so old bookmarks still work,
+        // but we won't expose the raw integer in any new links we generate.
+        $group_id = $numeric_id > 0 ? $numeric_id : null;
+    }
+}
+
+if ($group_id && class_exists('FTT_Family_Groups')) {
+    $group = FTT_Family_Groups::get_group($group_id);
+    
+    // Verify user has access to this group
+    if (!$group || !FTT_Family_Groups::can_manage_group($group_id, $current_user->ID)) {
+        echo '<p>' . esc_html__('You do not have permission to manage this group.', 'schedule-collaboration-tracking') . '</p>';
+        return;
+    }
+    
+    $is_group_admin = true;
+    $group_members = FTT_Family_Groups::get_group_members($group_id);
+    $children = array_filter($group_members, function($m) { return $m->role === 'child'; });
+    $parents = array_filter($group_members, function($m) { return $m->role === 'parent'; });
+} else {
+    // Legacy mode - use old relationship system
+    $is_parent = FTT_Roles::is_parent($current_user->ID);
+    $children_ids = FTT_Roles::get_children($current_user->ID);
+    $children = array_map(function($id) {
+        $user = get_userdata($id);
+        return (object)['user_id' => $id, 'role' => 'child', 'display_name' => $user ? $user->display_name : ''];
+    }, $children_ids);
+    
+    $parents_ids = FTT_Roles::get_parents($current_user->ID);
+    $parents = array_map(function($id) {
+        $user = get_userdata($id);
+        return (object)['user_id' => $id, 'role' => 'parent', 'display_name' => $user ? $user->display_name : ''];
+    }, $parents_ids);
+}
 ?>
 
 <div class="ftt-family-management-container">
     <div class="ftt-page-header">
-        <h1><?php esc_html_e('Manage Family', 'schedule-collaboration-tracking'); ?></h1>
-        <a href="<?php echo esc_url(home_url('/ftt-dashboard/')); ?>" class="button button-secondary">
-            ← <?php esc_html_e('Back to Dashboard', 'schedule-collaboration-tracking'); ?>
+        <h1>
+            <?php 
+            if ($group) {
+                printf(esc_html__('Manage %s', 'schedule-collaboration-tracking'), esc_html($group->name));
+            } else {
+                esc_html_e('Manage Family', 'schedule-collaboration-tracking');
+            }
+            ?>
+        </h1>
+        <a href="<?php echo esc_url($group ? home_url('/ftt-groups/') : home_url('/ftt-dashboard/')); ?>" class="ftt-back-btn">
+            <span class="dashicons dashicons-arrow-left-alt"></span>
+            <?php echo $group ? esc_html__('Back to Groups', 'schedule-collaboration-tracking') : esc_html__('Back to Dashboard', 'schedule-collaboration-tracking'); ?>
         </a>
     </div>
+    
+    <?php if ($group): ?>
+    <!-- Group Info Bar -->
+    <div class="ftt-group-info-bar">
+        <div class="ftt-group-color-bar" style="background-color: <?php echo esc_attr($group->color); ?>"></div>
+        <div class="ftt-group-info-content">
+            <div class="ftt-group-info-text">
+                <?php if ($group->description): ?>
+                    <p class="ftt-group-description-text"><?php echo esc_html($group->description); ?></p>
+                <?php endif; ?>
+                <p class="ftt-group-meta">
+                    <span><?php echo esc_html($group->member_count - $group->child_count); ?> <?php echo ($group->member_count - $group->child_count) == 1 ? 'parent' : 'parents'; ?></span>
+                    <span class="ftt-separator">•</span>
+                    <span><?php echo esc_html($group->child_count); ?> <?php echo $group->child_count == 1 ? 'child' : 'children'; ?></span>
+                </p>
+            </div>
+            <a href="<?php echo esc_url(home_url('/ftt-calendar/?group=' . FTT_Family_Groups::get_group_token($group->id))); ?>" class="button button-primary">
+                <span class="dashicons dashicons-calendar-alt"></span>
+                <?php esc_html_e('View Calendar', 'schedule-collaboration-tracking'); ?>
+            </a>
+        </div>
+    </div>
+    <?php endif; ?>
 
     <!-- Children Section -->
     <div class="ftt-management-section ftt-children-section">
@@ -43,21 +122,35 @@ $parents = FTT_Roles::get_parents($current_user->ID);
 
         <div id="ftt-children-list" class="ftt-children-grid">
             <?php if (!empty($children)): ?>
-                <?php foreach ($children as $child_id):
-                    $child = get_userdata($child_id);
-                    if (!$child) continue;
+                <?php foreach ($children as $child):
+                    $child_id = is_object($child) ? $child->user_id : $child;
+                    $child_user = get_userdata($child_id);
+                    if (!$child_user) continue;
                     
                     $child_age = get_user_meta($child_id, 'child_age', true);
                     $child_grade = get_user_meta($child_id, 'child_grade', true);
                     $child_school = get_user_meta($child_id, 'child_school', true);
-                    $child_color = get_user_meta($child_id, 'child_color', true) ?: '#2196F3';
+                    
+                    // Use FTT_Child_Colors for consistent color handling
+                    $child_color = '#2196F3'; // default
+                    $color_data = null;
+                    if (class_exists('FTT_Child_Colors')) {
+                        $color_data = FTT_Child_Colors::get_child_color($child_id);
+                        if ($color_data && isset($color_data['hex'])) {
+                            $child_color = $color_data['hex'];
+                        }
+                    }
+                    if (!$color_data) {
+                        // Fallback to direct meta read for backwards compatibility
+                        $child_color = get_user_meta($child_id, 'child_color', true) ?: '#2196F3';
+                    }
                 ?>
                     <div class="ftt-child-card" data-child-id="<?php echo esc_attr($child_id); ?>">
                         <div class="ftt-child-avatar" style="background-color: <?php echo esc_attr($child_color); ?>">
-                            <?php echo esc_html(strtoupper(substr($child->first_name, 0, 1))); ?>
+                            <?php echo esc_html(strtoupper(substr($child_user->first_name, 0, 1))); ?>
                         </div>
                         <div class="ftt-child-info">
-                            <h3><?php echo esc_html($child->display_name); ?></h3>
+                            <h3><?php echo esc_html($child_user->display_name); ?></h3>
                             <?php if ($child_age): ?>
                                 <p class="ftt-child-meta"><?php printf(esc_html__('Age: %s', 'schedule-collaboration-tracking'), esc_html($child_age)); ?></p>
                             <?php endif; ?>
@@ -97,23 +190,28 @@ $parents = FTT_Roles::get_parents($current_user->ID);
 
         <div id="ftt-adults-list" class="ftt-adults-grid">
             <?php if (!empty($parents)): ?>
-                <?php foreach ($parents as $parent_id):
+                <?php foreach ($parents as $parent):
+                    $parent_id = is_object($parent) ? $parent->user_id : $parent;
                     if ($parent_id == $current_user->ID) continue; // Skip self
                     
-                    $parent = get_userdata($parent_id);
-                    if (!$parent) continue;
+                    $parent_user = get_userdata($parent_id);
+                    if (!$parent_user) continue;
                     
-                    $relationship = get_user_meta($parent_id, 'relationship_to_' . $current_user->ID, true);
+                    $relationship = is_object($parent) && isset($parent->relationship) ? $parent->relationship : get_user_meta($parent_id, 'relationship_to_' . $current_user->ID, true);
+                    $can_manage = is_object($parent) && isset($parent->can_manage_group) ? $parent->can_manage_group : false;
                 ?>
                     <div class="ftt-adult-card" data-adult-id="<?php echo esc_attr($parent_id); ?>">
                         <div class="ftt-adult-avatar">
-                            <?php echo esc_html(strtoupper(substr($parent->first_name, 0, 1))); ?>
+                            <?php echo esc_html(strtoupper(substr($parent_user->first_name, 0, 1))); ?>
                         </div>
                         <div class="ftt-adult-info">
-                            <h3><?php echo esc_html($parent->display_name); ?></h3>
-                            <p class="ftt-adult-email"><?php echo esc_html($parent->user_email); ?></p>
+                            <h3><?php echo esc_html($parent_user->display_name); ?></h3>
+                            <p class="ftt-adult-email"><?php echo esc_html($parent_user->user_email); ?></p>
                             <?php if ($relationship): ?>
-                                <p class="ftt-adult-meta"><?php echo esc_html($relationship); ?></p>
+                                <p class="ftt-adult-meta"><?php echo esc_html(ucfirst($relationship)); ?></p>
+                            <?php endif; ?>
+                            <?php if ($can_manage): ?>
+                                <span class="ftt-badge-admin">Admin</span>
                             <?php endif; ?>
                         </div>
                         <div class="ftt-adult-actions">
@@ -229,8 +327,8 @@ $parents = FTT_Roles::get_parents($current_user->ID);
                         <span class="ftt-category-icon"><?php echo $category['icon']; ?></span>
                         <span class="ftt-category-label"><?php echo esc_html($category['label']); ?></span>
                         <span class="ftt-category-count"><?php echo count($category['types']); ?> types</span>
-                        <button type="button" class="ftt-category-expand" data-category="<?php echo esc_attr($cat_key); ?>">▼</button>
                     </label>
+                    <button type="button" class="ftt-category-expand" data-category="<?php echo esc_attr($cat_key); ?>">▼</button>
                     <div class="ftt-category-types-list" id="ftt-types-<?php echo esc_attr($cat_key); ?>" style="display: none;">
                         <ul>
                             <?php foreach ($category['types'] as $type_key): 
@@ -606,6 +704,7 @@ $parents = FTT_Roles::get_parents($current_user->ID);
 
 .ftt-category-checkbox input[type="checkbox"] {
     margin: 0;
+    cursor: pointer;
 }
 
 .ftt-category-icon {
@@ -615,22 +714,12 @@ $parents = FTT_Roles::get_parents($current_user->ID);
 .ftt-category-label {
     flex: 1;
     font-weight: 500;
+    cursor: pointer;
 }
 
 .ftt-category-count {
     font-size: 12px;
     color: #999;
-}
-
-.ftt-category-expand {
-    background: none;
-    border: none;
-    color: #666;
-    cursor: pointer;
-    padding: 5px;
-    font-size: 12px;
-    transition: transform 0.2s;
-    margin-left: auto;
 }
 
 .ftt-category-expand.expanded {
@@ -641,6 +730,7 @@ $parents = FTT_Roles::get_parents($current_user->ID);
     border: 2px solid #e0e0e0;
     border-radius: 8px;
     overflow: hidden;
+    position: relative;
 }
 
 .ftt-category-checkbox {
@@ -648,8 +738,33 @@ $parents = FTT_Roles::get_parents($current_user->ID);
     align-items: center;
     gap: 10px;
     padding: 15px;
+    padding-right: 50px; /* Make room for expand button */
     border: none;
     margin: 0;
+}
+
+.ftt-category-expand {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: none;
+    border: none;
+    color: #666;
+    cursor: pointer;
+    padding: 8px;
+    font-size: 14px;
+    line-height: 1;
+    transition: transform 0.2s;
+    z-index: 10;
+    user-select: none;
+}
+
+.ftt-category-expand:hover {
+    color: #2271b1;
+}
+
+.ftt-category-expand:focus {
+    outline: none;
 }
 
 .ftt-category-types-list {
@@ -745,6 +860,13 @@ $parents = FTT_Roles::get_parents($current_user->ID);
 .ftt-modal-actions .button {
     min-width: 100px;
     white-space: nowrap;
+    padding: 6px 12px;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.ftt-modal-actions .button-primary {
+    min-width: 120px;
 }
 
 .ftt-modal-content form {
@@ -807,4 +929,579 @@ $parents = FTT_Roles::get_parents($current_user->ID);
     color: #721c24;
     border: 1px solid #f5c6cb;
 }
+
+/* Group Info Bar */
+.ftt-group-info-bar {
+    background: white;
+    border-radius: 8px;
+    padding: 0;
+    margin-bottom: 30px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    overflow: hidden;
+}
+
+.ftt-group-color-bar {
+    height: 6px;
+    width: 100%;
+}
+
+.ftt-group-info-content {
+    padding: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+}
+
+.ftt-group-info-text {
+    flex: 1;
+}
+
+.ftt-group-description-text {
+    margin: 0 0 10px 0;
+    color: #333;
+    font-size: 15px;
+}
+
+.ftt-group-meta {
+    margin: 0;
+    color: #666;
+    font-size: 14px;
+}
+
+.ftt-separator {
+    margin: 0 8px;
+}
+
+.ftt-badge-admin {
+    display: inline-block;
+    background: #2271b1;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: bold;
+    margin-left: 10px;
+}
+
+/* Back Button Styling */
+.ftt-back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 8px 16px;
+    background: white;
+    border: 2px solid #2271b1;
+    border-radius: 4px;
+    color: #2271b1;
+    text-decoration: none;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.ftt-back-btn:hover {
+    background: #2271b1;
+    color: white;
+    text-decoration: none;
+}
+
+.ftt-back-btn .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+}
+
+/* ==================== Mobile Responsiveness ==================== */
+
+@media (max-width: 768px) {
+    .ftt-management-container {
+        padding: 10px;
+    }
+    
+    .ftt-page-header {
+        padding: 15px;
+    }
+    
+    .ftt-page-header h1 {
+        font-size: 24px;
+    }
+    
+    .ftt-back-btn {
+        width: 100%;
+        justify-content: center;
+        margin-top: 10px;
+    }
+    
+    .ftt-group-info-bar {
+        flex-direction: column;
+        padding: 15px;
+    }
+    
+    .ftt-group-info-content {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 15px;
+    }
+    
+    .ftt-group-info-content .button {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .ftt-section-header {
+        padding: 15px;
+    }
+    
+    .ftt-section-header h2 {
+        font-size: 20px;
+    }
+    
+    .ftt-child-list,
+    .ftt-coparent-list {
+        grid-template-columns: 1fr !important;
+    }
+    
+    .ftt-child-card,
+    .ftt-coparent-card {
+        padding: 15px;
+    }
+    
+    .ftt-child-card h3,
+    .ftt-coparent-card h3 {
+        font-size: 16px;
+    }
+    
+    .ftt-card-actions {
+        flex-direction: column;
+        width: 100%;
+    }
+    
+    .ftt-card-actions .button {
+        width: 100%;
+        white-space: nowrap;
+    }
+    
+    .ftt-add-child-btn,
+    .ftt-add-coparent-btn {
+        width: 100%;
+        justify-content: center;
+        padding: 12px;
+    }
+    
+    .ftt-category-checkbox-wrapper {
+        padding: 12px;
+    }
+    
+    .ftt-category-checkbox {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    
+    .ftt-form-field {
+        margin-bottom: 15px;
+    }
+    
+    .ftt-form-field input,
+    .ftt-form-field select,
+    .ftt-form-field textarea {
+        font-size: 16px !important; /* Prevent zoom on iOS */
+    }
+    
+    .ftt-form-actions {
+        flex-direction: column;
+    }
+    
+    .ftt-form-actions .button {
+        width: 100%;
+        padding: 12px;
+    }
+    
+    .ftt-modal-content {
+        width: 95%;
+        margin: 10% auto;
+        padding: 20px;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+    
+    .ftt-modal-header h3 {
+        font-size: 18px;
+    }
+    
+    .ftt-invitation-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    
+    .ftt-invitation-actions {
+        width: 100%;
+        justify-content: stretch;
+    }
+    
+    .ftt-invitation-actions .button {
+        flex: 1;
+    }
+}
+
+@media (max-width: 480px) {
+    .ftt-management-container {
+        padding: 5px;
+    }
+    
+    .ftt-page-header {
+        padding: 10px;
+    }
+    
+    .ftt-page-header h1 {
+        font-size: 20px;
+    }
+    
+    .ftt-section-header h2 {
+        font-size: 18px;
+    }
+    
+    .ftt-child-card,
+    .ftt-coparent-card {
+        padding: 12px;
+    }
+    
+    .ftt-form-field input,
+    .ftt-form-field select,
+    .ftt-form-field textarea {
+        padding: 10px;
+    }
+}
 </style>
+
+<script>
+jQuery(document).ready(function($) {
+    const groupId    = <?php echo $group_id ? (int) $group_id : 'null'; ?>;
+    const groupToken = <?php echo ( $group && ! empty( $group->group_token ) ) ? wp_json_encode( $group->group_token ) : 'null'; ?>;
+    const isGroupMode = groupId !== null;
+    
+    // Add Child Button
+    $('#ftt-add-child-btn').on('click', function() {
+        $('#ftt-child-form')[0].reset();
+        $('#ftt-child-id').val('');
+        $('#ftt-child-modal-title').text('<?php esc_html_e('Add Child', 'schedule-collaboration-tracking'); ?>');
+        $('#ftt-child-modal').fadeIn(200);
+    });
+    
+    // Edit Child Button
+    $(document).on('click', '.ftt-edit-child', function() {
+        const childId = $(this).data('child-id');
+        const card = $(this).closest('.ftt-child-card');
+        
+        $('#ftt-child-id').val(childId);
+        $('#child-first-name').val(card.find('h3').text().split(' ')[0]);
+        $('#child-last-name').val(card.find('h3').text().split(' ').slice(1).join(' '));
+        
+        const metaText = card.find('.ftt-child-meta').text();
+        
+        const age = metaText.match(/Age: (\d+)/);
+        if (age) $('#child-age').val(age[1]);
+        
+        const grade = metaText.match(/Grade: ([^•]+)/);
+        if (grade) $('#child-grade').val(grade[1].trim());
+        
+        const school = card.find('.ftt-child-meta:contains("School")').text();
+        if (school) {
+            $('#child-school').val(school.replace(/^.*:\s*/, '').trim());
+        }
+        
+        // Get color from avatar background
+        const avatarBg = card.find('.ftt-child-avatar').css('background-color');
+        if (avatarBg) {
+            // Convert rgb to hex
+            const rgb = avatarBg.match(/\d+/g);
+            if (rgb && rgb.length >= 3) {
+                const hex = '#' + rgb.slice(0,3).map(x => {
+                    const hex = parseInt(x).toString(16);
+                    return hex.length === 1 ? '0' + hex : hex;
+                }).join('');
+                $('#child-color').val(hex);
+            }
+        }
+        
+        $('#ftt-child-modal-title').text('<?php esc_html_e('Edit Child', 'schedule-collaboration-tracking'); ?>');
+        $('#ftt-child-modal').fadeIn(200);
+    });
+    
+    // Save Child Form
+    $('#ftt-child-form').on('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = $(this).serializeArray();
+        const data = {};
+        formData.forEach(field => data[field.name] = field.value);
+        
+        const childId = $('#ftt-child-id').val();
+        const endpoint = childId ? `/wp-json/ftt/v1/children/${childId}` : '/wp-json/ftt/v1/children';
+        const method = childId ? 'PUT' : 'POST';
+        
+        // Add group_id if in group mode
+        if (isGroupMode) {
+            data.group_id = groupId;
+        }
+        
+        $.ajax({
+            url: endpoint,
+            method: method,
+            data: JSON.stringify(data),
+            contentType: 'application/json',
+            beforeSend: function(xhr) {
+                xhr.setRequestHeader('X-WP-Nonce', fttData.nonce);
+            }
+        }).done(function(response) {
+            $('#ftt-child-form-message').addClass('success').text(response.message || 'Child saved successfully!');
+            setTimeout(function() {
+                $('#ftt-child-modal').fadeOut(200);
+                location.reload();
+            }, 1000);
+        }).fail(function(xhr) {
+            const message = xhr.responseJSON?.message || 'Error saving child';
+            $('#ftt-child-form-message').addClass('error').text(message);
+        });
+    });
+    
+    // Remove Child
+    $(document).on('click', '.ftt-remove-child', function() {
+        if (!confirm('<?php esc_html_e('Remove this child?', 'schedule-collaboration-tracking'); ?>')) {
+            return;
+        }
+        
+        const childId = $(this).data('child-id');
+        const endpoint = isGroupMode 
+            ? `/wp-json/ftt/v1/groups/${groupId}/members/${childId}`
+            : `/wp-json/ftt/v1/children/${childId}`;
+        
+        $.ajax({
+            url: endpoint,
+            method: 'DELETE',
+            beforeSend: function(xhr) {
+                xhr.setRequestHeader('X-WP-Nonce', fttData.nonce);
+            }
+        }).done(function(response) {
+            $(`.ftt-child-card[data-child-id="${childId}"]`).fadeOut(300, function() {
+                $(this).remove();
+            });
+        }).fail(function(xhr) {
+            alert(xhr.responseJSON?.message || 'Error removing child');
+        });
+    });
+    
+    // Invite Adult Button
+    $('#ftt-invite-adult-btn').on('click', function() {
+        $('#ftt-invite-adult-form')[0].reset();
+        $('#ftt-invite-adult-modal').fadeIn(200);
+    });
+    
+    // Invite Adult Form
+    $('#ftt-invite-adult-form').on('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = $(this).serializeArray();
+        const data = {};
+        formData.forEach(field => data[field.name] = field.value);
+        
+        // Add group_id if in group mode
+        if (isGroupMode) {
+            data.group_id = groupId;
+            data.role = 'parent';
+        }
+        
+        const endpoint = isGroupMode
+            ? `/wp-json/ftt/v1/groups/${groupId}/invitations`
+            : '/wp-json/ftt/v1/invite-adult';
+        
+        $.ajax({
+            url: endpoint,
+            method: 'POST',
+            data: JSON.stringify(data),
+            contentType: 'application/json',
+            beforeSend: function(xhr) {
+                xhr.setRequestHeader('X-WP-Nonce', fttData.nonce);
+            }
+        }).done(function(response) {
+            $('#ftt-invite-adult-message').addClass('success').text(response.message || 'Invitation sent!');
+            setTimeout(function() {
+                $('#ftt-invite-adult-modal').fadeOut(200);
+                location.reload();
+            }, 1500);
+        }).fail(function(xhr) {
+            const message = xhr.responseJSON?.message || 'Error sending invitation';
+            $('#ftt-invite-adult-message').addClass('error').text(message);
+        });
+    });
+    
+    // Remove Adult
+    $(document).on('click', '.ftt-remove-adult', function() {
+        if (!confirm('<?php esc_html_e('Remove this co-parent/guardian?', 'schedule-collaboration-tracking'); ?>')) {
+            return;
+        }
+        
+        const adultId = $(this).data('adult-id');
+        
+        if (isGroupMode) {
+            $.ajax({
+                url: `/wp-json/ftt/v1/groups/${groupId}/members/${adultId}`,
+                method: 'DELETE',
+                beforeSend: function(xhr) {
+                    xhr.setRequestHeader('X-WP-Nonce', fttData.nonce);
+                }
+            }).done(function(response) {
+                $(`.ftt-adult-card[data-adult-id="${adultId}"]`).fadeOut(300, function() {
+                    $(this).remove();
+                });
+            }).fail(function(xhr) {
+                alert(xhr.responseJSON?.message || 'Error removing adult');
+            });
+        } else {
+            $.ajax({
+                url: '/wp-json/ftt/v1/remove-adult',
+                method: 'POST',
+                data: JSON.stringify({ adult_id: adultId }),
+                contentType: 'application/json',
+                beforeSend: function(xhr) {
+                    xhr.setRequestHeader('X-WP-Nonce', fttData.nonce);
+                }
+            }).done(function(response) {
+                $(`.ftt-adult-card[data-adult-id="${adultId}"]`).fadeOut(300, function() {
+                    $(this).remove();
+                });
+            }).fail(function(xhr) {
+                alert(xhr.responseJSON?.message || 'Error removing adult');
+            });
+        }
+    });
+    
+    // Modal Close Handlers
+    $('.ftt-modal-close, .ftt-modal-close-x').on('click', function() {
+        $(this).closest('.ftt-modal').fadeOut(200);
+    });
+    
+    $('.ftt-modal').on('click', function(e) {
+        if ($(e.target).hasClass('ftt-modal')) {
+            $(this).fadeOut(200);
+        }
+    });
+    
+    // Event Preferences Form
+    $('#ftt-event-preferences-form').on('submit', function(e) {
+        e.preventDefault();
+        
+        const categories = [];
+        $(this).find('input[name="visible_categories[]"]:checked').each(function() {
+            categories.push($(this).val());
+        });
+        
+        $.ajax({
+            url: '/wp-json/ftt/v1/user-preferences',
+            method: 'POST',
+            data: JSON.stringify({ visible_categories: categories }),
+            contentType: 'application/json',
+            beforeSend: function(xhr) {
+                xhr.setRequestHeader('X-WP-Nonce', fttData.nonce);
+            }
+        }).done(function(response) {
+            $('#ftt-preferences-message').addClass('success').text('Preferences saved!');
+            setTimeout(function() {
+                $('#ftt-preferences-message').removeClass('success').text('');
+            }, 3000);
+        }).fail(function(xhr) {
+            $('#ftt-preferences-message').addClass('error').text('Error saving preferences');
+        });
+    });
+    
+    // Category Expand/Collapse
+    $(document).on('click', '.ftt-category-expand', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const category = $(this).data('category');
+        const typesList = $('#ftt-types-' + category);
+        
+        $(this).toggleClass('expanded');
+        typesList.slideToggle(200);
+    });
+    
+    // User Settings Form
+    $('#ftt-user-preferences-form').on('submit', function(e) {
+        e.preventDefault();
+        
+        const data = {
+            home_airport: $('#home_airport').val().toUpperCase(),
+            timezone: $('#timezone').val()
+        };
+        
+        $.ajax({
+            url: '/wp-json/ftt/v1/user-preferences',
+            method: 'POST',
+            data: JSON.stringify(data),
+            contentType: 'application/json',
+            beforeSend: function(xhr) {
+                xhr.setRequestHeader('X-WP-Nonce', fttData.nonce);
+            }
+        }).done(function(response) {
+            $('#ftt-settings-message').addClass('success').text('Settings saved!');
+            setTimeout(function() {
+                $('#ftt-settings-message').removeClass('success').text('');
+            }, 3000);
+        }).fail(function(xhr) {
+            $('#ftt-settings-message').addClass('error').text('Error saving settings');
+        });
+    });
+    
+    // Toggle Pending Invitations
+    $('.ftt-toggle-pending-invitations').on('click', function() {
+        $(this).find('.ftt-toggle-icon').toggleClass('dashicons-arrow-down-alt2 dashicons-arrow-up-alt2');
+        $(this).next('.ftt-invitations-list').slideToggle(200);
+    });
+    
+    // Resend Invitation
+    $(document).on('click', '.ftt-resend-invite', function() {
+        const code = $(this).data('invite-code');
+        
+        $.ajax({
+            url: '/wp-json/ftt/v1/resend-invitation',
+            method: 'POST',
+            data: JSON.stringify({ invite_code: code }),
+            contentType: 'application/json',
+            beforeSend: function(xhr) {
+                xhr.setRequestHeader('X-WP-Nonce', fttData.nonce);
+            }
+        }).done(function(response) {
+            alert('Invitation resent successfully!');
+        }).fail(function(xhr) {
+            alert(xhr.responseJSON?.message || 'Error resending invitation');
+        });
+    });
+    
+    // Cancel Invitation
+    $(document).on('click', '.ftt-cancel-invite', function() {
+        if (!confirm('Cancel this invitation?')) {
+            return;
+        }
+        
+        const code = $(this).data('invite-code');
+        
+        $.ajax({
+            url: '/wp-json/ftt/v1/cancel-invitation',
+            method: 'POST',
+            data: JSON.stringify({ invite_code: code }),
+            contentType: 'application/json',
+            beforeSend: function(xhr) {
+                xhr.setRequestHeader('X-WP-Nonce', fttData.nonce);
+            }
+        }).done(function(response) {
+            $(`.ftt-invitation-card[data-invite-code="${code}"]`).fadeOut(300, function() {
+                $(this).remove();
+            });
+        }).fail(function(xhr) {
+            alert(xhr.responseJSON?.message || 'Error canceling invitation');
+        });
+    });
+});
+</script>

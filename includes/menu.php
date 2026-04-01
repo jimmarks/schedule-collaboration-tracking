@@ -20,9 +20,52 @@ class FTT_Menu {
      */
     public static function init() {
         add_action('admin_init', array(__CLASS__, 'add_menu_meta_box'));
+        add_filter('default_hidden_meta_boxes', array(__CLASS__, 'unhide_meta_box'), 10, 2);
         add_filter('wp_nav_menu_items', array(__CLASS__, 'add_login_logout_link'), 10, 2);
         add_filter('wp_nav_menu_items', array(__CLASS__, 'add_billing_links'), 20, 2);
         add_filter('wp_setup_nav_menu_item', array(__CLASS__, 'setup_nav_menu_item'));
+        add_action('after_setup_theme', array(__CLASS__, 'register_member_menu_location'));
+        add_filter('wp_nav_menu_args', array(__CLASS__, 'swap_menu_for_members'));
+    }
+
+    /**
+     * Register the members-only nav menu location.
+     */
+    public static function register_member_menu_location() {
+        register_nav_menu('primary_member', __('Primary (Members)', 'schedule-collaboration-tracking'));
+    }
+
+    /**
+     * Swap the primary nav location to use the members menu when logged in,
+     * but only if a menu has been assigned to the primary_member location.
+     */
+    public static function swap_menu_for_members($args) {
+        if (!is_user_logged_in()) {
+            return $args;
+        }
+
+        // Only act on the primary location
+        if (!isset($args['theme_location']) || $args['theme_location'] !== 'primary') {
+            return $args;
+        }
+
+        // Only swap if a menu is actually assigned to primary_member
+        $member_menu = get_nav_menu_locations()['primary_member'] ?? 0;
+        if ($member_menu) {
+            $args['theme_location'] = 'primary_member';
+        }
+
+        return $args;
+    }
+
+    /**
+     * Ensure our meta box is never hidden by default in Screen Options.
+     */
+    public static function unhide_meta_box( $hidden, $screen ) {
+        if ( isset( $screen->id ) && $screen->id === 'nav-menus' ) {
+            $hidden = array_diff( $hidden, array( 'ftt-login-logout-menu' ) );
+        }
+        return $hidden;
     }
     
     /**
@@ -44,47 +87,62 @@ class FTT_Menu {
      */
     public static function render_menu_meta_box() {
         $settings = get_option('ftt_settings', array());
-        $enabled = $settings['enable_login_menu'] ?? false;
-        
-        if (!$enabled) {
-            ?>
-            <p><?php esc_html_e('Login/Logout menu is disabled.', 'schedule-collaboration-tracking'); ?></p>
-            <p><a href="<?php echo admin_url('edit.php?post_type=ftt_event&page=srt-settings'); ?>"><?php esc_html_e('Enable in Settings', 'schedule-collaboration-tracking'); ?></a></p>
-            <?php
-            return;
-        }
-        
+        $enabled  = $settings['enable_login_menu'] ?? false;
+
         global $_nav_menu_placeholder, $nav_menu_selected_id;
         $_nav_menu_placeholder = 0 > $_nav_menu_placeholder ? $_nav_menu_placeholder - 1 : -1;
+
+        if ( ! $enabled ) {
+            echo '<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:3px;padding:8px 10px;margin-bottom:10px;font-size:12px;">';
+            echo '<strong>' . esc_html__( 'Note:', 'schedule-collaboration-tracking' ) . '</strong> ';
+            echo esc_html__( 'Feature is disabled. ', 'schedule-collaboration-tracking' );
+            echo '<a href="' . esc_url( admin_url( 'edit.php?post_type=ftt_event&page=ftt-settings&tab=general' ) ) . '">' . esc_html__( 'Enable in Settings → General', 'schedule-collaboration-tracking' ) . '</a>';
+            echo '</div>';
+        }
         ?>
         <div id="ftt-login-logout" class="posttypediv">
             <div id="tabs-panel-ftt-login-logout" class="tabs-panel tabs-panel-active">
                 <ul id="ftt-login-logout-checklist" class="categorychecklist form-no-clear">
                     <li>
                         <label class="menu-item-title">
-                            <input type="checkbox" class="menu-item-checkbox" name="menu-item[<?php echo $_nav_menu_placeholder; ?>][menu-item-object-id]" value="-1" /> 
-                            <?php esc_html_e('Login / Logout', 'schedule-collaboration-tracking'); ?>
+                            <input type="checkbox" class="menu-item-checkbox"
+                                name="menu-item[<?php echo (int) $_nav_menu_placeholder; ?>][menu-item-object-id]"
+                                value="-1" />
+                            <?php esc_html_e( 'Login / Logout', 'schedule-collaboration-tracking' ); ?>
                         </label>
-                        <input type="hidden" class="menu-item-type" name="menu-item[<?php echo $_nav_menu_placeholder; ?>][menu-item-type]" value="custom" />
-                        <input type="hidden" class="menu-item-title" name="menu-item[<?php echo $_nav_menu_placeholder; ?>][menu-item-title]" value="<?php esc_attr_e('Login', 'schedule-collaboration-tracking'); ?>" />
-                        <input type="hidden" class="menu-item-url" name="menu-item[<?php echo $_nav_menu_placeholder; ?>][menu-item-url]" value="#ftt-login-logout" />
-                        <input type="hidden" class="menu-item-classes" name="menu-item[<?php echo $_nav_menu_placeholder; ?>][menu-item-classes]" value="ftt-login-logout-item" />
+                        <input type="hidden" class="menu-item-type"
+                            name="menu-item[<?php echo (int) $_nav_menu_placeholder; ?>][menu-item-type]"
+                            value="custom" />
+                        <input type="hidden" class="menu-item-title"
+                            name="menu-item[<?php echo (int) $_nav_menu_placeholder; ?>][menu-item-title]"
+                            value="<?php esc_attr_e( 'Login', 'schedule-collaboration-tracking' ); ?>" />
+                        <input type="hidden" class="menu-item-url"
+                            name="menu-item[<?php echo (int) $_nav_menu_placeholder; ?>][menu-item-url]"
+                            value="#ftt-login-logout" />
+                        <input type="hidden" class="menu-item-classes"
+                            name="menu-item[<?php echo (int) $_nav_menu_placeholder; ?>][menu-item-classes]"
+                            value="ftt-login-logout-item" />
                     </li>
                 </ul>
             </div>
             <p class="button-controls">
                 <span class="add-to-menu">
-                    <input type="submit"<?php wp_nav_menu_disabled_check($nav_menu_selected_id); ?> class="button-secondary submit-add-to-menu right" value="<?php esc_attr_e('Add to Menu', 'schedule-collaboration-tracking'); ?>" name="add-srt-login-logout-menu-item" id="submit-ftt-login-logout" />
+                    <input type="submit"
+                        <?php wp_nav_menu_disabled_check( $nav_menu_selected_id ); ?>
+                        class="button-secondary submit-add-to-menu right"
+                        value="<?php esc_attr_e( 'Add to Menu', 'schedule-collaboration-tracking' ); ?>"
+                        name="add-srt-login-logout-menu-item"
+                        id="submit-ftt-login-logout" />
                     <span class="spinner"></span>
                 </span>
             </p>
         </div>
         <p class="description">
-            <?php esc_html_e('This menu item will automatically display "Login" or "Logout" based on the user\'s authentication status.', 'schedule-collaboration-tracking'); ?>
+            <?php esc_html_e( 'Dynamically shows "Login" to guests and "Logout" to signed-in users.', 'schedule-collaboration-tracking' ); ?>
         </p>
         <?php
     }
-    
+
     /**
      * Setup nav menu item
      */
@@ -170,7 +228,7 @@ class FTT_Menu {
      * Generate logout menu item HTML
      */
     private static function generate_logout_item() {
-        $logout_url = wp_logout_url(self::get_current_url());
+        $logout_url = wp_logout_url( home_url('/') );
         $logout_text = __('Logout', 'schedule-collaboration-tracking');
         
         // Get current user

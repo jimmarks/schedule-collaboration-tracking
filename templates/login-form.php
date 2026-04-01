@@ -126,17 +126,15 @@ if (isset($_GET['checkemail']) && $_GET['checkemail'] === 'confirm') {
             <input type="hidden" name="testcookie" value="1" />
             
             <?php
-            // hCaptcha integration
+            // reCAPTCHA v3 integration — invisible, token injected on submit
             $settings = get_option('ftt_settings', array());
-            $enable_hcaptcha = $settings['enable_hcaptcha'] ?? false;
-            $hcaptcha_site_key = $settings['hcaptcha_site_key'] ?? '';
+            $enable_recaptcha = $settings['enable_recaptcha'] ?? false;
+            $recaptcha_site_key = $settings['recaptcha_site_key'] ?? '';
             
-            if ($enable_hcaptcha && !empty($hcaptcha_site_key)) :
+            if ($enable_recaptcha && !empty($recaptcha_site_key)) :
             ?>
-            <!-- hCaptcha -->
-            <div class="ftt-form-field">
-                <div class="h-captcha" data-sitekey="<?php echo esc_attr($hcaptcha_site_key); ?>"></div>
-            </div>
+            <!-- Google reCAPTCHA v3 hidden token field -->
+            <input type="hidden" name="g-recaptcha-response" id="ftt-login-recaptcha-token" value="">
             <?php endif; ?>
             
             <div class="ftt-form-actions">
@@ -145,7 +143,39 @@ if (isset($_GET['checkemail']) && $_GET['checkemail'] === 'confirm') {
                     Log In
                 </button>
             </div>
-        </form>
+
+            <?php
+            // Passive policy acknowledgment notice
+            $ftt_login_s = get_option('ftt_settings', []);
+            $ftt_privacy_url = '';
+            $ftt_terms_url   = '';
+            if ( ! empty( $ftt_login_s['policy_privacy_page'] ) ) {
+                $ftt_privacy_url = get_permalink( (int) $ftt_login_s['policy_privacy_page'] );
+            }
+            if ( ! empty( $ftt_login_s['policy_terms_page'] ) ) {
+                $ftt_terms_url = get_permalink( (int) $ftt_login_s['policy_terms_page'] );
+            }
+            $ftt_policy_links = [];
+            if ( $ftt_terms_url ) {
+                $ftt_policy_links[] = '<a href="' . esc_url($ftt_terms_url) . '" target="_blank">' . esc_html__('Terms of Service', 'schedule-collaboration-tracking') . '</a>';
+            }
+            if ( $ftt_privacy_url ) {
+                $ftt_policy_links[] = '<a href="' . esc_url($ftt_privacy_url) . '" target="_blank">' . esc_html__('Privacy Policy', 'schedule-collaboration-tracking') . '</a>';
+            }
+            ?>
+            <p class="ftt-login-policy-notice" style="font-size:12px;color:#888;text-align:center;margin:12px 0 0;line-height:1.5;">
+                <?php
+                if ( ! empty( $ftt_policy_links ) ) {
+                    printf(
+                        /* translators: %s = comma-separated policy links */
+                        esc_html__('By logging in, you confirm your continued acceptance of the %s accepted at registration.', 'schedule-collaboration-tracking'),
+                        implode( ' ' . esc_html__('and', 'schedule-collaboration-tracking') . ' ', $ftt_policy_links ) // phpcs:ignore WordPress.Security.EscapeOutput -- links already escaped above
+                    );
+                } else {
+                    esc_html_e('By logging in, you confirm your continued acceptance of the policies accepted at registration.', 'schedule-collaboration-tracking');
+                }
+                ?>
+            </p>
         
         <div class="ftt-login-links">
             <a href="<?php echo esc_url($lost_password_url); ?>" class="ftt-link">
@@ -185,7 +215,7 @@ if (isset($_GET['checkemail']) && $_GET['checkemail'] === 'confirm') {
 }
 
 .ftt-login-header h1 {
-    color: #0066cc;
+    color: #6A3E8E;
     font-size: 28px;
     margin: 0 0 10px 0;
     font-weight: 600;
@@ -242,7 +272,7 @@ if (isset($_GET['checkemail']) && $_GET['checkemail'] === 'confirm') {
 }
 
 #ftt-loginform label .dashicons {
-    color: #0066cc;
+    color: #6A3E8E;
     font-size: 18px;
     width: 18px;
     height: 18px;
@@ -251,7 +281,7 @@ if (isset($_GET['checkemail']) && $_GET['checkemail'] === 'confirm') {
 #ftt-loginform .ftt-input {
     width: 100%;
     padding: 12px 15px;
-    border: 2px solid #ddd;
+    border: 2px solid #E9E3F2;
     border-radius: 6px;
     font-size: 15px;
     transition: all 0.2s;
@@ -259,8 +289,8 @@ if (isset($_GET['checkemail']) && $_GET['checkemail'] === 'confirm') {
 
 #ftt-loginform .ftt-input:focus {
     outline: none;
-    border-color: #0066cc;
-    box-shadow: 0 0 0 3px rgba(0,102,204,0.1);
+    border-color: #6A3E8E;
+    box-shadow: 0 0 0 3px rgba(106,62,142,0.1);
 }
 
 .ftt-remember-me label {
@@ -294,14 +324,14 @@ if (isset($_GET['checkemail']) && $_GET['checkemail'] === 'confirm') {
 }
 
 .ftt-btn-primary {
-    background: #0066cc;
+    background: #F05A5A;
     color: #fff;
 }
 
 .ftt-btn-primary:hover {
-    background: #0052a3;
+    background: #E84E4E;
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0,102,204,0.3);
+    box-shadow: 0 4px 12px rgba(240,90,90,0.3);
 }
 
 .ftt-btn .dashicons {
@@ -313,13 +343,13 @@ if (isset($_GET['checkemail']) && $_GET['checkemail'] === 'confirm') {
 .ftt-login-links {
     margin-top: 25px;
     padding-top: 25px;
-    border-top: 1px solid #e0e0e0;
+    border-top: 1px solid #E9E3F2;
     text-align: center;
     font-size: 14px;
 }
 
 .ftt-login-links .ftt-link {
-    color: #0066cc;
+    color: #6A3E8E;
     text-decoration: none;
     display: inline-flex;
     align-items: center;
@@ -328,7 +358,7 @@ if (isset($_GET['checkemail']) && $_GET['checkemail'] === 'confirm') {
 }
 
 .ftt-login-links .ftt-link:hover {
-    color: #0052a3;
+    color: #5B347A;
     text-decoration: underline;
 }
 
@@ -354,12 +384,29 @@ if (isset($_GET['checkemail']) && $_GET['checkemail'] === 'confirm') {
 }
 </style>
 <?php
-// Load hCaptcha script if enabled
+// Load reCAPTCHA v3 script if enabled
 $settings = get_option('ftt_settings', array());
-$enable_hcaptcha = $settings['enable_hcaptcha'] ?? false;
-$hcaptcha_site_key = $settings['hcaptcha_site_key'] ?? '';
+$enable_recaptcha = $settings['enable_recaptcha'] ?? false;
+$recaptcha_site_key = $settings['recaptcha_site_key'] ?? '';
 
-if ($enable_hcaptcha && !empty($hcaptcha_site_key)) :
+if ($enable_recaptcha && !empty($recaptcha_site_key)) :
 ?>
-<script src="https://js.hcaptcha.com/1/api.js" async defer></script>
+<script src="https://www.google.com/recaptcha/api.js?render=<?php echo esc_attr($recaptcha_site_key); ?>" async defer></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var form = document.querySelector('.ftt-login-form');
+    if (!form) return;
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        var submitBtn = form.querySelector('[type="submit"]');
+        if (submitBtn) submitBtn.disabled = true;
+        grecaptcha.ready(function() {
+            grecaptcha.execute('<?php echo esc_js($recaptcha_site_key); ?>', {action: 'login'}).then(function(token) {
+                document.getElementById('ftt-login-recaptcha-token').value = token;
+                form.submit();
+            });
+        });
+    });
+});
+</script>
 <?php endif; ?>

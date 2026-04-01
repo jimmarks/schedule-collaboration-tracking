@@ -107,21 +107,30 @@ class FTT_Stripe_Webhooks {
      */
     private static function handle_checkout_completed($session) {
         $user_id = $session->metadata->wordpress_user_id ?? null;
+        $group_id = $session->metadata->group_id ?? null;
         
-        if (!$user_id) {
-            error_log('FTT: No user ID in checkout session metadata');
+        if (!$user_id && !$group_id) {
+            error_log('FTT: No user ID or group ID in checkout session metadata');
             return;
         }
         
         // Store customer ID
-        if (!empty($session->customer)) {
+        if ($group_id && !empty($session->customer)) {
+            // Group billing (v2.1)
+            FTT_Family_Groups::update_group_billing($group_id, [
+                'stripe_customer_id' => $session->customer,
+            ]);
+        } elseif ($user_id && !empty($session->customer)) {
+            // User billing (v2.0)
             update_user_meta($user_id, 'ftt_stripe_customer_id', $session->customer);
         }
         
         // Subscription will be handled by subscription.created event
-        delete_user_meta($user_id, 'ftt_pending_checkout_session');
+        if ($user_id) {
+            delete_user_meta($user_id, 'ftt_pending_checkout_session');
+        }
         
-        do_action('ftt_checkout_completed', $user_id, $session);
+        do_action('ftt_checkout_completed', $user_id, $group_id, $session);
     }
     
     /**
@@ -129,179 +138,118 @@ class FTT_Stripe_Webhooks {
      */
     private static function handle_subscription_created($subscription) {
         $user_id = $subscription->metadata->wordpress_user_id ?? null;
+        $group_id = $subscription->metadata->group_id ?? null;
         
-        if (!$user_id) {
-            // Try to find user by customer ID
-            $users = get_users([
-                'meta_key' => 'ftt_stripe_customer_id',
-                'meta_value' => $subscription->customer,
-                'number' => 1,
-            ]);
-            
-            if (empty($users)) {
-                error_log('FTT: Could not find user for subscription: ' . $subscription->id);
-                return;
+        // Try to find by customer ID if no metadata
+        if (!$group_id) {
+            $group = FTT_Family_Groups::get_group_by_customer_id($subscription->customer);
+            if ($group) {
+                $group_id = $group->id;
             }
-            
-            $user_id = $users[0]->ID;
+        }
+        
+        if (!$group_id) {
+            error_log('FTT: Could not find group for subscription: ' . $subscription->id);
+            return;
         }
         
         // Extract data
         $status = $subscription->status;
         $interval = $subscription->items->data[0]->plan->interval ?? 'month';
-        $addon_quantity = 0;
         
-        // Count addon items
-        $settings = get_option('ftt_stripe_settings', []);
-        $addon_price_monthly = $settings['price_addon_monthly'] ?? '';
-        $addon_price_yearly = $settings['price_addon_yearly'] ?? '';
+        // v2.1: Group billing only
+        $billing_data = [
+            'stripe_subscription_id' => $subscription->id,
+            'subscription_status' => $status,
+            'subscription_interval' => $interval,
+        ];
         
-        foreach ($subscription->items->data as $item) {
-            if ($item->price->id === $addon_price_monthly || $item->price->id === $addon_price_yearly) {
-                $addon_quantity = $item->quantity;
-                break;
-            }
-        }
-        
-        // Calculate prices
-        $base_price = $interval === 'year' ? 89.99 : 9.99;
-        $addon_price = $interval === 'year' ? 50.00 : 5.00;
-        $total_price = $base_price + ($addon_quantity * $addon_price);
-        
-        // Update user meta
-        update_user_meta($user_id, 'ftt_stripe_subscription_id', $subscription->id);
-        update_user_meta($user_id, 'ftt_subscription_status', $status);
-        update_user_meta($user_id, 'ftt_subscription_interval', $interval);
-        update_user_meta($user_id, 'ftt_base_price', number_format($base_price, 2, '.', ''));
-        update_user_meta($user_id, 'ftt_addon_quantity', $addon_quantity);
-        update_user_meta($user_id, 'ftt_subscription_price', number_format($total_price, 2, '.', ''));
-        
-        // Trial dates
         if ($subscription->trial_end) {
-            update_user_meta($user_id, 'ftt_trial_start', date('Y-m-d H:i:s', $subscription->trial_start));
-            update_user_meta($user_id, 'ftt_trial_end', date('Y-m-d H:i:s', $subscription->trial_end));
+            $billing_data['trial_ends_at'] = date('Y-m-d H:i:s', $subscription->trial_end);
         }
         
-        // Current period
-        update_user_meta($user_id, 'ftt_subscription_start', date('Y-m-d H:i:s', $subscription->start_date));
-        update_user_meta($user_id, 'ftt_current_period_start', date('Y-m-d H:i:s', $subscription->current_period_start));
-        update_user_meta($user_id, 'ftt_current_period_end', date('Y-m-d H:i:s', $subscription->current_period_end));
-        update_user_meta($user_id, 'ftt_cancel_at_period_end', $subscription->cancel_at_period_end);
+        if ($subscription->current_period_end) {
+            $billing_data['next_billing_date'] = date('Y-m-d H:i:s', $subscription->current_period_end);
+        }
         
-        // Send welcome email
-        self::send_trial_start_email($user_id);
+        FTT_Family_Groups::update_group_billing($group_id, $billing_data);
         
-        do_action('ftt_subscription_created', $user_id, $subscription);
+        // Send welcome email to billing owner
+        $group = FTT_Family_Groups::get_group($group_id);
+        if ($group && $group->billing_owner) {
+            self::send_trial_start_email($group->billing_owner);
+        }
+        
+        do_action('ftt_group_subscription_created', $group_id, $subscription);
     }
     
     /**
      * Handle subscription updated
      */
     private static function handle_subscription_updated($subscription) {
-        // Find user
-        $users = get_users([
-            'meta_key' => 'ftt_stripe_subscription_id',
-            'meta_value' => $subscription->id,
-            'number' => 1,
-        ]);
+        // v2.1: Groups-only billing
+        $group = FTT_Family_Groups::get_group_by_subscription_id($subscription->id);
         
-        if (empty($users)) {
-            error_log('FTT: Could not find user for subscription update: ' . $subscription->id);
+        if (!$group) {
+            error_log('FTT: Could not find group for subscription update: ' . $subscription->id);
             return;
         }
         
-        $user_id = $users[0]->ID;
+        $billing_data = [
+            'subscription_status' => $subscription->status,
+            'subscription_interval' => $subscription->items->data[0]->plan->interval ?? 'month',
+        ];
         
-        // Extract data
-        $status = $subscription->status;
-        $interval = $subscription->items->data[0]->plan->interval ?? 'month';
-        $addon_quantity = 0;
-        
-        // Count addon items
-        $settings = get_option('ftt_stripe_settings', []);
-        $addon_price_monthly = $settings['price_addon_monthly'] ?? '';
-        $addon_price_yearly = $settings['price_addon_yearly'] ?? '';
-        
-        foreach ($subscription->items->data as $item) {
-            if ($item->price->id === $addon_price_monthly || $item->price->id === $addon_price_yearly) {
-                $addon_quantity = $item->quantity;
-                break;
-            }
+        if ($subscription->current_period_end) {
+            $billing_data['next_billing_date'] = date('Y-m-d H:i:s', $subscription->current_period_end);
         }
         
-        // Calculate prices
-        $base_price = $interval === 'year' ? 89.99 : 9.99;
-        $addon_price = $interval === 'year' ? 50.00 : 5.00;
-        $total_price = $base_price + ($addon_quantity * $addon_price);
+        FTT_Family_Groups::update_group_billing($group->id, $billing_data);
         
-        // Update user meta
-        update_user_meta($user_id, 'ftt_subscription_status', $status);
-        update_user_meta($user_id, 'ftt_subscription_interval', $interval);
-        update_user_meta($user_id, 'ftt_base_price', number_format($base_price, 2, '.', ''));
-        update_user_meta($user_id, 'ftt_addon_quantity', $addon_quantity);
-        update_user_meta($user_id, 'ftt_subscription_price', number_format($total_price, 2, '.', ''));
-        update_user_meta($user_id, 'ftt_current_period_start', date('Y-m-d H:i:s', $subscription->current_period_start));
-        update_user_meta($user_id, 'ftt_current_period_end', date('Y-m-d H:i:s', $subscription->current_period_end));
-        update_user_meta($user_id, 'ftt_cancel_at_period_end', $subscription->cancel_at_period_end);
-        
-        // Invalidate calendar token if subscription is now invalid
-        $blocked_statuses = ['suspended', 'incomplete', 'incomplete_expired', 'unpaid'];
-        if (in_array($status, $blocked_statuses) && class_exists('FTT_Billing_Manager')) {
-            FTT_Billing_Manager::invalidate_calendar_access($user_id);
-        }
-        
-        do_action('ftt_subscription_updated', $user_id, $subscription);
+        do_action('ftt_group_subscription_updated', $group->id, $subscription);
     }
     
     /**
      * Handle subscription deleted
      */
     private static function handle_subscription_deleted($subscription) {
-        $users = get_users([
-            'meta_key' => 'ftt_stripe_subscription_id',
-            'meta_value' => $subscription->id,
-            'number' => 1,
-        ]);
+        // v2.1: Groups-only billing
+        $group = FTT_Family_Groups::get_group_by_subscription_id($subscription->id);
         
-        if (empty($users)) {
+        if (!$group) {
+            error_log('FTT: Could not find group for subscription deletion: ' . $subscription->id);
             return;
         }
         
-        $user_id = $users[0]->ID;
+        FTT_Family_Groups::update_group_billing($group->id, [
+            'subscription_status' => 'canceled',
+        ]);
         
-        update_user_meta($user_id, 'ftt_subscription_status', 'canceled');
-        
-        // Invalidate calendar token when subscription is fully deleted
-        if (class_exists('FTT_Billing_Manager')) {
-            FTT_Billing_Manager::invalidate_calendar_access($user_id);
+        // Send cancellation email to billing owner
+        if ($group->billing_owner) {
+            self::send_cancellation_email($group->billing_owner);
         }
         
-        // Send cancellation confirmation email
-        self::send_cancellation_email($user_id);
-        
-        do_action('ftt_subscription_deleted', $user_id, $subscription);
+        do_action('ftt_group_subscription_deleted', $group->id, $subscription);
     }
     
     /**
      * Handle trial ending soon
      */
     private static function handle_trial_will_end($subscription) {
-        $users = get_users([
-            'meta_key' => 'ftt_stripe_subscription_id',
-            'meta_value' => $subscription->id,
-            'number' => 1,
-        ]);
+        // v2.1: Groups-only billing
+        $group = FTT_Family_Groups::get_group_by_subscription_id($subscription->id);
         
-        if (empty($users)) {
+        if (!$group) {
+            error_log('FTT: Could not find group for trial ending: ' . $subscription->id);
             return;
         }
         
-        $user_id = $users[0]->ID;
+        if ($group->billing_owner) {
+            // Trial ending email removed — 7-day and 2-day cron reminders cover this.
+        }
         
-        // Send trial ending email
-        self::send_trial_ending_email($user_id);
-        
-        do_action('ftt_trial_ending', $user_id, $subscription);
+        do_action('ftt_group_trial_ending', $group->id, $subscription);
     }
     
     /**
@@ -312,31 +260,22 @@ class FTT_Stripe_Webhooks {
             return; // One-time payment, not subscription
         }
         
-        $users = get_users([
-            'meta_key' => 'ftt_stripe_subscription_id',
-            'meta_value' => $invoice->subscription,
-            'number' => 1,
-        ]);
+        // v2.1: Groups-only billing
+        $group = FTT_Family_Groups::get_group_by_subscription_id($invoice->subscription);
         
-        if (empty($users)) {
+        if (!$group) {
+            error_log('FTT: Could not find group for payment: ' . $invoice->subscription);
             return;
         }
         
-        $user_id = $users[0]->ID;
-        
-        // Clear any failed payment flags
-        delete_user_meta($user_id, 'ftt_payment_failed_date');
-        delete_user_meta($user_id, 'ftt_grace_period_end');
-        delete_user_meta($user_id, 'ftt_payment_retry_count');
-        delete_user_meta($user_id, 'ftt_payment_failed_notified');
-        
-        // Send receipt if first payment after trial
-        $trial_end = get_user_meta($user_id, 'ftt_trial_end', true);
-        if ($trial_end && strtotime($trial_end) > strtotime('-1 day')) {
-            self::send_first_payment_email($user_id, $invoice);
+        // Update status to active if it was past_due
+        if ($group->subscription_status === 'past_due') {
+            FTT_Family_Groups::update_group_billing($group->id, [
+                'subscription_status' => 'active',
+            ]);
         }
         
-        do_action('ftt_payment_succeeded', $user_id, $invoice);
+        do_action('ftt_group_payment_succeeded', $group->id, $invoice);
     }
     
     /**
@@ -347,44 +286,25 @@ class FTT_Stripe_Webhooks {
             return;
         }
         
-        $users = get_users([
-            'meta_key' => 'ftt_stripe_subscription_id',
-            'meta_value' => $invoice->subscription,
-            'number' => 1,
-        ]);
+        // v2.1: Groups-only billing
+        $group = FTT_Family_Groups::get_group_by_subscription_id($invoice->subscription);
         
-        if (empty($users)) {
+        if (!$group) {
+            error_log('FTT: Could not find group for failed payment: ' . $invoice->subscription);
             return;
         }
         
-        $user_id = $users[0]->ID;
+        // Mark group subscription as past_due
+        FTT_Family_Groups::update_group_billing($group->id, [
+            'subscription_status' => 'past_due',
+        ]);
         
-        // Mark payment as failed
-        $retry_count = (int) get_user_meta($user_id, 'ftt_payment_retry_count', true);
-        $failed_date = get_user_meta($user_id, 'ftt_payment_failed_date', true);
-        
-        if (empty($failed_date)) {
-            $failed_date = current_time('mysql');
-            update_user_meta($user_id, 'ftt_payment_failed_date', $failed_date);
-            
-            // Set grace period (7 days)
-            $settings = get_option('ftt_stripe_settings', []);
-            $grace_days = $settings['grace_period_days'] ?? 7;
-            $grace_end = date('Y-m-d H:i:s', strtotime($failed_date . ' +' . $grace_days . ' days'));
-            update_user_meta($user_id, 'ftt_grace_period_end', $grace_end);
+        // Send failure notification to billing owner
+        if ($group->billing_owner) {
+            self::send_payment_failed_email($group->billing_owner);
         }
         
-        update_user_meta($user_id, 'ftt_payment_retry_count', $retry_count + 1);
-        update_user_meta($user_id, 'ftt_subscription_status', 'past_due');
-        
-        // Send failure notification
-        $notified = get_user_meta($user_id, 'ftt_payment_failed_notified', true);
-        if (!$notified) {
-            self::send_payment_failed_email($user_id);
-            update_user_meta($user_id, 'ftt_payment_failed_notified', true);
-        }
-        
-        do_action('ftt_payment_failed', $user_id, $invoice);
+        do_action('ftt_group_payment_failed', $group->id, $invoice);
     }
     
     /**
@@ -397,15 +317,14 @@ class FTT_Stripe_Webhooks {
         $trial_end = get_user_meta($user_id, 'ftt_trial_end', true);
         $trial_end_formatted = date('F j, Y', strtotime($trial_end));
         
-        $subject = 'Welcome to Family Travel Tracker - Your 14-Day Trial Starts Now!';
-        $message = "Hi {$user->display_name},\n\n";
-        $message .= "Welcome to Family Travel Tracker! Your 14-day free trial has started.\n\n";
-        $message .= "Your first payment will be charged on: {$trial_end_formatted}\n";
-        $message .= "You can cancel anytime before then with no charge.\n\n";
-        $message .= "Get started: " . home_url('/dashboard/') . "\n\n";
-        $message .= "Questions? Reply to this email anytime.\n\n";
-        $message .= "Thanks,\nThe Family Travel Tracker Team";
-        
+        $subject = FTT_Email_Templates::render_subject('trial_start', [
+            'display_name'   => $user->display_name,
+        ]);
+        $message = FTT_Email_Templates::render_body('trial_start', [
+            'display_name'   => $user->display_name,
+            'trial_end_date' => $trial_end_formatted,
+            'dashboard_url'  => home_url('/dashboard/'),
+        ]);
         wp_mail($user->user_email, $subject, $message);
     }
     
@@ -420,14 +339,14 @@ class FTT_Stripe_Webhooks {
         $price = get_user_meta($user_id, 'ftt_subscription_price', true);
         $interval = get_user_meta($user_id, 'ftt_subscription_interval', true);
         
-        $subject = 'Your Free Trial Ends Soon';
-        $message = "Hi {$user->display_name},\n\n";
-        $message .= "Just a reminder that your 14-day free trial ends on " . date('F j, Y', strtotime($trial_end)) . ".\n\n";
-        $message .= "Your subscription will automatically continue at \${$price}/" . ($interval === 'year' ? 'year' : 'month') . ".\n\n";
-        $message .= "Want to cancel? You can do so anytime in your billing settings:\n";
-        $message .= home_url('/manage-subscription/') . "\n\n";
-        $message .= "Thanks for using Family Travel Tracker!\n";
-        
+        $subject = FTT_Email_Templates::render_subject('trial_ending', []);
+        $message = FTT_Email_Templates::render_body('trial_ending', [
+            'display_name'            => $user->display_name,
+            'trial_end_date'          => date('F j, Y', strtotime($trial_end)),
+            'price'                   => $price,
+            'interval'                => ($interval === 'year' ? 'year' : 'month'),
+            'manage_subscription_url' => home_url('/manage-subscription/'),
+        ]);
         wp_mail($user->user_email, $subject, $message);
     }
     
@@ -440,13 +359,12 @@ class FTT_Stripe_Webhooks {
         
         $amount = number_format($invoice->amount_paid / 100, 2);
         
-        $subject = 'Payment Received - Thank You!';
-        $message = "Hi {$user->display_name},\n\n";
-        $message .= "Your trial has ended and we've successfully charged your payment method.\n\n";
-        $message .= "Amount: \${$amount}\n";
-        $message .= "Invoice: {$invoice->hosted_invoice_url}\n\n";
-        $message .= "Thank you for being a Family Travel Tracker subscriber!\n";
-        
+        $subject = FTT_Email_Templates::render_subject('first_payment', []);
+        $message = FTT_Email_Templates::render_body('first_payment', [
+            'display_name' => $user->display_name,
+            'amount'       => $amount,
+            'invoice_url'  => $invoice->hosted_invoice_url,
+        ]);
         wp_mail($user->user_email, $subject, $message);
     }
     
@@ -459,13 +377,12 @@ class FTT_Stripe_Webhooks {
         
         $grace_end = get_user_meta($user_id, 'ftt_grace_period_end', true);
         
-        $subject = 'Payment Failed - Action Required';
-        $message = "Hi {$user->display_name},\n\n";
-        $message .= "We were unable to process your payment for Family Travel Tracker.\n\n";
-        $message .= "Please update your payment method by " . date('F j, Y', strtotime($grace_end)) . " to avoid service interruption.\n\n";
-        $message .= "Update payment method: " . home_url('/manage-subscription/') . "\n\n";
-        $message .= "Questions? Reply to this email.\n";
-        
+        $subject = FTT_Email_Templates::render_subject('payment_failed', []);
+        $message = FTT_Email_Templates::render_body('payment_failed', [
+            'display_name'            => $user->display_name,
+            'grace_end_date'          => date('F j, Y', strtotime($grace_end)),
+            'manage_subscription_url' => home_url('/manage-subscription/'),
+        ]);
         wp_mail($user->user_email, $subject, $message);
     }
     
@@ -478,12 +395,11 @@ class FTT_Stripe_Webhooks {
         
         $period_end = get_user_meta($user_id, 'ftt_current_period_end', true);
         
-        $subject = 'Subscription Canceled';
-        $message = "Hi {$user->display_name},\n\n";
-        $message .= "Your subscription has been canceled.\n\n";
-        $message .= "You'll continue to have access until: " . date('F j, Y', strtotime($period_end)) . "\n\n";
-        $message .= "We're sorry to see you go. If you have feedback, we'd love to hear it.\n";
-        
+        $subject = FTT_Email_Templates::render_subject('subscription_canceled', []);
+        $message = FTT_Email_Templates::render_body('subscription_canceled', [
+            'display_name'  => $user->display_name,
+            'period_end_date' => date('F j, Y', strtotime($period_end)),
+        ]);
         wp_mail($user->user_email, $subject, $message);
     }
     

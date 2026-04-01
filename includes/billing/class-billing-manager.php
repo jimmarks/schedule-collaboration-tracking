@@ -65,8 +65,13 @@ class FTT_Billing_Manager {
         
         // Skip checks if Stripe is not configured
         $stripe_settings = get_option('ftt_stripe_settings', []);
-        if (empty($stripe_settings['secret_key']) || empty($stripe_settings['price_base_monthly'])) {
-            error_log('FTT BILLING DEBUG: Stripe not configured - allowing access (secret_key: ' . (empty($stripe_settings['secret_key']) ? 'EMPTY' : 'SET') . ', price_base_monthly: ' . (empty($stripe_settings['price_base_monthly']) ? 'EMPTY' : 'SET') . ')');
+        $mode = $stripe_settings['mode'] ?? 'test';
+        $secret_key = $mode === 'live' 
+            ? ($stripe_settings['live_secret_key'] ?? '')
+            : ($stripe_settings['test_secret_key'] ?? '');
+        
+        if (empty($secret_key) || empty($stripe_settings['price_base_monthly'])) {
+            error_log('FTT BILLING DEBUG: Stripe not configured - allowing access (secret_key: ' . (empty($secret_key) ? 'EMPTY' : 'SET') . ', price_base_monthly: ' . (empty($stripe_settings['price_base_monthly']) ? 'EMPTY' : 'SET') . ')');
             // Stripe not configured, allow access
             return;
         }
@@ -82,55 +87,71 @@ class FTT_Billing_Manager {
         error_log('FTT BILLING DEBUG: Not on billing page, checking subscription');
         
         $user_id = get_current_user_id();
-        $status = get_user_meta($user_id, 'ftt_subscription_status', true);
-        
-        error_log('FTT BILLING DEBUG: Subscription status: ' . ($status ?: 'EMPTY'));
-        
-        // Check for admin-imposed access denial
-        $access_denied = get_user_meta($user_id, 'ftt_access_denied', true);
-        if ($access_denied) {
-            error_log('FTT BILLING DEBUG: Access manually denied by admin - redirecting to login');
-            wp_redirect(add_query_arg('access_denied', '1', home_url('/ftt-login/')));
-            exit;
+
+        // Check admin-granted billing exemptions (per-user or per-group)
+        if (self::is_billing_exempt($user_id)) {
+            error_log('FTT BILLING DEBUG: User is billing-exempt - allowing access');
+            return;
         }
         
-        // Block access for invalid subscription statuses
-        $blocked_statuses = ['suspended', 'incomplete', 'incomplete_expired'];
-        
-        if (empty($status)) {
-            error_log('FTT BILLING DEBUG: No subscription - redirecting to /pricing/');
-            wp_redirect(add_query_arg('reason', 'no_subscription', home_url('/pricing/')));
-            exit;
-        }
-        
-        if (in_array($status, $blocked_statuses)) {
-            error_log('FTT BILLING DEBUG: Invalid subscription status - redirecting to /pricing/');
-            wp_redirect(add_query_arg('reason', $status, home_url('/pricing/')));
-            exit;
-        }
-        
-        // Check if subscription period has ended (for canceled or active subscriptions)
-        $period_end = get_user_meta($user_id, 'ftt_current_period_end', true);
-        if (!empty($period_end) && strtotime($period_end) < time()) {
-            error_log('FTT BILLING DEBUG: Subscription period ended - redirecting to /pricing/');
-            wp_redirect(add_query_arg('reason', 'expired', home_url('/pricing/')));
-            exit;
-        }
-        
-        error_log('FTT BILLING DEBUG: User has valid subscription - allowing access');
-        
-        // Grace period expired - show warning
-        if ($status === 'past_due') {
-            $grace_end = get_user_meta($user_id, 'ftt_grace_period_end', true);
-            if ($grace_end && strtotime($grace_end) < time()) {
-                // Grace period expired, restrict access
-                add_action('wp_footer', function() {
-                    echo '<div class="ftt-access-warning">Your subscription payment failed. Please update your payment method to continue using Family Travel Tracker. <a href="' . home_url('/manage-subscription/') . '">Update Payment Method</a></div>';
-                });
+        // v2.1: Groups-only billing - check if user has active group access
+        if (class_exists('FTT_Family_Groups') && method_exists('FTT_Family_Groups', 'user_has_group_access')) {
+            if (FTT_Family_Groups::user_has_group_access($user_id)) {
+                error_log('FTT BILLING DEBUG: User has active group billing access - allowing');
+                return;
             }
+            error_log('FTT BILLING DEBUG: User has no active group billing - redirecting');
+            $redirect = method_exists('FTT_Family_Groups', 'get_access_redirect_url')
+                ? FTT_Family_Groups::get_access_redirect_url($user_id)
+                : add_query_arg('reason', 'no_subscription', home_url('/ftt-groups/'));
+            wp_redirect($redirect);
+            exit;
         }
+        
+        // Fallback if FTT_Family_Groups not available
+        error_log('FTT BILLING DEBUG: FTT_Family_Groups not available - redirecting to groups');
+        wp_redirect(home_url('/ftt-groups/'));
+        exit;
+
     }
     
+    /**
+     * Check if a user is exempt from billing requirements.
+     *
+     * Site admins are always exempt. Individual users can be granted
+     * exemption via user meta, and entire groups can be exempted
+     * via the ftt_billing_exempt_groups option — both managed from
+     * the admin Manage Users → Billing Overrides screen.
+     *
+     * @param int $user_id User ID
+     * @return bool
+     */
+    public static function is_billing_exempt($user_id) {
+        // Site admins are always exempt
+        if (user_can($user_id, 'manage_options')) {
+            return true;
+        }
+
+        // Per-user exemption granted by admin
+        if (get_user_meta($user_id, 'ftt_billing_exempt', true)) {
+            return true;
+        }
+
+        // Per-group exemption: user belongs to a group marked exempt
+        $exempt_groups = get_option('ftt_billing_exempt_groups', []);
+        if (!empty($exempt_groups) && class_exists('FTT_Family_Groups')) {
+            $user_groups = FTT_Family_Groups::get_user_groups($user_id);
+            $exempt_ids  = array_map('intval', (array) $exempt_groups);
+            foreach ($user_groups as $group) {
+                if (in_array((int) $group->id, $exempt_ids, true)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     /**
      * Check if current page is a billing page
      */
@@ -139,7 +160,7 @@ class FTT_Billing_Manager {
         
         // Check by post slug
         if (is_object($post) && isset($post->post_name)) {
-            $billing_slugs = ['pricing', 'manage-subscription', 'checkout-success', 'checkout-cancel'];
+            $billing_slugs = ['pricing', 'manage-subscription', 'checkout-success', 'checkout-cancel', 'ftt-onboarding', 'ftt-trial-expired'];
             if (in_array($post->post_name, $billing_slugs)) {
                 return true;
             }
@@ -148,7 +169,7 @@ class FTT_Billing_Manager {
         // Fallback: check by REQUEST_URI
         if (isset($_SERVER['REQUEST_URI'])) {
             $uri = $_SERVER['REQUEST_URI'];
-            $billing_paths = ['/pricing', '/manage-subscription', '/checkout-success', '/checkout-cancel'];
+            $billing_paths = ['/pricing', '/manage-subscription', '/checkout-success', '/checkout-cancel', '/ftt-groups', '/ftt-onboarding', '/ftt-trial-expired'];
             foreach ($billing_paths as $path) {
                 if (strpos($uri, $path) !== false) {
                     return true;
@@ -167,8 +188,8 @@ class FTT_Billing_Manager {
      * @throws Exception if limit reached
      */
     public static function check_child_limit($parent_id, $child_id) {
-        // Admins have no limits
-        if (user_can($parent_id, 'manage_options')) {
+        // Admins and billing-exempt users have no limits
+        if (self::is_billing_exempt($parent_id)) {
             return;
         }
         
@@ -337,14 +358,6 @@ class FTT_Billing_Manager {
                 }
             }
             
-            // Final day reminder
-            if ($days_remaining == 0) {
-                $sent = get_user_meta($user->ID, 'ftt_trial_reminder_sent_14', true);
-                if (!$sent) {
-                    self::send_trial_reminder_email($user->ID, 0);
-                    update_user_meta($user->ID, 'ftt_trial_reminder_sent_14', true);
-                }
-            }
         }
     }
     
@@ -360,22 +373,21 @@ class FTT_Billing_Manager {
         $period = $interval === 'year' ? 'year' : 'month';
         
         if ($days_remaining == 7) {
-            $subject = 'Your trial ends in 7 days';
-            $message = "Hi {$user->display_name},\n\n";
-            $message .= "Just a friendly reminder that your 14-day free trial ends in 7 days.\n\n";
+            $tpl_key = 'trial_reminder_7';
         } elseif ($days_remaining == 2) {
-            $subject = 'Your trial ends in 2 days';
-            $message = "Hi {$user->display_name},\n\n";
-            $message .= "Your free trial ends in 2 days. Your first charge will be \${$price}/{$period}.\n\n";
+            $tpl_key = 'trial_reminder_2';
         } else {
-            $subject = 'Your trial ends today';
-            $message = "Hi {$user->display_name},\n\n";
-            $message .= "Your free trial ends today. You'll be charged \${$price}/{$period} tomorrow.\n\n";
+            return; // No email for other day values
         }
-        
-        $message .= "Cancel anytime: " . home_url('/manage-subscription/') . "\n\n";
-        $message .= "Thanks for using Family Travel Tracker!\n";
-        
+
+        $tokens = [
+            'display_name'            => $user->display_name,
+            'price'                   => $price,
+            'interval'                => $period,
+            'manage_subscription_url' => home_url('/manage-subscription/'),
+        ];
+        $subject = FTT_Email_Templates::render_subject($tpl_key, $tokens);
+        $message = FTT_Email_Templates::render_body($tpl_key, $tokens);
         wp_mail($user->user_email, $subject, $message);
     }
     
@@ -416,13 +428,11 @@ class FTT_Billing_Manager {
         $user = get_userdata($user_id);
         if (!$user) return;
         
-        $subject = 'Access Suspended - Payment Required';
-        $message = "Hi {$user->display_name},\n\n";
-        $message .= "Your Family Travel Tracker access has been suspended due to payment failure.\n\n";
-        $message .= "To restore access, please update your payment method:\n";
-        $message .= home_url('/manage-subscription/') . "\n\n";
-        $message .= "Questions? Reply to this email.\n";
-        
+        $subject = FTT_Email_Templates::render_subject('access_suspended', []);
+        $message = FTT_Email_Templates::render_body('access_suspended', [
+            'display_name'            => $user->display_name,
+            'manage_subscription_url' => home_url('/manage-subscription/'),
+        ]);
         wp_mail($user->user_email, $subject, $message);
     }
     
@@ -499,6 +509,118 @@ class FTT_Billing_Manager {
     }
     
     /**
+     * Get group billing summary (v2.1)
+     * 
+     * @param int $group_id Group ID
+     * @return array|null Billing summary or null if group not found
+     */
+    public static function get_group_billing_summary($group_id) {
+        $group = FTT_Family_Groups::get_group($group_id);
+        
+        if (!$group) {
+            return null;
+        }
+        
+        $child_count = FTT_Family_Groups::get_member_count($group_id, 'child');
+        $addon_quantity = max(0, $child_count - 1); // First child included in base
+        
+        $interval = $group->subscription_interval ?: 'month';
+        $period = $interval === 'year' ? 'year' : 'month';
+        
+        $base_price = $interval === 'year' ? 99.00 : 9.99;
+        $addon_price = $interval === 'year' ? 50.00 : 5.00;
+        $total_price = $base_price + ($addon_quantity * $addon_price);
+        
+        $in_trial = ($group->subscription_status === 'trialing');
+        $days_until_charge = 0;
+        
+        if ($in_trial && $group->trial_ends_at) {
+            $days_until_charge = ceil((strtotime($group->trial_ends_at) - time()) / DAY_IN_SECONDS);
+        }
+        
+        // Determine if billing is set up (has a subscription status)
+        $has_billing = !empty($group->subscription_status) && $group->subscription_status !== 'incomplete';
+        
+        return [
+            'group_id' => $group_id,
+            'group_name' => $group->name,
+            'has_billing' => $has_billing,
+            'status' => $group->subscription_status,
+            'status_label' => self::get_status_label($group->subscription_status),
+            'in_trial' => $in_trial,
+            'days_until_charge' => $days_until_charge,
+            'trial_ends_at' => $group->trial_ends_at,
+            'interval' => $interval,
+            'period' => $period,
+            'base_price' => '$' . number_format($base_price, 2),
+            'addon_quantity' => $addon_quantity,
+            'addon_price' => '$' . number_format($addon_price, 2),
+            'total_price' => '$' . number_format($total_price, 2),
+            'children_count' => $child_count,
+            'allowed_children' => $child_count,
+            'next_billing_date' => $group->next_billing_date ? date('F j, Y', strtotime($group->next_billing_date)) : 'N/A',
+            'cancel_at_end' => false, // Groups don't support cancel-at-period-end yet; Stripe webhook will update this field when needed
+            'has_stripe' => !empty($group->stripe_subscription_id),
+            'billing_owner' => $group->billing_owner,
+            'is_owner' => (get_current_user_id() == $group->billing_owner),
+        ];
+    }
+    
+    /**
+     * Get user's billing info (checks both old user-based and new group-based)
+     * 
+     * @param int $user_id User ID
+     * @return array Billing information
+     */
+    public static function get_user_billing_info($user_id) {
+        // Check if user has groups (v2.1)
+        $groups = FTT_Family_Groups::get_user_groups($user_id);
+        
+        if (!empty($groups)) {
+            // New group-based billing
+            $billing_groups = [];
+            $total_children = 0;
+            
+            foreach ($groups as $group) {
+                $summary = self::get_group_billing_summary($group->id);
+                if ($summary) {
+                    $billing_groups[] = $summary;
+                    $total_children += $summary['children_count'];
+                }
+            }
+            
+            return [
+                'mode' => 'groups',
+                'groups' => $billing_groups,
+                'total_children' => $total_children,
+                'has_active_billing' => !empty(array_filter($billing_groups, function($g) {
+                    return in_array($g['status'], ['active', 'trialing']);
+                })),
+            ];
+        } else {
+            // Old user-based billing (v2.0)
+            $summary = self::get_billing_summary($user_id);
+            
+            return [
+                'mode' => 'user',
+                'summary' => $summary,
+                'has_active_billing' => in_array($summary['status'], ['active', 'trialing']),
+            ];
+        }
+    }
+    
+    /**
+     * Check if user has active subscription (works with both user and group billing)
+     * 
+     * @param int $user_id User ID
+     * @return bool
+     */
+    public static function has_active_subscription($user_id) {
+        $billing_info = self::get_user_billing_info($user_id);
+        return $billing_info['has_active_billing'];
+    }
+    
+    /**
      * Add CSS for status banners
      */
     public static function add_status_banner_styles() {
@@ -560,7 +682,12 @@ class FTT_Billing_Manager {
         
         // Skip if Stripe not configured
         $stripe_settings = get_option('ftt_stripe_settings', []);
-        if (empty($stripe_settings['secret_key'])) {
+        $mode = $stripe_settings['mode'] ?? 'test';
+        $secret_key = $mode === 'live' 
+            ? ($stripe_settings['live_secret_key'] ?? '')
+            : ($stripe_settings['test_secret_key'] ?? '');
+        
+        if (empty($secret_key)) {
             return;
         }
         
@@ -569,59 +696,97 @@ class FTT_Billing_Manager {
             return;
         }
         
-        $user_id = get_current_user_id();
-        $status = get_user_meta($user_id, 'ftt_subscription_status', true);
-        $period_end = get_user_meta($user_id, 'ftt_current_period_end', true);
-        $cancel_at_end = get_user_meta($user_id, 'ftt_cancel_at_period_end', true);
-        
+        $user_id     = get_current_user_id();
         $banner_html = '';
         $banner_class = '';
-        
-        // Canceled subscription (still active until period end)
-        if ($status === 'canceled' || ($status === 'active' && $cancel_at_end)) {
-            if (!empty($period_end) && strtotime($period_end) > time()) {
-                $days_remaining = ceil((strtotime($period_end) - time()) / 86400);
-                $end_date = date('F j, Y', strtotime($period_end));
-                
-                $banner_html = sprintf(
-                    __('⚠️ Your subscription has been canceled and will expire on <strong>%s</strong> (%d days remaining). Want to keep your access? <a href="%s">Reactivate your subscription</a>', 'schedule-collaboration-tracking'),
-                    $end_date,
-                    $days_remaining,
-                    home_url('/manage-subscription/')
-                );
-                $banner_class = 'ftt-status-canceled';
+
+        // ── v2.3+: Read billing status from the user's primary group (group-based billing) ──
+        $primary_group_id = get_user_meta($user_id, 'ftt_primary_group', true);
+        if ($primary_group_id && class_exists('FTT_Family_Groups')) {
+            $group = FTT_Family_Groups::get_group($primary_group_id);
+            if ($group) {
+                $g_status     = $group->subscription_status;
+                $g_trial_end  = $group->trial_ends_at;
+                $g_has_stripe = !empty($group->stripe_subscription_id);
+                $g_next_bill  = $group->next_billing_date ?? null;
+
+                if ($g_status === 'trialing' && !empty($g_trial_end)) {
+                    $days_remaining = (int) ceil((strtotime($g_trial_end) - time()) / DAY_IN_SECONDS);
+                    $end_date       = date_i18n(get_option('date_format'), strtotime($g_trial_end));
+
+                    if ($days_remaining > 0) {
+                        if ($g_has_stripe) {
+                            // Stripe-managed trial — card already on file
+                            $banner_html = sprintf(
+                                __('🎉 Free trial active &mdash; ends <strong>%s</strong> (%d days remaining). Your card will be charged automatically. <a href="%s">Manage billing</a>', 'schedule-collaboration-tracking'),
+                                $end_date, $days_remaining, home_url('/manage-subscription/')
+                            );
+                            $banner_class = 'ftt-status-trialing';
+                        } else {
+                            // Card-free trial — need to add payment before trial ends
+                            $banner_html = sprintf(
+                                __('⏳ Free trial active &mdash; <strong>%d days remaining</strong> (ends %s). Add billing info before your trial ends to keep access. <a href="%s">Set up billing</a>', 'schedule-collaboration-tracking'),
+                                $days_remaining, $end_date, home_url('/ftt-onboarding/?step=2')
+                            );
+                            $banner_class = 'ftt-status-trial-no-card';
+                        }
+                    }
+                } elseif (($g_status === 'canceled' || $g_status === 'active') && !empty($g_next_bill) && strtotime($g_next_bill) > time()) {
+                    // Active but scheduled to cancel
+                    $days_remaining = (int) ceil((strtotime($g_next_bill) - time()) / DAY_IN_SECONDS);
+                    $end_date       = date_i18n(get_option('date_format'), strtotime($g_next_bill));
+                    if ($g_status === 'canceled') {
+                        $banner_html = sprintf(
+                            __('⚠️ Your subscription has been canceled and will expire on <strong>%s</strong> (%d days remaining). <a href="%s">Reactivate</a>', 'schedule-collaboration-tracking'),
+                            $end_date, $days_remaining, home_url('/manage-subscription/')
+                        );
+                        $banner_class = 'ftt-status-canceled';
+                    }
+                } elseif ($g_status === 'past_due') {
+                    $banner_html = sprintf(
+                        __('❌ Payment failed. Please <a href="%s">update your payment method</a> to avoid losing access.', 'schedule-collaboration-tracking'),
+                        home_url('/manage-subscription/')
+                    );
+                    $banner_class = 'ftt-status-past_due';
+                }
             }
         }
-        // Trial period
-        elseif ($status === 'trialing') {
-            if (!empty($period_end)) {
-                $days_remaining = ceil((strtotime($period_end) - time()) / 86400);
-                $end_date = date('F j, Y', strtotime($period_end));
-                
-                $banner_html = sprintf(
-                    __('🎉 You\'re in your free trial! It ends on <strong>%s</strong> (%d days remaining). <a href="%s">View billing details</a>', 'schedule-collaboration-tracking'),
-                    $end_date,
-                    $days_remaining,
-                    home_url('/manage-subscription/')
+
+        // ── Fallback: legacy per-user subscription meta ──
+        if (!$banner_html) {
+            $status        = get_user_meta($user_id, 'ftt_subscription_status', true);
+            $period_end    = get_user_meta($user_id, 'ftt_current_period_end', true);
+            $cancel_at_end = get_user_meta($user_id, 'ftt_cancel_at_period_end', true);
+
+            if ($status === 'trialing' && !empty($period_end) && strtotime($period_end) > time()) {
+                $days_remaining = (int) ceil((strtotime($period_end) - time()) / DAY_IN_SECONDS);
+                $end_date       = date_i18n(get_option('date_format'), strtotime($period_end));
+                $banner_html  = sprintf(
+                    __('🎉 Free trial active &mdash; ends <strong>%s</strong> (%d days remaining). <a href="%s">View billing</a>', 'schedule-collaboration-tracking'),
+                    $end_date, $days_remaining, home_url('/manage-subscription/')
                 );
                 $banner_class = 'ftt-status-trialing';
-            }
-        }
-        // Past due (payment failed)
-        elseif ($status === 'past_due') {
-            $grace_end = get_user_meta($user_id, 'ftt_grace_period_end', true);
-            if (!empty($grace_end) && strtotime($grace_end) > time()) {
-                $days_remaining = ceil((strtotime($grace_end) - time()) / 86400);
-                
-                $banner_html = sprintf(
-                    __('❌ Your payment failed. Please <a href="%s">update your payment method</a> within %d days to avoid losing access.', 'schedule-collaboration-tracking'),
-                    home_url('/manage-subscription/'),
-                    $days_remaining
+            } elseif (($status === 'canceled' || ($status === 'active' && $cancel_at_end)) && !empty($period_end) && strtotime($period_end) > time()) {
+                $days_remaining = (int) ceil((strtotime($period_end) - time()) / DAY_IN_SECONDS);
+                $end_date       = date_i18n(get_option('date_format'), strtotime($period_end));
+                $banner_html  = sprintf(
+                    __('⚠️ Subscription cancels <strong>%s</strong> (%d days remaining). <a href="%s">Reactivate</a>', 'schedule-collaboration-tracking'),
+                    $end_date, $days_remaining, home_url('/manage-subscription/')
                 );
-                $banner_class = 'ftt-status-past_due';
+                $banner_class = 'ftt-status-canceled';
+            } elseif ($status === 'past_due') {
+                $grace_end = get_user_meta($user_id, 'ftt_grace_period_end', true);
+                if (!empty($grace_end) && strtotime($grace_end) > time()) {
+                    $days_remaining = (int) ceil((strtotime($grace_end) - time()) / DAY_IN_SECONDS);
+                    $banner_html  = sprintf(
+                        __('❌ Payment failed. <a href="%s">Update payment method</a> within %d days.', 'schedule-collaboration-tracking'),
+                        home_url('/manage-subscription/'), $days_remaining
+                    );
+                    $banner_class = 'ftt-status-past_due';
+                }
             }
         }
-        
+
         // Display banner if we have content
         if ($banner_html) {
             echo '<div class="ftt-subscription-status-banner ' . esc_attr($banner_class) . '">' . $banner_html . '</div>';

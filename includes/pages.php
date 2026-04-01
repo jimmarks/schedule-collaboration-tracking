@@ -97,6 +97,34 @@ class FTT_Pages {
                 'menu_order' => 11,
                 'description' => 'Manage children, co-parents, and family settings',
             ),
+            'groups' => array(
+                'title' => 'Family Groups',
+                'shortcode' => '[ftt_groups]',
+                'slug' => 'ftt-groups',
+                'menu_order' => 12,
+                'description' => 'Manage family groups, members, and group billing',
+            ),
+            'profile' => array(
+                'title' => 'My Settings',
+                'shortcode' => '[ftt_profile]',
+                'slug' => 'ftt-profile',
+                'menu_order' => 13,
+                'description' => 'Personal settings: name, email, phone, timezone, home airports, notifications',
+            ),
+            'onboarding' => array(
+                'title' => 'Welcome',
+                'shortcode' => '[ftt_onboarding]',
+                'slug' => 'ftt-onboarding',
+                'menu_order' => 14,
+                'description' => 'Post-registration onboarding wizard: calendar setup and billing offer',
+            ),
+            'trial_expired' => array(
+                'title' => 'Trial Ended',
+                'shortcode' => '[ftt_trial_expired]',
+                'slug' => 'ftt-trial-expired',
+                'menu_order' => 15,
+                'description' => 'Trial expiry page: prompts user to set up billing to restore access',
+            ),
         );
     }
     
@@ -201,6 +229,21 @@ class FTT_Pages {
     public static function get_page_id($page_key) {
         $page_ids = get_option('ftt_page_ids', array());
         return isset($page_ids[$page_key]) ? $page_ids[$page_key] : false;
+    }
+    
+    /**
+     * Check if current page is an FTT plugin page
+     *
+     * @return bool True if current page is an FTT page
+     */
+    public static function is_ftt_page() {
+        global $post;
+        if (!is_a($post, 'WP_Post')) {
+            return false;
+        }
+        
+        $page_ids = get_option('ftt_page_ids', array());
+        return in_array($post->ID, $page_ids, true);
     }
     
     /**

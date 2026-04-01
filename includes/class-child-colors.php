@@ -57,7 +57,9 @@ class FTT_Child_Colors {
         // Find the index of this new child
         $child_index = 0;
         foreach ($children as $i => $child) {
-            if ($child->ID == $child_id) {
+            // $children is an array of user IDs (ints), not WP_User objects
+            $child_id_val = is_object($child) ? $child->ID : (int) $child;
+            if ($child_id_val == $child_id) {
                 $child_index = $i;
                 break;
             }
@@ -84,8 +86,29 @@ class FTT_Child_Colors {
      * @return array|false Color data or false if no color assigned
      */
     public static function get_child_color($child_id) {
+        // Check new format first (ftt_assigned_color)
         $hex = get_user_meta($child_id, 'ftt_assigned_color', true);
         $name = get_user_meta($child_id, 'ftt_color_name', true);
+        
+        // Fallback to legacy format (child_color) for backwards compatibility
+        if (!$hex) {
+            $hex = get_user_meta($child_id, 'child_color', true);
+            if ($hex) {
+                // Migrate to new format
+                $palette = self::get_palette();
+                $color_name = 'Custom';
+                foreach ($palette as $color) {
+                    if (strtolower($color['hex']) === strtolower($hex)) {
+                        $color_name = $color['name'];
+                        break;
+                    }
+                }
+                // Save in new format
+                update_user_meta($child_id, 'ftt_assigned_color', $hex);
+                update_user_meta($child_id, 'ftt_color_name', $color_name);
+                $name = $color_name;
+            }
+        }
         
         if (!$hex) {
             return false;
@@ -148,19 +171,24 @@ class FTT_Child_Colors {
      * @return array Array of child data with colors
      */
     public static function get_children_with_colors($parent_id) {
-        $children = FTT_Roles::get_children($parent_id);
+        $children_ids = FTT_Roles::get_children($parent_id);
         $result = [];
         
-        foreach ($children as $child) {
-            $color = self::get_child_color($child->ID);
+        foreach ($children_ids as $child_id) {
+            $child = get_user_by('id', $child_id);
+            if (!$child) {
+                continue;
+            }
+            
+            $color = self::get_child_color($child_id);
             
             // Auto-assign if missing
             if (!$color) {
-                $color = self::assign_color($child->ID, $parent_id);
+                $color = self::assign_color($child_id, $parent_id);
             }
             
             $result[] = [
-                'id' => $child->ID,
+                'id' => $child_id,
                 'name' => $child->display_name,
                 'email' => $child->user_email,
                 'color' => $color,

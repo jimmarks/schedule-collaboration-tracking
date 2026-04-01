@@ -2,31 +2,15 @@
 /**
  * Template: Billing - Manage Subscription
  *
+ * $billing is pre-computed by render_manage_subscription() in shortcodes.php
+ * using FTT_Billing_Manager::get_group_billing_summary(). All redirects and
+ * access checks happen there (before ob_start) to prevent blank-page issues.
+ *
  * @package Family_Travel_Tracker
  */
 
 // Exit if accessed directly
 if (!defined('ABSPATH')) {
-    exit;
-}
-
-// Require login
-if (!is_user_logged_in()) {
-    wp_redirect(wp_login_url(home_url('/manage-subscription/')));
-    exit;
-}
-
-$user_id = get_current_user_id();
-
-// Check if user has subscription
-if (!class_exists('FTT_Billing_Manager')) {
-    wp_die('Billing system not configured.');
-}
-
-$billing = FTT_Billing_Manager::get_billing_summary($user_id);
-
-if (!$billing || empty($billing['status'])) {
-    wp_redirect(home_url('/pricing/'));
     exit;
 }
 ?>
@@ -67,7 +51,32 @@ if (!$billing || empty($billing['status'])) {
         <?php endif; ?>
     </div>
     
-    <!-- Current Plan -->
+    <!-- Current Plan / Trial Status -->
+    <?php if (!$billing['has_stripe']) : ?>
+    <!-- Card-free trial: no plan selected yet — show trial details only -->
+    <div class="ftt-billing-plan">
+        <h2><?php esc_html_e('Trial Access', 'schedule-collaboration-tracking'); ?></h2>
+        <div class="ftt-plan-info">
+            <p>
+                <?php esc_html_e('You\'re on a free trial — no plan has been selected yet. You have full access to all features until your trial ends.', 'schedule-collaboration-tracking'); ?>
+            </p>
+            <?php if (!empty($billing['trial_ends_at'])) : ?>
+            <p>
+                <strong><?php esc_html_e('Trial ends:', 'schedule-collaboration-tracking'); ?></strong>
+                <?php echo esc_html(date_i18n(get_option('date_format'), strtotime($billing['trial_ends_at']))); ?>
+            </p>
+            <?php endif; ?>
+            <?php if ($billing['children_count'] > 0) : ?>
+            <p>
+                <strong><?php esc_html_e('Children added:', 'schedule-collaboration-tracking'); ?></strong>
+                <?php echo esc_html($billing['children_count']); ?>
+            </p>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <?php else : ?>
+    <!-- Active Stripe subscription: show full plan details -->
     <div class="ftt-billing-plan">
         <h2><?php esc_html_e('Current Plan', 'schedule-collaboration-tracking'); ?></h2>
         
@@ -95,10 +104,12 @@ if (!$billing || empty($billing['status'])) {
         </div>
         
         <div class="ftt-plan-info">
+            <?php if ($billing['children_count'] > 0 || $billing['allowed_children'] > 0) : ?>
             <p>
                 <strong><?php esc_html_e('Children:', 'schedule-collaboration-tracking'); ?></strong>
                 <?php printf(esc_html__('%d of %d used', 'schedule-collaboration-tracking'), $billing['children_count'], $billing['allowed_children']); ?>
             </p>
+            <?php endif; ?>
             <?php if (!$billing['in_trial']) : ?>
                 <p>
                     <strong><?php esc_html_e('Next Billing Date:', 'schedule-collaboration-tracking'); ?></strong>
@@ -107,11 +118,26 @@ if (!$billing || empty($billing['status'])) {
             <?php endif; ?>
         </div>
     </div>
+    <?php endif; ?>
     
     <!-- Actions -->
     <div class="ftt-billing-actions">
         <h2><?php esc_html_e('Manage Subscription', 'schedule-collaboration-tracking'); ?></h2>
         
+        <?php if (!$billing['has_stripe']) : ?>
+            <!-- Card-free trial: prompt to set up billing -->
+            <div class="ftt-action-card">
+                <h3><?php esc_html_e('Add a payment method', 'schedule-collaboration-tracking'); ?></h3>
+                <p><?php printf(
+                    /* translators: %d: days remaining */
+                    esc_html__('Your free trial is active. Set up billing now so your access continues uninterrupted after your trial ends.', 'schedule-collaboration-tracking')
+                ); ?></p>
+                <a href="<?php echo esc_url(home_url('/ftt-onboarding/?step=2')); ?>" class="button button-primary">
+                    <?php esc_html_e('Set up billing →', 'schedule-collaboration-tracking'); ?>
+                </a>
+            </div>
+        <?php else : ?>
+
         <?php if ($billing['children_count'] < $billing['allowed_children']) : ?>
             <div class="ftt-action-card">
                 <h3><?php esc_html_e('Add a Child', 'schedule-collaboration-tracking'); ?></h3>
@@ -147,6 +173,8 @@ if (!$billing || empty($billing['status'])) {
                 </button>
             </div>
         <?php endif; ?>
+
+        <?php endif; // end has_stripe ?>
     </div>
 </div>
 

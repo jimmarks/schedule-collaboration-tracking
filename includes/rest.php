@@ -113,6 +113,13 @@ class FTT_REST {
             'methods'             => 'GET',
             'callback'            => array(__CLASS__, 'get_dashboard'),
             'permission_callback' => array(__CLASS__, 'check_read_permission'),
+            'args'                => array(
+                'group_id' => array(
+                    'type'              => 'integer',
+                    'description'       => 'Filter dashboard by group ID (v2.1)',
+                    'sanitize_callback' => 'absint',
+                ),
+            ),
         ));
         
         // Get registration page URL
@@ -234,6 +241,34 @@ class FTT_REST {
             'permission_callback' => 'is_user_logged_in',
         ));
         
+        // Update user's primary group
+        register_rest_route('ftt/v1', '/user/primary-group', array(
+            'methods'             => 'POST',
+            'callback'            => array(__CLASS__, 'update_primary_group'),
+            'permission_callback' => 'is_user_logged_in',
+            'args'                => array(
+                'group_id' => array(
+                    'required'          => true,
+                    'type'              => 'integer',
+                    'sanitize_callback' => 'absint',
+                ),
+            ),
+        ));
+        
+        // User lookup by email (for adding members to groups)
+        register_rest_route('ftt/v1', '/users/lookup', array(
+            'methods'             => 'GET',
+            'callback'            => array(__CLASS__, 'lookup_user_by_email'),
+            'permission_callback' => 'is_user_logged_in',
+            'args'                => array(
+                'email' => array(
+                    'required'          => true,
+                    'type'              => 'string',
+                    'sanitize_callback' => 'sanitize_email',
+                ),
+            ),
+        ));
+        
         // Public registration endpoint (for sign-up page on www domain)
         register_rest_route('ftt/v1', '/register', array(
             'methods'             => 'POST',
@@ -248,82 +283,145 @@ class FTT_REST {
                 'callback'            => array(__CLASS__, 'create_checkout_session'),
                 'permission_callback' => 'is_user_logged_in',
             ));
-            
+
             register_rest_route('ftt/v1', '/add-child-addon', array(
                 'methods'             => 'POST',
                 'callback'            => array(__CLASS__, 'add_child_addon'),
                 'permission_callback' => 'is_user_logged_in',
             ));
-            
+
             register_rest_route('ftt/v1', '/cancel-subscription', array(
                 'methods'             => 'POST',
                 'callback'            => array(__CLASS__, 'cancel_subscription'),
                 'permission_callback' => 'is_user_logged_in',
             ));
-            
+
             register_rest_route('ftt/v1', '/reactivate-subscription', array(
                 'methods'             => 'POST',
                 'callback'            => array(__CLASS__, 'reactivate_subscription'),
                 'permission_callback' => 'is_user_logged_in',
             ));
-            
-            // Family management endpoints
-            register_rest_route('ftt/v1', '/add-child', array(
+        }
+
+        // Family management endpoints (independent of Stripe)
+        register_rest_route('ftt/v1', '/add-child', array(
+            'methods'             => 'POST',
+            'callback'            => array(__CLASS__, 'add_child'),
+            'permission_callback' => 'is_user_logged_in',
+        ));
+
+        register_rest_route('ftt/v1', '/edit-child', array(
+            'methods'             => 'POST',
+            'callback'            => array(__CLASS__, 'edit_child'),
+            'permission_callback' => 'is_user_logged_in',
+        ));
+
+        register_rest_route('ftt/v1', '/remove-child', array(
+            'methods'             => 'POST',
+            'callback'            => array(__CLASS__, 'remove_child'),
+            'permission_callback' => 'is_user_logged_in',
+        ));
+
+        register_rest_route('ftt/v1', '/invite-adult', array(
+            'methods'             => 'POST',
+            'callback'            => array(__CLASS__, 'invite_adult'),
+            'permission_callback' => 'is_user_logged_in',
+        ));
+
+        register_rest_route('ftt/v1', '/remove-adult', array(
+            'methods'             => 'POST',
+            'callback'            => array(__CLASS__, 'remove_adult'),
+            'permission_callback' => 'is_user_logged_in',
+        ));
+
+        register_rest_route('ftt/v1', '/cancel-invitation', array(
+            'methods'             => 'POST',
+            'callback'            => array(__CLASS__, 'cancel_invitation'),
+            'permission_callback' => 'is_user_logged_in',
+        ));
+
+        register_rest_route('ftt/v1', '/resend-invitation', array(
+            'methods'             => 'POST',
+            'callback'            => array(__CLASS__, 'resend_invitation'),
+            'permission_callback' => 'is_user_logged_in',
+        ));
+
+        register_rest_route('ftt/v1', '/save-event-preferences', array(
+            'methods'             => 'POST',
+            'callback'            => array(__CLASS__, 'save_event_preferences'),
+            'permission_callback' => 'is_user_logged_in',
+        ));
+
+        register_rest_route('ftt/v1', '/get-family-members', array(
+            'methods'             => 'GET',
+            'callback'            => array(__CLASS__, 'get_family_members'),
+            'permission_callback' => 'is_user_logged_in',
+        ));
+
+        // RESTful child CRUD routes (used by templates/family-management.php)
+        register_rest_route('ftt/v1', '/children', array(
+            array(
+                'methods'             => 'GET',
+                'callback'            => array(__CLASS__, 'get_children_list'),
+                'permission_callback' => 'is_user_logged_in',
+            ),
+            array(
                 'methods'             => 'POST',
                 'callback'            => array(__CLASS__, 'add_child'),
                 'permission_callback' => 'is_user_logged_in',
-            ));
-            
-            register_rest_route('ftt/v1', '/edit-child', array(
-                'methods'             => 'POST',
+            ),
+        ));
+
+        register_rest_route('ftt/v1', '/children/(?P<id>\d+)', array(
+            array(
+                'methods'             => 'PUT',
                 'callback'            => array(__CLASS__, 'edit_child'),
                 'permission_callback' => 'is_user_logged_in',
-            ));
-            
-            register_rest_route('ftt/v1', '/remove-child', array(
-                'methods'             => 'POST',
+            ),
+            array(
+                'methods'             => 'DELETE',
                 'callback'            => array(__CLASS__, 'remove_child'),
                 'permission_callback' => 'is_user_logged_in',
-            ));
-            
-            register_rest_route('ftt/v1', '/invite-adult', array(
-                'methods'             => 'POST',
-                'callback'            => array(__CLASS__, 'invite_adult'),
-                'permission_callback' => 'is_user_logged_in',
-            ));
-            
-            register_rest_route('ftt/v1', '/remove-adult', array(
-                'methods'             => 'POST',
-                'callback'            => array(__CLASS__, 'remove_adult'),
-                'permission_callback' => 'is_user_logged_in',
-            ));
-            
-            register_rest_route('ftt/v1', '/cancel-invitation', array(
-                'methods'             => 'POST',
-                'callback'            => array(__CLASS__, 'cancel_invitation'),
-                'permission_callback' => 'is_user_logged_in',
-            ));
-            
-            register_rest_route('ftt/v1', '/resend-invitation', array(
-                'methods'             => 'POST',
-                'callback'            => array(__CLASS__, 'resend_invitation'),
-                'permission_callback' => 'is_user_logged_in',
-            ));
-            
-            register_rest_route('ftt/v1', '/save-event-preferences', array(
-                'methods'             => 'POST',
-                'callback'            => array(__CLASS__, 'save_event_preferences'),
-                'permission_callback' => 'is_user_logged_in',
-            ));
-            
-            register_rest_route('ftt/v1', '/get-family-members', array(
-                'methods'             => 'GET',
-                'callback'            => array(__CLASS__, 'get_family_members'),
-                'permission_callback' => 'is_user_logged_in',
-            ));
-        }
+            ),
+        ));
+
+        // Track client-side API calls (e.g. Google Places selected by user)
+        register_rest_route('ftt/v1', '/track-api-call', array(
+            'methods'             => 'POST',
+            'callback'            => array(__CLASS__, 'track_api_call'),
+            'permission_callback' => 'is_user_logged_in',
+            'args'                => array(
+                'api' => array(
+                    'required'          => true,
+                    'type'              => 'string',
+                    'enum'              => array('google_places'),
+                    'sanitize_callback' => 'sanitize_key',
+                ),
+                'success' => array(
+                    'type'    => 'boolean',
+                    'default' => true,
+                ),
+            ),
+        ));
     }
     
+    /**
+     * Record a client-side API call (currently: google_places only).
+     */
+    public static function track_api_call( WP_REST_Request $request ) {
+        if ( ! class_exists('FTT_API_Tracker') ) {
+            return new WP_REST_Response( array( 'ok' => false ), 200 );
+        }
+        $api     = sanitize_key( $request->get_param('api') );
+        $success = (bool) $request->get_param('success');
+        // Whitelist enforced by route 'enum' arg; double-check here for safety.
+        if ( ! in_array( $api, array('google_places'), true ) ) {
+            return new WP_REST_Response( array( 'ok' => false, 'error' => 'unknown api' ), 400 );
+        }
+        FTT_API_Tracker::record( $api, $success );
+        return new WP_REST_Response( array( 'ok' => true ), 200 );
+    }
+
     /**
      * Check read permission
      */
@@ -339,17 +437,38 @@ class FTT_REST {
     }
     
     /**
-     * Check edit permission
+     * Check edit permission.
+     * Accepts any active FTT user (parent, member/child, or admin).
+     * We do NOT use current_user_can('edit_posts') because parent accounts are
+     * not granted that WordPress capability — only make_member() accounts are.
      */
     public static function check_edit_permission() {
-        return current_user_can('edit_posts');
+        $uid = get_current_user_id();
+        if (!$uid) return false;
+        return current_user_can('manage_options')
+            || FTT_Roles::is_parent($uid)
+            || FTT_Roles::is_member($uid);
     }
-    
+
     /**
-     * Check delete permission
+     * Check delete permission.
+     * Same FTT-aware check — any active FTT user may delete their own events.
+     * Ownership is validated inside the delete handler.
      */
     public static function check_delete_permission() {
-        return current_user_can('delete_posts');
+        $uid = get_current_user_id();
+        if (!$uid) return false;
+        return current_user_can('manage_options')
+            || FTT_Roles::is_parent($uid)
+            || FTT_Roles::is_member($uid);
+    }
+
+    /**
+     * Alias used by flight-linking.php routes.
+     * Identical to check_edit_permission — any logged-in FTT user.
+     */
+    public static function check_user_permission() {
+        return self::check_edit_permission();
     }
     
     /**
@@ -372,7 +491,23 @@ class FTT_REST {
         
         // Member filtering logic
         $member_id = $request->get_param('member_id');
-        if ($member_id) {
+        $group_id = $request->get_param('group_id');
+        
+        if ($group_id) {
+            // Filter by specific group (v2.1)
+            global $wpdb;
+            $event_ids = $wpdb->get_col($wpdb->prepare(
+                "SELECT post_id FROM {$wpdb->prefix}ftt_event_groups WHERE group_id = %d",
+                $group_id
+            ));
+            
+            if (!empty($event_ids)) {
+                $args['post__in'] = $event_ids;
+            } else {
+                // No events in this group - return empty
+                return rest_ensure_response(array());
+            }
+        } elseif ($member_id) {
             // Specific member requested
             $meta_query[] = array(
                 'key'     => 'member_id',
@@ -568,188 +703,192 @@ class FTT_REST {
      * Get dashboard data
      */
     public static function get_dashboard($request) {
+        global $wpdb;
+
         $current_user_id = get_current_user_id();
-        $now = current_time('mysql');
-        $two_weeks = date('Y-m-d H:i:s', strtotime('+14 days', current_time('timestamp')));
-        
+        $group_id        = absint($request->get_param('group_id'));
+        $now             = current_time('mysql');
+        $thirty_days     = date('Y-m-d H:i:s', strtotime('+30 days', current_time('timestamp')));
+
         error_log('=== DASHBOARD DEBUG ===');
         error_log('Current User ID: ' . $current_user_id);
-        error_log('Is Member: ' . (FTT_Roles::is_member($current_user_id) ? 'yes' : 'no'));
-        error_log('Is Parent: ' . (FTT_Roles::is_parent($current_user_id) ? 'yes' : 'no'));
-        
-        // Determine which member IDs to query for
-        $member_ids = array();
-        
-        if (FTT_Roles::is_member($current_user_id)) {
-            // Members see only their own events
+        error_log('Group ID Filter: ' . ($group_id ?: 'none'));
+        error_log('Is Member: '  . (FTT_Roles::is_member($current_user_id)  ? 'yes' : 'no'));
+        error_log('Is Parent: '  . (FTT_Roles::is_parent($current_user_id)  ? 'yes' : 'no'));
+
+        // ----------------------------------------------------------------
+        // Determine event scope
+        // Group mode  → use ftt_event_groups (matches calendar endpoint).
+        //               This captures ALL group events regardless of member_id,
+        //               including family events (member_id = '').
+        // Member mode → single user's own events.
+        // Parent mode → children's events via legacy ftt_parent_of meta,
+        //               plus unassigned / family events.
+        // ----------------------------------------------------------------
+        $group_event_ids = null; // non-null only in group mode
+        $member_ids      = array();
+
+        if ($group_id && class_exists('FTT_Family_Groups')) {
+            // Verify the caller has access to this group.
+            if (!FTT_Family_Groups::can_manage_group($group_id, $current_user_id)
+                && !current_user_can('manage_options')) {
+                return rest_ensure_response(array(
+                    'flights_needed'  => array(),
+                    'not_booked'      => array(),
+                    'upcoming_travel' => array(),
+                ));
+            }
+
+            $group_event_ids = $wpdb->get_col($wpdb->prepare(
+                "SELECT post_id FROM {$wpdb->prefix}ftt_event_groups WHERE group_id = %d",
+                $group_id
+            ));
+            error_log('Group mode: found ' . count($group_event_ids) . ' events in group ' . $group_id);
+
+            if (empty($group_event_ids)) {
+                error_log('No events in group - returning empty data');
+                return rest_ensure_response(array(
+                    'flights_needed'  => array(),
+                    'not_booked'      => array(),
+                    'upcoming_travel' => array(),
+                ));
+            }
+
+        } elseif (FTT_Roles::is_member($current_user_id)) {
             $member_ids = array($current_user_id);
             error_log('Member mode: showing events for user ' . $current_user_id);
+
         } elseif (FTT_Roles::is_parent($current_user_id)) {
-            // Parents see their children's events
             $children = FTT_Roles::get_children($current_user_id);
             error_log('Parent mode: found ' . count($children) . ' children');
+
             if (!empty($children)) {
-                // get_children() already returns an array of user IDs
                 $member_ids = $children;
                 error_log('Member IDs to query: ' . implode(', ', $member_ids));
+            } elseif (class_exists('FTT_Family_Groups')) {
+                // Fallback: derive children from group membership if legacy meta is empty.
+                $user_groups = FTT_Family_Groups::get_user_groups($current_user_id);
+                foreach ($user_groups as $ug) {
+                    foreach (FTT_Family_Groups::get_group_members($ug->id, 'child') as $m) {
+                        if (!in_array((int) $m->user_id, $member_ids, true)) {
+                            $member_ids[] = (int) $m->user_id;
+                        }
+                    }
+                }
+                error_log('Parent fallback via groups: ' . count($member_ids) . ' children');
             }
         }
-        
-        // If no member IDs, return empty data
-        if (empty($member_ids)) {
-            error_log('No member IDs found - returning empty data');
+
+        // No filter criteria at all → return empty.
+        if ($group_event_ids === null && empty($member_ids)) {
+            error_log('No filter criteria - returning empty data');
             return rest_ensure_response(array(
                 'flights_needed'  => array(),
                 'not_booked'      => array(),
                 'upcoming_travel' => array(),
             ));
         }
-        
-        // Build meta query for member_id filtering
-        $member_meta_query = array(
-            'relation' => 'OR',
-        );
-        
-        // Include events for each child
-        foreach ($member_ids as $member_id) {
-            $member_meta_query[] = array(
-                'key'     => 'member_id',
-                'value'   => $member_id,
-                'compare' => '=',
-            );
+
+        // ----------------------------------------------------------------
+        // Build the member meta query (non-group mode only).
+        // ----------------------------------------------------------------
+        $member_meta_query = null;
+        if ($group_event_ids === null) {
+            $member_meta_query = array('relation' => 'OR');
+            foreach ($member_ids as $mid) {
+                $member_meta_query[] = array(
+                    'key'     => 'member_id',
+                    'value'   => $mid,
+                    'compare' => '=',
+                );
+            }
+            // Parents also see unassigned / family events and their own events.
+            if (FTT_Roles::is_parent($current_user_id)) {
+                $member_meta_query[] = array('key' => 'member_id', 'compare' => 'NOT EXISTS');
+                $member_meta_query[] = array('key' => 'member_id', 'value' => '',                  'compare' => '=');
+                $member_meta_query[] = array('key' => 'member_id', 'value' => $current_user_id, 'compare' => '=');
+            }
         }
-        
-        // For parents, also include unassigned events and events they created themselves
-        if (FTT_Roles::is_parent($current_user_id)) {
-            // Include events with no member_id set
-            $member_meta_query[] = array(
-                'key'     => 'member_id',
-                'compare' => 'NOT EXISTS',
-            );
-            // Include events with empty member_id
-            $member_meta_query[] = array(
-                'key'     => 'member_id',
-                'value'   => '',
-                'compare' => '=',
-            );
-            // Include events assigned to parent themselves (backward compatibility)
-            $member_meta_query[] = array(
-                'key'     => 'member_id',
-                'value'   => $current_user_id,
-                'compare' => '=',
-            );
-        }
-        
-        error_log('Meta query built for member_ids: ' . print_r($member_meta_query, true));
-        
-        // Flights needed (future events with flight_needed = true)
-        $flights_needed = new WP_Query(array(
+
+        // ----------------------------------------------------------------
+        // Helper: build base WP_Query args, injecting post__in OR meta filter.
+        // ----------------------------------------------------------------
+        $base_args = array(
             'post_type'      => 'ftt_event',
             'posts_per_page' => -1,
             'post_status'    => 'publish',
-            'meta_query'     => array(
-                'relation' => 'AND',
-                $member_meta_query,
-                array(
-                    'key'     => 'flight_needed',
-                    'value'   => '1',
-                    'compare' => '=',
-                ),
-                array(
-                    'key'     => 'start_datetime',
-                    'value'   => $now,
-                    'compare' => '>=',
-                    'type'    => 'DATETIME',
-                ),
-            ),
             'orderby'        => 'meta_value',
             'meta_key'       => 'start_datetime',
             'order'          => 'ASC',
-        ));
-        
+        );
+        if ($group_event_ids !== null) {
+            $base_args['post__in'] = $group_event_ids;
+        }
+
+        // ----------------------------------------------------------------
+        // Flights needed: future events with at least one unbooked fly leg.
+        // ----------------------------------------------------------------
+        $flights_meta = array(
+            'relation' => 'AND',
+            array('key' => 'flight_needed', 'value' => '1', 'compare' => '='),
+            array('key' => 'start_datetime', 'value' => $now, 'compare' => '>=', 'type' => 'DATETIME'),
+        );
+        if ($member_meta_query !== null) {
+            $flights_meta[] = $member_meta_query;
+        }
+
+        $flights_needed = new WP_Query(array_merge($base_args, array('meta_query' => $flights_meta)));
         error_log('Flights needed query found ' . $flights_needed->found_posts . ' posts');
-        error_log('SQL: ' . $flights_needed->request);
-        
+
         $flights_needed_data = array();
-        $not_booked_data = array();
-        
+        $not_booked_data     = array();
+
         foreach ($flights_needed->posts as $post) {
-            $member_id = get_post_meta($post->ID, 'member_id', true);
-            error_log('Event ID ' . $post->ID . ' (' . $post->post_title . ') has member_id: ' . ($member_id ?: 'NOT SET'));
-            
-            // Check if any legs are not booked
             $travel_legs = json_decode(get_post_meta($post->ID, 'travel_legs', true) ?: '[]', true);
             $has_unbooked = false;
-            
             foreach ($travel_legs as $leg) {
-                if ($leg['mode'] === 'fly' && !$leg['booked']) {
+                if (isset($leg['mode']) && $leg['mode'] === 'fly' && empty($leg['booked'])) {
                     $has_unbooked = true;
                     break;
                 }
             }
-            
-            // Only add to flights_needed if there's at least one unbooked leg
             if ($has_unbooked) {
-                $event_data = self::format_event($post);
+                $event_data            = self::format_event($post);
                 $flights_needed_data[] = $event_data;
-                $not_booked_data[] = $event_data;
+                $not_booked_data[]     = $event_data;
             }
         }
-        
-        // Upcoming travel (next 30 days with travel_needed = true)
-        $upcoming_travel = new WP_Query(array(
-            'post_type'      => 'ftt_event',
-            'posts_per_page' => -1,
-            'post_status'    => 'publish',
-            'meta_query'     => array(
-                'relation' => 'AND',
-                $member_meta_query,
-                array(
-                    'key'     => 'travel_needed',
-                    'value'   => '1',
-                    'compare' => '=',
-                ),
-                array(
-                    'key'     => 'start_datetime',
-                    'value'   => $now,
-                    'compare' => '>=',
-                    'type'    => 'DATETIME',
-                ),
-                array(
-                    'key'     => 'start_datetime',
-                    'value'   => $thirty_days,
-                    'compare' => '<=',
-                    'type'    => 'DATETIME',
-                ),
-            ),
-            'orderby'        => 'meta_value',
-            'meta_key'       => 'start_datetime',
-            'order'          => 'ASC',
-        ));
-        
+
+        // ----------------------------------------------------------------
+        // Upcoming travel: next 30 days with travel_needed = 1.
+        // ----------------------------------------------------------------
+        $travel_meta = array(
+            'relation' => 'AND',
+            array('key' => 'travel_needed', 'value' => '1', 'compare' => '='),
+            array('key' => 'start_datetime', 'value' => $now,          'compare' => '>=', 'type' => 'DATETIME'),
+            array('key' => 'start_datetime', 'value' => $thirty_days,  'compare' => '<=', 'type' => 'DATETIME'),
+        );
+        if ($member_meta_query !== null) {
+            $travel_meta[] = $member_meta_query;
+        }
+
+        $upcoming_travel = new WP_Query(array_merge($base_args, array('meta_query' => $travel_meta)));
+
         $upcoming_travel_data = array();
         foreach ($upcoming_travel->posts as $post) {
             $upcoming_travel_data[] = self::format_event($post);
         }
-        
+
         error_log('=== DASHBOARD RESULTS ===');
-        error_log('Flights needed: ' . count($flights_needed_data));
-        error_log('Not booked: ' . count($not_booked_data));
-        error_log('Upcoming travel: ' . count($upcoming_travel_data));
+        error_log('Flights needed: '   . count($flights_needed_data));
+        error_log('Not booked: '       . count($not_booked_data));
+        error_log('Upcoming travel: '  . count($upcoming_travel_data));
         error_log('=== END DASHBOARD DEBUG ===');
-        
+
         return rest_ensure_response(array(
             'flights_needed'  => $flights_needed_data,
             'not_booked'      => $not_booked_data,
             'upcoming_travel' => $upcoming_travel_data,
-            'debug' => array(
-                'user_id' => $current_user_id,
-                'is_member' => FTT_Roles::is_member($current_user_id),
-                'is_parent' => FTT_Roles::is_parent($current_user_id),
-                'member_ids' => $member_ids,
-                'children_count' => FTT_Roles::is_parent($current_user_id) ? count(FTT_Roles::get_children($current_user_id)) : 0,
-                'query_found_posts' => $flights_needed->found_posts,
-            ),
         ));
     }
     
@@ -829,6 +968,7 @@ class FTT_REST {
         
         $meta_fields = array(
             'member_id',
+            'group_id',
             'start_datetime',
             'end_datetime',
             'timezone',
@@ -864,9 +1004,34 @@ class FTT_REST {
             update_post_meta($post_id, 'member_id', get_current_user_id());
         }
         
+        // Handle group association (v2.1)
+        if ($request->has_param('group_id')) {
+            $group_id = absint($request->get_param('group_id'));
+            if ($group_id > 0) {
+                // Add event to group if not already associated
+                FTT_Family_Groups::add_event_to_group($post_id, $group_id);
+            }
+        } elseif (!get_post_meta($post_id, 'group_id', true)) {
+            // Auto-assign to user's primary group if no group specified
+            $current_user_id = get_current_user_id();
+            $primary_group = get_user_meta($current_user_id, 'ftt_primary_group', true);
+            if ($primary_group) {
+                // Guard: verify the group still exists before inserting (avoids FK constraint error)
+                $group_exists = $wpdb->get_var( $wpdb->prepare(
+                    "SELECT id FROM {$wpdb->prefix}ftt_family_groups WHERE id = %d",
+                    $primary_group
+                ) );
+                if ($group_exists) {
+                    update_post_meta($post_id, 'group_id', $primary_group);
+                    FTT_Family_Groups::add_event_to_group($post_id, $primary_group);
+                }
+            }
+        }
+        
         // Check for newly booked flights and delete associated price alerts
         if ($request->has_param('travel_legs')) {
-            $new_travel_legs = json_decode($request->get_param('travel_legs'), true);
+            $raw_legs = $request->get_param('travel_legs');
+            $new_travel_legs = is_array($raw_legs) ? $raw_legs : json_decode($raw_legs, true);
             
             if (is_array($new_travel_legs) && is_array($old_travel_legs)) {
                 foreach ($new_travel_legs as $index => $new_leg) {
@@ -984,8 +1149,15 @@ class FTT_REST {
         $return_leg_index = null;
         $return_date = null;
         
-        // Method 1: Check if this single leg has arrive_date spanning multiple days (likely return date)
-        if (!empty($leg['arrive_date']) && !empty($leg['depart_date'])) {
+        // Method 0: Check explicit is_round_trip flag (new preferred method)
+        if (!empty($leg['is_round_trip']) && !empty($leg['return_date'])) {
+            $is_round_trip = true;
+            $return_date = $leg['return_date'];
+            error_log("SRT: Using explicit round-trip flag with return date {$return_date}");
+        }
+        
+        // Method 1: Check if this single leg has arrive_date spanning multiple days (legacy method)
+        if (!$is_round_trip && !empty($leg['arrive_date']) && !empty($leg['depart_date'])) {
             $depart_time = strtotime($leg['depart_date']);
             $arrive_time = strtotime($leg['arrive_date']);
             $days_diff = ($arrive_time - $depart_time) / (60 * 60 * 24);
@@ -1306,19 +1478,84 @@ class FTT_REST {
      */
     public static function update_user_preferences($request) {
         $user_id = get_current_user_id();
+        $params = $request->get_json_params();
         
-        $home_airport = $request->get_param('home_airport');
-        $timezone = $request->get_param('timezone');
+        // Handle visible event categories
+        if (isset($params['visible_categories']) && is_array($params['visible_categories'])) {
+            update_user_meta($user_id, 'ftt_visible_event_categories', $params['visible_categories']);
+        }
         
+        // Handle home_airport from either JSON params or regular params
+        $home_airport = isset($params['home_airport']) ? $params['home_airport'] : $request->get_param('home_airport');
         if ($home_airport !== null) {
             update_user_meta($user_id, 'ftt_home_airport', strtoupper(sanitize_text_field($home_airport)));
         }
         
+        // Handle timezone from either JSON params or regular params
+        $timezone = isset($params['timezone']) ? $params['timezone'] : $request->get_param('timezone');
         if ($timezone !== null) {
             update_user_meta($user_id, 'ftt_timezone', sanitize_text_field($timezone));
         }
         
         return rest_ensure_response(array('success' => true, 'message' => 'Preferences updated'));
+    }
+    
+    /**
+     * Update user's primary group
+     */
+    public static function update_primary_group($request) {
+        $user_id = get_current_user_id();
+        $group_id = $request->get_param('group_id');
+        
+        // Verify user is a member of this group
+        $user_groups = FTT_Family_Groups::get_user_groups($user_id);
+        $is_member = false;
+        
+        foreach ($user_groups as $group) {
+            if ($group->id == $group_id) {
+                $is_member = true;
+                break;
+            }
+        }
+        
+        if (!$is_member) {
+            return new WP_Error('not_member', 'You are not a member of this group', array('status' => 403));
+        }
+        
+        update_user_meta($user_id, 'ftt_primary_group', $group_id);
+        
+        return rest_ensure_response(array(
+            'success' => true, 
+            'message' => 'Primary group updated',
+            'group_id' => $group_id
+        ));
+    }
+    
+    /**
+     * Lookup user by email (for adding members to groups)
+     */
+    public static function lookup_user_by_email($request) {
+        $email = $request->get_param('email');
+        
+        if (empty($email)) {
+            return new WP_Error('missing_email', 'Email address is required', array('status' => 400));
+        }
+        
+        $user = get_user_by('email', $email);
+        
+        if (!$user) {
+            return rest_ensure_response(array(
+                'success' => false,
+                'message' => 'No user found with that email address'
+            ));
+        }
+        
+        return rest_ensure_response(array(
+            'success' => true,
+            'user_id' => $user->ID,
+            'display_name' => $user->display_name,
+            'email' => $user->user_email
+        ));
     }
     
     /**
@@ -1451,6 +1688,9 @@ class FTT_REST {
         do_action('ftt_user_registered', $user_id, $email, $name);
         
         // Create Stripe checkout session
+        if (!class_exists('FTT_Stripe_Integration')) {
+            return new WP_Error('stripe_unavailable', 'Billing is not configured on this site. Please contact support.', ['status' => 503]);
+        }
         $session = FTT_Stripe_Integration::create_checkout_session($user_id, $interval, $addon_quantity);
         
         if (!$session) {
@@ -1587,11 +1827,15 @@ class FTT_REST {
             
             // Set role
             $user = new WP_User($child_id);
-            $user->set_role('ftt_member');
-            
+            $user->set_role('subscriber');
+            FTT_Roles::make_member($child_id);
+
             error_log('FTT REST: Created new user ID: ' . $child_id);
         }
-        
+
+        // Ensure member flag is set for both new and existing users
+        FTT_Roles::make_member($child_id);
+
         // Update child metadata
         if ($age > 0) {
             update_user_meta($child_id, 'child_age', $age);
@@ -1602,12 +1846,27 @@ class FTT_REST {
         if (!empty($school)) {
             update_user_meta($child_id, 'child_school', $school);
         }
-        if (!empty($color)) {
-            update_user_meta($child_id, 'child_color', $color);
+        if (!empty($color) && class_exists('FTT_Child_Colors')) {
+            FTT_Child_Colors::update_color($child_id, $color);
         }
         
         // Link to parent
         FTT_Roles::add_parent_child($user_id, $child_id);
+
+        // Add child to the correct group (group-based billing system)
+        if (class_exists('FTT_Family_Groups')) {
+            // Prefer the group explicitly specified by the caller (e.g. ?group=X page).
+            // Fall back to the parent's primary group for legacy / non-group-mode calls.
+            $requested_group_id = absint($params['group_id'] ?? 0);
+            if ($requested_group_id && FTT_Family_Groups::can_manage_group($requested_group_id, $user_id)) {
+                FTT_Family_Groups::add_member($requested_group_id, $child_id, 'child');
+            } else {
+                $primary_group_id = get_user_meta($user_id, 'ftt_primary_group', true);
+                if ($primary_group_id) {
+                    FTT_Family_Groups::add_member((int) $primary_group_id, $child_id, 'child');
+                }
+            }
+        }
         
         error_log('FTT REST: Child linked successfully');
         
@@ -1624,15 +1883,31 @@ class FTT_REST {
     public static function edit_child($request) {
         $user_id = get_current_user_id();
         $params = $request->get_json_params();
-        
-        $child_id = absint($params['child_id'] ?? 0);
-        
+
+        // Accept child_id from URL param (PUT /children/{id}) or JSON body (POST /edit-child)
+        $child_id = absint($request->get_param('id') ?: 0);
+        if (!$child_id) {
+            $child_id = absint($params['child_id'] ?? 0);
+        }
+
         if (!$child_id) {
             return new WP_Error('missing_child_id', 'Child ID is required', ['status' => 400]);
         }
-        
-        // Verify parent-child relationship
-        if (!FTT_Roles::is_parent($user_id) || !in_array($child_id, FTT_Roles::get_children($user_id))) {
+
+        // Verify parent-child relationship via FTT_Roles meta
+        $can_manage = FTT_Roles::is_parent($user_id) && in_array($child_id, FTT_Roles::get_children($user_id));
+
+        // Fallback: check group membership with management permission
+        if (!$can_manage && class_exists('FTT_Family_Groups')) {
+            $primary_group = get_user_meta($user_id, 'ftt_primary_group', true);
+            if ($primary_group && FTT_Family_Groups::can_manage_group((int) $primary_group, $user_id)) {
+                $members = FTT_Family_Groups::get_group_members((int) $primary_group, 'child');
+                $child_ids_in_group = array_map('intval', wp_list_pluck($members, 'user_id'));
+                $can_manage = in_array($child_id, $child_ids_in_group);
+            }
+        }
+
+        if (!$can_manage) {
             return new WP_Error('unauthorized', 'You do not have permission to edit this child', ['status' => 403]);
         }
         
@@ -1663,8 +1938,8 @@ class FTT_REST {
         if (!empty($school)) {
             update_user_meta($child_id, 'child_school', $school);
         }
-        if (!empty($color)) {
-            update_user_meta($child_id, 'child_color', $color);
+        if (!empty($color) && class_exists('FTT_Child_Colors')) {
+            FTT_Child_Colors::update_color($child_id, $color);
         }
         
         return rest_ensure_response([
@@ -1678,21 +1953,43 @@ class FTT_REST {
      */
     public static function remove_child($request) {
         $user_id = get_current_user_id();
-        $params = $request->get_json_params();
-        
-        $child_id = absint($params['child_id'] ?? 0);
-        
+
+        // Accept child_id from URL param (DELETE /children/{id}) or JSON body (POST /remove-child)
+        $child_id = absint($request->get_param('id') ?: 0);
+        if (!$child_id) {
+            $params = $request->get_json_params();
+            $child_id = absint($params['child_id'] ?? 0);
+        }
+
         if (!$child_id) {
             return new WP_Error('missing_child_id', 'Child ID is required', ['status' => 400]);
         }
-        
-        // Verify parent-child relationship
-        if (!FTT_Roles::is_parent($user_id) || !in_array($child_id, FTT_Roles::get_children($user_id))) {
+
+        // Verify parent-child relationship via FTT_Roles meta
+        $can_manage = FTT_Roles::is_parent($user_id) && in_array($child_id, FTT_Roles::get_children($user_id));
+
+        // Fallback: check group membership
+        $primary_group_id = 0;
+        if (class_exists('FTT_Family_Groups')) {
+            $primary_group_id = (int) get_user_meta($user_id, 'ftt_primary_group', true);
+            if (!$can_manage && $primary_group_id) {
+                $members = FTT_Family_Groups::get_group_members($primary_group_id, 'child');
+                $child_ids_in_group = array_map('intval', wp_list_pluck($members, 'user_id'));
+                $can_manage = in_array($child_id, $child_ids_in_group);
+            }
+        }
+
+        if (!$can_manage) {
             return new WP_Error('unauthorized', 'You do not have permission to remove this child', ['status' => 403]);
         }
-        
-        // Remove parent-child relationship
+
+        // Remove parent-child relationship (legacy meta)
         FTT_Roles::remove_parent_child($user_id, $child_id);
+
+        // Also remove from group (handles group table + residual meta cleanup)
+        if ($primary_group_id && class_exists('FTT_Family_Groups')) {
+            FTT_Family_Groups::remove_member($primary_group_id, $child_id);
+        }
         
         return rest_ensure_response([
             'success' => true,
@@ -1709,12 +2006,60 @@ class FTT_REST {
         
         $email = sanitize_email($params['email'] ?? '');
         $relationship = sanitize_text_field($params['relationship'] ?? 'co-parent');
+        $group_id = isset($params['group_id']) ? absint($params['group_id']) : 0;
+        $can_manage_group = isset($params['can_manage_group']) ? (bool) $params['can_manage_group'] : true;
         
         if (empty($email)) {
             return new WP_Error('missing_email', 'Email address is required', ['status' => 400]);
         }
+
+        // Check if someone with this email already has an account
+        $existing_user = get_user_by('email', $email);
+        if ($existing_user) {
+            // Prevent inviting yourself
+            if ($existing_user->ID === $user_id) {
+                return new WP_Error('self_invite', 'You cannot invite yourself', ['status' => 400]);
+            }
+
+            // If group mode, check for duplicate membership first
+            if ($group_id && class_exists('FTT_Family_Groups')) {
+                if (FTT_Family_Groups::is_member($group_id, $existing_user->ID)) {
+                    return new WP_Error('already_member', 'This user is already a member of the group', ['status' => 400]);
+                }
+                FTT_Family_Groups::add_member($group_id, $existing_user->ID, 'parent', [
+                    'relationship'     => $relationship,
+                    'can_manage_group' => $can_manage_group,
+                    'added_by'         => $user_id,
+                ]);
+            }
+
+            // Also create the legacy parent-child cross-link
+            $children = FTT_Roles::get_children($user_id);
+            foreach ($children as $child_id) {
+                FTT_Roles::add_parent_child($existing_user->ID, $child_id);
+            }
+
+            // Send a simple notification (not a registration link)
+            $current_user = wp_get_current_user();
+            $dashboard_url = FTT_Pages::get_page_url('dashboard') ?: home_url('/ftt-dashboard/');
+            $subject = sprintf('You have been added to %s\'s family calendar', $current_user->display_name);
+            $message = sprintf(
+                "%s has added you as a %s on their family calendar.\n\n" .
+                "Log in to view the shared calendar: %s",
+                $current_user->display_name,
+                $relationship,
+                $dashboard_url
+            );
+            wp_mail($email, $subject, $message);
+
+            return rest_ensure_response([
+                'success' => true,
+                'added_directly' => true,
+                'message' => 'User already has an account and has been added directly',
+            ]);
+        }
         
-        // Get expiration days from settings
+        // User doesn't exist — create a pending invitation and send a registration link
         $settings = get_option('ftt_settings', array());
         $expiration_days = isset($settings['invitation_expiration_days']) ? absint($settings['invitation_expiration_days']) : 7;
         
@@ -1732,18 +2077,25 @@ class FTT_REST {
         $invitations[$invite_code] = [
             'email' => $email,
             'relationship' => $relationship,
+            'group_id' => $group_id,
+            'can_manage_group' => $can_manage_group,
             'expires' => $expires,
             'created' => $created,
             'status' => 'pending',
+            'inviter_id' => $user_id, // Store inviter ID in invitation data
         ];
         
         update_user_meta($user_id, 'ftt_adult_invitations', $invitations);
         
-        // Generate invitation URL
+        // Generate invitation URL - only needs the code now
+        $register_url = FTT_Pages::get_page_url('register');
+        if (!$register_url) {
+            $register_url = home_url('/ftt-register/');
+        }
+        
         $invite_url = add_query_arg([
             'ftt_invite' => $invite_code,
-            'inviter' => $user_id,
-        ], home_url('/ftt-dashboard/'));
+        ], $register_url);
         
         // Send email
         $current_user = wp_get_current_user();
@@ -1830,11 +2182,14 @@ class FTT_REST {
         $settings = get_option('ftt_settings', array());
         $expiration_days = isset($settings['invitation_expiration_days']) ? absint($settings['invitation_expiration_days']) : 7;
         
-        // Generate invitation URL
+        // Generate invitation URL (same as invite_adult - points to registration page)
+        $register_url = FTT_Pages::get_page_url('register');
+        if (!$register_url) {
+            $register_url = home_url('/ftt-register/');
+        }
         $invite_url = add_query_arg([
             'ftt_invite' => $invite_code,
-            'inviter' => $user_id,
-        ], home_url('/ftt-dashboard/'));
+        ], $register_url);
         
         // Send email
         $current_user = wp_get_current_user();
@@ -1910,6 +2265,49 @@ class FTT_REST {
     
     /**
      * Get family members (children and adults)
+     */
+    /**
+     * Get current user's children (RESTful GET /children)
+     */
+    public static function get_children_list($request) {
+        $user_id = get_current_user_id();
+
+        // Start with children from FTT_Roles meta
+        $child_ids = array_map('intval', FTT_Roles::get_children($user_id));
+
+        // Merge group-based children so both billing paths are covered
+        if (class_exists('FTT_Family_Groups')) {
+            $primary_group_id = (int) get_user_meta($user_id, 'ftt_primary_group', true);
+            if ($primary_group_id) {
+                $members = FTT_Family_Groups::get_group_members($primary_group_id, 'child');
+                $group_child_ids = array_map('intval', wp_list_pluck($members, 'user_id'));
+                $child_ids = array_values(array_unique(array_merge($child_ids, $group_child_ids)));
+            }
+        }
+
+        $children = [];
+        foreach ($child_ids as $child_id) {
+            $child = get_userdata($child_id);
+            if ($child) {
+                $children[] = [
+                    'id'         => $child_id,
+                    'name'       => $child->display_name,
+                    'first_name' => $child->first_name,
+                    'last_name'  => $child->last_name,
+                    'email'      => $child->user_email,
+                    'age'        => get_user_meta($child_id, 'child_age', true),
+                    'grade'      => get_user_meta($child_id, 'child_grade', true),
+                    'school'     => get_user_meta($child_id, 'child_school', true),
+                    'color'      => get_user_meta($child_id, 'child_color', true),
+                ];
+            }
+        }
+
+        return rest_ensure_response(['children' => $children]);
+    }
+
+    /**
+     * Get all family members (children and adults)
      */
     public static function get_family_members($request) {
         $user_id = get_current_user_id();

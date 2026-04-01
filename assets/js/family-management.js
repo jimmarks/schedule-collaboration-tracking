@@ -8,15 +8,7 @@ jQuery(document).ready(function($) {
         $('.ftt-invitations-list').slideToggle(200);
     });
     
-    // Toggle category types list
-    $('.ftt-category-expand').on('click', function(e) {
-        e.preventDefault();
-        var category = $(this).data('category');
-        var typesList = $('#ftt-types-' + category);
-        
-        $(this).toggleClass('expanded');
-        typesList.slideToggle(200);
-    });
+    // Note: Category expand/collapse is handled in templates/family-management.php inline script
     
     // Add Child Modal
     $('#ftt-add-child-btn').on('click', function() {

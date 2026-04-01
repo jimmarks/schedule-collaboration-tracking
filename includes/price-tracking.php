@@ -21,7 +21,7 @@ class FTT_Price_Tracking {
     public static function get_notification_email() {
         $settings = get_option('ftt_settings', array());
         $email = $settings['notification_from_email'] ?? '';
-        return !empty($email) ? $email : get_option('admin_email');
+        return !empty($email) ? $email : 'noreply@familytraveltracker.app';
     }
     
     /**
@@ -32,7 +32,34 @@ class FTT_Price_Tracking {
         $name = $settings['notification_from_name'] ?? '';
         return !empty($name) ? $name : get_bloginfo('name');
     }
-    
+
+    /**
+     * Get support contact email for user-facing email footers.
+     * Configurable via ftt_settings[support_email]; never uses admin_email.
+     */
+    public static function get_support_email() {
+        $settings = get_option('ftt_settings', array());
+        $email = $settings['support_email'] ?? '';
+        return !empty($email) ? $email : 'support@familytraveltracker.app';
+    }
+
+    /**
+     * Get the FTT dashboard URL using the Pages system with a slug fallback.
+     */
+    private static function get_dashboard_url() {
+        $url = FTT_Pages::get_page_url('dashboard');
+        return $url ?: home_url('/ftt-dashboard/');
+    }
+
+    /**
+     * Get a user-facing URL for an event in email bodies.
+     * Links to the dashboard with ?event_id={id} so the frontend can open the event.
+     * Avoids CPT single-post URLs (which have no usable template).
+     */
+    private static function get_event_email_url($event_id) {
+        return add_query_arg('event_id', absint($event_id), self::get_dashboard_url());
+    }
+
     /**
      * Initialize
      */
@@ -126,7 +153,7 @@ class FTT_Price_Tracking {
             '<h1 style="color: #10b981; font-size: 48px; margin-bottom: 20px;">✓</h1>' .
             '<h2 style="color: #333; font-size: 24px; margin-bottom: 10px;">Price Alert Deactivated</h2>' .
             '<p style="color: #666; font-size: 16px; margin-bottom: 30px;">You will no longer receive price updates for this flight.</p>' .
-            '<a href="' . home_url('/member-dashboard/') . '" style="display: inline-block; background: #0066cc; color: white; text-decoration: none; padding: 12px 30px; border-radius: 6px; font-weight: 600; font-size: 14px;">Go to Dashboard</a>' .
+            '<a href="' . esc_url( self::get_dashboard_url() ) . '" style="display: inline-block; background: #0066cc; color: white; text-decoration: none; padding: 12px 30px; border-radius: 6px; font-weight: 600; font-size: 14px;">Go to Dashboard</a>' .
             '</div>',
             'Alert Deactivated',
             array('response' => 200)
@@ -511,8 +538,15 @@ class FTT_Price_Tracking {
                         $is_round_trip = false;
                         $return_date = null;
                         
-                        // Method 1: Check if arrive_date spans multiple days (likely return date)
-                        if (!empty($leg['arrive_date']) && !empty($leg['depart_date'])) {
+                        // Method 0: Check explicit is_round_trip flag (new preferred method)
+                        if (!empty($leg['is_round_trip']) && !empty($leg['return_date'])) {
+                            $is_round_trip = true;
+                            $return_date = $leg['return_date'];
+                            error_log("SRT: Event {$event->ID}, Leg {$index}: Using explicit round-trip flag with return date {$return_date}");
+                        }
+                        
+                        // Method 1: Check if arrive_date spans multiple days (legacy method)
+                        if (!$is_round_trip && !empty($leg['arrive_date']) && !empty($leg['depart_date'])) {
                             $depart_time = strtotime($leg['depart_date']);
                             $arrive_time = strtotime($leg['arrive_date']);
                             $days_diff = ($arrive_time - $depart_time) / (60 * 60 * 24);
@@ -520,6 +554,7 @@ class FTT_Price_Tracking {
                             if ($days_diff >= 1) {
                                 $is_round_trip = true;
                                 $return_date = $leg['arrive_date'];
+                                error_log("SRT: Event {$event->ID}, Leg {$index}: Detected round-trip from arrive_date span");
                             }
                         }
                         
@@ -533,6 +568,7 @@ class FTT_Price_Tracking {
                                     $is_round_trip = true;
                                     $return_date = $travel_legs[$i]['depart_date'];
                                     $checked_legs[] = $i; // Mark return leg as checked
+                                    error_log("SRT: Event {$event->ID}, Leg {$index}: Detected round-trip from reversed leg {$i}");
                                     break;
                                 }
                             }
@@ -638,6 +674,9 @@ class FTT_Price_Tracking {
         ));
         
         if (is_wp_error($response)) {
+            if ( class_exists('FTT_API_Tracker') ) {
+                FTT_API_Tracker::record('serpapi', false);
+            }
             return array(
                 'price' => false,
                 'debug' => array(
@@ -670,6 +709,9 @@ class FTT_Price_Tracking {
         
         // SerpAPI returns best flights in 'best_flights' array
         if (isset($body['best_flights'][0]['price'])) {
+            if ( class_exists('FTT_API_Tracker') ) {
+                FTT_API_Tracker::record('serpapi', true);
+            }
             return array(
                 'price' => floatval($body['best_flights'][0]['price']),
                 'price_insights' => $price_insights,
@@ -679,6 +721,9 @@ class FTT_Price_Tracking {
         
         // Fallback to other_flights
         if (isset($body['other_flights'][0]['price'])) {
+            if ( class_exists('FTT_API_Tracker') ) {
+                FTT_API_Tracker::record('serpapi', true);
+            }
             return array(
                 'price' => floatval($body['other_flights'][0]['price']),
                 'price_insights' => $price_insights,
@@ -691,6 +736,10 @@ class FTT_Price_Tracking {
             $debug_info['serpapi_error'] = $body['error'];
         }
         
+        // No price found — API responded but returned no flight data
+        if ( class_exists('FTT_API_Tracker') ) {
+            FTT_API_Tracker::record('serpapi', false);
+        }
         return array(
             'price' => false,
             'price_insights' => $price_insights,
@@ -862,7 +911,7 @@ class FTT_Price_Tracking {
      */
     private static function build_price_alert_email($user, $event, $leg, $current_price, $google_insights = null) {
         $site_name = get_bloginfo('name');
-        $event_url = get_permalink($event->ID);
+        $event_url = self::get_event_email_url($event->ID);
         
         ob_start();
         ?>
@@ -943,7 +992,8 @@ class FTT_Price_Tracking {
             </div>
             
             <div style="background: #fff; border-radius: 8px; padding: 20px; text-align: center; font-size: 12px; color: #666;">
-                <p style="margin: 10px 0;">You're receiving this because you set up a price alert. Manage your alerts in your <a href="<?php echo home_url('/member-dashboard/'); ?>" style="color: #0066cc; text-decoration: none;">Member Dashboard</a>.</p>
+                <p style="margin: 10px 0;">You're receiving this because you set up a price alert. Manage your alerts in your <a href="<?php echo esc_url( self::get_dashboard_url() ); ?>" style="color: #0066cc; text-decoration: none;">Member Dashboard</a>.</p>
+                <p style="margin: 10px 0;">Need help? Email <a href="mailto:<?php echo esc_attr( self::get_support_email() ); ?>" style="color: #0066cc; text-decoration: none;"><?php echo esc_html( self::get_support_email() ); ?></a></p>
                 <p style="margin: 10px 0;">&copy; <?php echo date('Y'); ?> <?php echo esc_html($site_name); ?></p>
             </div>
             
@@ -985,12 +1035,16 @@ class FTT_Price_Tracking {
         global $wpdb;
         $alerts_table = $wpdb->prefix . 'ftt_price_alerts';
         
-        $where = $wpdb->prepare("WHERE user_id = %d", $user_id);
+        $query = "SELECT * FROM $alerts_table WHERE user_id = %d";
+        $params = array($user_id);
+        
         if ($active_only) {
-            $where .= " AND is_active = 1";
+            $query .= " AND is_active = 1";
         }
         
-        return $wpdb->get_results("SELECT * FROM $alerts_table $where ORDER BY created_at DESC");
+        $query .= " ORDER BY created_at DESC";
+        
+        return $wpdb->get_results($wpdb->prepare($query, $params));
     }
     
     /**
@@ -1061,7 +1115,10 @@ class FTT_Price_Tracking {
             'Content-Type: text/html; charset=UTF-8',
             sprintf('From: %s <%s>', $from_name, $from_email),
         );
-        $subject = sprintf('[%s] Price Alert Confirmation - %s', $site_name, $event->post_title);
+        $subject = FTT_Email_Templates::render_subject('alert_confirmation', [
+            'site_name'   => $site_name,
+            'event_title' => $event->post_title,
+        ]);
         
         $message = self::build_confirmation_email($user, $event, $leg, $alert);
         
@@ -1078,7 +1135,7 @@ class FTT_Price_Tracking {
      */
     private static function build_confirmation_email($user, $event, $leg, $alert) {
         $site_name = get_bloginfo('name');
-        $event_url = get_permalink($event->ID);
+        $event_url = self::get_event_email_url($event->ID);
         $token = self::generate_alert_token($alert->id, $alert->user_id);
         $unsubscribe_url = add_query_arg(array(
             'action' => 'ftt_deactivate_alert',
@@ -1184,13 +1241,14 @@ class FTT_Price_Tracking {
                 <a href="<?php echo esc_url($event_url); ?>" style="display: inline-block; background: #0066cc; color: white; text-decoration: none; padding: 12px 30px; border-radius: 6px; font-weight: 600; font-size: 14px; margin: 5px;">
                     View Event Details
                 </a>
-                <a href="<?php echo home_url('/member-dashboard/'); ?>" style="display: inline-block; background: #6b7280; color: white; text-decoration: none; padding: 12px 30px; border-radius: 6px; font-weight: 600; font-size: 14px; margin: 5px;">
+                <a href="<?php echo esc_url( self::get_dashboard_url() ); ?>" style="display: inline-block; background: #6b7280; color: white; text-decoration: none; padding: 12px 30px; border-radius: 6px; font-weight: 600; font-size: 14px; margin: 5px;">
                     Manage All Alerts
                 </a>
             </div>
             
             <div style="background: #fff; border-radius: 8px; padding: 20px; text-align: center; font-size: 12px; color: #666;">
                 <p style="margin: 10px 0;">No longer need this alert? <a href="<?php echo esc_url($unsubscribe_url); ?>" style="color: #0066cc; text-decoration: none;">Turn it off</a></p>
+                <p style="margin: 10px 0;">Need help? Email <a href="mailto:<?php echo esc_attr( self::get_support_email() ); ?>" style="color: #0066cc; text-decoration: none;"><?php echo esc_html( self::get_support_email() ); ?></a></p>
                 <p style="margin: 10px 0;">&copy; <?php echo date('Y'); ?> <?php echo esc_html($site_name); ?></p>
             </div>
             
@@ -1377,7 +1435,9 @@ class FTT_Price_Tracking {
                 'Content-Type: text/html; charset=UTF-8',
                 sprintf('From: %s <%s>', $from_name, $from_email),
             );
-            $subject = sprintf('Daily Flight Price Digest - %d flights tracked', $total_flights);
+            $subject = FTT_Email_Templates::render_subject('daily_digest', [
+                'flight_count' => $total_flights,
+            ]);
             
             wp_mail($user->user_email, $subject, $email_body, $headers);
             
@@ -1449,7 +1509,8 @@ class FTT_Price_Tracking {
             <?php endif; ?>
             
             <div style="background: #fff; border-radius: 8px; padding: 20px; margin-top: 30px; text-align: center; font-size: 12px; color: #666;">
-                <p style="margin: 10px 0;">This digest is sent daily at 2am. You can manage your price alerts in your <a href="<?php echo home_url('/member-dashboard/'); ?>" style="color: #0066cc; text-decoration: none;">Member Dashboard</a>.</p>
+                <p style="margin: 10px 0;">This digest is sent daily at 2am. You can manage your price alerts in your <a href="<?php echo esc_url( self::get_dashboard_url() ); ?>" style="color: #0066cc; text-decoration: none;">Member Dashboard</a>.</p>
+                <p style="margin: 10px 0;">Need help? Email <a href="mailto:<?php echo esc_attr( self::get_support_email() ); ?>" style="color: #0066cc; text-decoration: none;"><?php echo esc_html( self::get_support_email() ); ?></a></p>
                 <p style="margin: 10px 0;">&copy; <?php echo date('Y'); ?> <?php echo esc_html($site_name); ?></p>
             </div>
             

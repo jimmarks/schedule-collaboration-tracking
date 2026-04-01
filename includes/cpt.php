@@ -210,7 +210,7 @@ class FTT_CPT {
     /**
      * Get default event types with category assignments (for backward compatibility)
      */
-    private static function get_default_event_types() {
+    public static function get_default_event_types() {
         return array(
             // Education
             'school_event' => array(

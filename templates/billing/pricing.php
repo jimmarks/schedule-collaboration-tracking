@@ -20,12 +20,23 @@ if (isset($_GET['debug'])) {
     }
 }
 
-// Redirect if already has subscription
+// v2.1: Redirect logged-in users to groups page for billing
 $user_id = get_current_user_id();
 if ($user_id) {
-    $subscription_status = get_user_meta($user_id, 'ftt_subscription_status', true);
-    if (!empty($subscription_status) && in_array($subscription_status, ['active', 'trialing'])) {
-        wp_redirect(home_url('/manage-subscription/'));
+    // Check if user has group access
+    if (class_exists('FTT_Family_Groups') && method_exists('FTT_Family_Groups', 'user_has_group_access')) {
+        if (FTT_Family_Groups::user_has_group_access($user_id)) {
+            // Has active billing, go to dashboard
+            wp_redirect(home_url('/ftt-dashboard/'));
+            exit;
+        } else {
+            // No active billing, go to groups to set up
+            wp_redirect(home_url('/ftt-groups/'));
+            exit;
+        }
+    } else {
+        // Fallback: redirect to groups
+        wp_redirect(home_url('/ftt-groups/'));
         exit;
     }
 }

@@ -6,19 +6,22 @@
     'use strict';
 
     $(document).ready(function() {
-        // Tab switching
-        $('.nav-tab').on('click', function(e) {
+        // Tab switching — scoped to .ftt-settings-tabs so that outer FTT
+        // page-navigation tabs (which use real URLs) are NOT intercepted.
+        // Only match anchor links (href="#...") to leave URL-based tabs alone.
+        $('.ftt-settings-tabs .nav-tab[href^="#"]').on('click', function(e) {
             e.preventDefault();
             
             const target = $(this).attr('href');
+            const $container = $(this).closest('.ftt-settings-tabs');
             
             // Update tabs
-            $('.nav-tab').removeClass('nav-tab-active');
+            $container.find('.nav-tab').removeClass('nav-tab-active');
             $(this).addClass('nav-tab-active');
             
             // Update content
-            $('.tab-content').removeClass('active');
-            $(target).addClass('active');
+            $container.find('.tab-content').removeClass('active');
+            $container.find(target).addClass('active');
         });
 
         // Test Stripe connection

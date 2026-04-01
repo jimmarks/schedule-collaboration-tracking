@@ -19,7 +19,6 @@ class FTT_Stripe_Settings {
      * Initialize hooks
      */
     public static function init() {
-        add_action('admin_menu', [__CLASS__, 'add_settings_page']);
         add_action('admin_init', [__CLASS__, 'register_settings']);
         add_action('admin_enqueue_scripts', [__CLASS__, 'enqueue_admin_scripts']);
         
@@ -59,7 +58,14 @@ class FTT_Stripe_Settings {
      * Enqueue admin scripts
      */
     public static function enqueue_admin_scripts($hook) {
-        if ($hook !== 'ftt_event_page_ftt-billing-settings') {
+        // Load on the stand-alone billing settings page AND when embedded as a
+        // tab inside the combined FTT Settings page.
+        $is_standalone  = $hook === 'ftt_event_page_ftt-billing-settings';
+        $is_embedded    = $hook === 'ftt_event_page_ftt-settings'
+                          && isset( $_GET['tab'] )
+                          && sanitize_key( $_GET['tab'] ) === 'billing-settings';
+
+        if ( ! $is_standalone && ! $is_embedded ) {
             return;
         }
         

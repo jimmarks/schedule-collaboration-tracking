@@ -13,7 +13,20 @@ if (!defined('ABSPATH')) {
 
 <div class="ftt-container">
     <div class="ftt-event-list">
-        <h2><?php esc_html_e('Upcoming Events', 'schedule-collaboration-tracking'); ?></h2>
+        <div class="ftt-page-header">
+            <h2><?php esc_html_e('Upcoming Events', 'schedule-collaboration-tracking'); ?></h2>
+            <div class="ftt-page-nav">
+                <?php
+                $dashboard_url = FTT_Pages::get_page_url('dashboard');
+                $calendar_url = FTT_Pages::get_page_url('calendar');
+                if ($dashboard_url) : ?>
+                    <a href="<?php echo esc_url($dashboard_url); ?>" class="button"><?php esc_html_e('Dashboard', 'schedule-collaboration-tracking'); ?></a>
+                <?php endif; ?>
+                <?php if ($calendar_url) : ?>
+                    <a href="<?php echo esc_url($calendar_url); ?>" class="button button-primary"><?php esc_html_e('Calendar', 'schedule-collaboration-tracking'); ?></a>
+                <?php endif; ?>
+            </div>
+        </div>
         
         <?php if ($query->have_posts()) : ?>
             <?php while ($query->have_posts()) : $query->the_post(); ?>
@@ -89,7 +102,16 @@ if (!defined('ABSPATH')) {
                     
                     <?php if (current_user_can('edit_posts')) : ?>
                         <p>
-                            <a href="<?php echo esc_url(get_permalink() . '?event_id=' . $event_id); ?>" class="button">
+                            <?php
+                            $event_form_url = FTT_Pages::get_page_url('event_form');
+                            if ($event_form_url) {
+                                $separator = strpos($event_form_url, '?') !== false ? '&' : '?';
+                                $edit_url = $event_form_url . $separator . 'event_id=' . $event_id;
+                            } else {
+                                $edit_url = home_url('/ftt-manage-events/') . '?event_id=' . $event_id;
+                            }
+                            ?>
+                            <a href="<?php echo esc_url($edit_url); ?>" class="button">
                                 <?php esc_html_e('Edit', 'schedule-collaboration-tracking'); ?>
                             </a>
                         </p>

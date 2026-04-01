@@ -17,7 +17,9 @@ class FTT_Settings {
      */
     public static function init() {
         add_action('admin_menu', array(__CLASS__, 'add_settings_page'));
+        add_action('admin_menu', array(__CLASS__, 'add_combined_pages'));
         add_action('admin_init', array(__CLASS__, 'register_settings'));
+        add_action('wp_dashboard_setup', array(__CLASS__, 'register_dashboard_widget'));
     }
     
     /**
@@ -26,12 +28,274 @@ class FTT_Settings {
     public static function add_settings_page() {
         add_submenu_page(
             'edit.php?post_type=ftt_event',
-            __('Schedule Settings', 'schedule-collaboration-tracking'),
+            __('FTT Settings', 'schedule-collaboration-tracking'),
             __('Settings', 'schedule-collaboration-tracking'),
             'manage_options',
             'ftt-settings',
             array(__CLASS__, 'render_settings_page')
         );
+
+        // Remove the built-in "Add New" submenu — admins should direct
+        // users to add events within their own groups/dashboards.
+        remove_submenu_page( 'edit.php?post_type=ftt_event', 'post-new.php?post_type=ftt_event' );
+    }
+
+    /**
+     * Register combined pages (Users & Groups, System)
+     */
+    public static function add_combined_pages() {
+        add_submenu_page(
+            'edit.php?post_type=ftt_event',
+            __('Users & Groups', 'schedule-collaboration-tracking'),
+            __('Users & Groups', 'schedule-collaboration-tracking'),
+            'manage_options',
+            'ftt-users-groups',
+            array(__CLASS__, 'render_users_groups_page')
+        );
+        add_submenu_page(
+            'edit.php?post_type=ftt_event',
+            __('System', 'schedule-collaboration-tracking'),
+            __('System', 'schedule-collaboration-tracking'),
+            'manage_options',
+            'ftt-system',
+            array(__CLASS__, 'render_system_page')
+        );
+    }
+
+    /**
+     * Register the billing summary dashboard widget
+     */
+    public static function register_dashboard_widget() {
+        if ( ! current_user_can('manage_options') ) return;
+        wp_add_dashboard_widget(
+            'ftt_billing_summary',
+            __('FTT Billing Overview', 'schedule-collaboration-tracking'),
+            array(__CLASS__, 'render_dashboard_widget')
+        );
+    }
+
+    /**
+     * Render the billing summary dashboard widget
+     */
+    public static function render_dashboard_widget() {
+        if ( ! class_exists('FTT_Admin_Billing_Dashboard') ) {
+            echo '<p>' . esc_html__('Billing module not available (Stripe library missing).', 'schedule-collaboration-tracking') . '</p>';
+            return;
+        }
+
+        global $wpdb;
+        $groups_table   = $wpdb->prefix . 'ftt_family_groups';
+        $members_table  = $wpdb->prefix . 'ftt_family_group_members';
+
+        $groups = $wpdb->get_results( "SELECT subscription_status, subscription_interval FROM {$groups_table} WHERE is_archived = 0" );
+
+        $base_monthly = 9.99;
+        $addon_monthly = 5.00;
+        $base_annual  = 99.00;
+        $addon_annual  = 50.00;
+
+        $total_mrr       = 0;
+        $active          = 0;
+        $trialing        = 0;
+        $past_due        = 0;
+        $canceled        = 0;
+
+        foreach ( $groups as $g ) {
+            switch ( $g->subscription_status ) {
+                case 'active':
+                    $active++;
+                    $child_count = (int) $wpdb->get_var( $wpdb->prepare(
+                        "SELECT COUNT(*) FROM {$members_table} m
+                         INNER JOIN {$groups_table} gr ON m.group_id = gr.id
+                         WHERE gr.subscription_status = %s AND gr.is_archived = 0",
+                        'active'
+                    ));
+                    if ( $g->subscription_interval === 'year' ) {
+                        $total_mrr += ( $base_annual + max(0, $child_count - 1) * $addon_annual ) / 12;
+                    } else {
+                        $total_mrr += $base_monthly + max(0, $child_count - 1) * $addon_monthly;
+                    }
+                    break;
+                case 'trialing': $trialing++; break;
+                case 'past_due': $past_due++;  break;
+                case 'canceled': $canceled++;  break;
+            }
+        }
+
+        $full_url  = admin_url('edit.php?post_type=ftt_event&page=ftt-settings&tab=billing');
+        $api_url   = admin_url('edit.php?post_type=ftt_event&page=ftt-settings&tab=billing');
+        $api_sum   = class_exists('FTT_API_Tracker') ? FTT_API_Tracker::get_summary() : null;
+        ?>
+        <style>
+        .ftt-dw-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px; }
+        .ftt-dw-stat { background:#f6f7f7; border-radius:6px; padding:12px 14px; text-align:center; }
+        .ftt-dw-stat .ftt-dw-value { font-size:28px; font-weight:700; line-height:1.1; color:#1d2327; }
+        .ftt-dw-stat .ftt-dw-label { font-size:12px; color:#646970; margin-top:3px; }
+        .ftt-dw-stat.ftt-dw-mrr .ftt-dw-value { color:#2a9d49; }
+        .ftt-dw-stat.ftt-dw-pastdue .ftt-dw-value { color:<?php echo $past_due > 0 ? '#d63638' : '#1d2327'; ?>; }
+        .ftt-dw-footer { font-size:12px; color:#646970; display:flex; justify-content:space-between; align-items:center; }
+        .ftt-dw-divider { border:none; border-top:1px solid #e2e4e7; margin:14px 0 10px; }
+        .ftt-dw-section-label { font-size:11px; font-weight:600; color:#3c434a; text-transform:uppercase; letter-spacing:.5px; margin-bottom:8px; }
+        .ftt-dw-api-row { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:4px; }
+        .ftt-dw-api-cell { background:#f6f7f7; border-radius:4px; padding:8px 10px; }
+        .ftt-dw-api-name { font-size:11px; font-weight:600; color:#3c434a; margin-bottom:4px; }
+        .ftt-dw-api-stats { font-size:12px; color:#1d2327; }
+        .ftt-dw-api-stats span { color:#646970; }
+        .ftt-dw-api-err { color:#d63638 !important; }
+        </style>
+        <div class="ftt-dw-grid">
+            <div class="ftt-dw-stat ftt-dw-mrr">
+                <div class="ftt-dw-value">$<?php echo number_format($total_mrr, 2); ?></div>
+                <div class="ftt-dw-label">Est. Monthly Revenue</div>
+            </div>
+            <div class="ftt-dw-stat">
+                <div class="ftt-dw-value"><?php echo $active; ?></div>
+                <div class="ftt-dw-label">Active Subscriptions</div>
+            </div>
+            <div class="ftt-dw-stat">
+                <div class="ftt-dw-value"><?php echo $trialing; ?></div>
+                <div class="ftt-dw-label">In Trial</div>
+            </div>
+            <div class="ftt-dw-stat ftt-dw-pastdue">
+                <div class="ftt-dw-value"><?php echo $past_due; ?></div>
+                <div class="ftt-dw-label">Past Due<?php echo $past_due > 0 ? ' ⚠️' : ''; ?></div>
+            </div>
+        </div>
+
+        <?php if ( $api_sum ) : ?>
+        <hr class="ftt-dw-divider">
+        <div class="ftt-dw-section-label">API Usage</div>
+        <div class="ftt-dw-api-row">
+            <div class="ftt-dw-api-cell">
+                <div class="ftt-dw-api-name">SerpAPI (Flight Prices)</div>
+                <div class="ftt-dw-api-stats">
+                    <strong><?php echo (int) $api_sum['serpapi']['today']; ?></strong> <span>today</span>
+                    &nbsp;·&nbsp;
+                    <strong><?php echo (int) $api_sum['serpapi']['last_7']; ?></strong> <span>/ 7d</span>
+                    &nbsp;·&nbsp;
+                    <strong><?php echo (int) $api_sum['serpapi']['last_30']; ?></strong> <span>/ 30d</span>
+                    <?php if ( $api_sum['serpapi']['errors_7'] > 0 ) : ?>
+                        <br><span class="ftt-dw-api-err">⚠ <?php echo (int) $api_sum['serpapi']['errors_7']; ?> error<?php echo $api_sum['serpapi']['errors_7'] !== 1 ? 's' : ''; ?> this week</span>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <div class="ftt-dw-api-cell">
+                <div class="ftt-dw-api-name">Google Places</div>
+                <div class="ftt-dw-api-stats">
+                    <strong><?php echo (int) $api_sum['google_places']['today']; ?></strong> <span>today</span>
+                    &nbsp;·&nbsp;
+                    <strong><?php echo (int) $api_sum['google_places']['last_7']; ?></strong> <span>/ 7d</span>
+                    &nbsp;·&nbsp;
+                    <strong><?php echo (int) $api_sum['google_places']['last_30']; ?></strong> <span>/ 30d</span>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+
+        <div class="ftt-dw-footer" style="margin-top:10px;">
+            <span><?php echo count($groups); ?> total groups</span>
+            <a href="<?php echo esc_url($full_url); ?>"><?php esc_html_e('Full Dashboard →', 'schedule-collaboration-tracking'); ?></a>
+        </div>
+        <?php
+    }
+
+    /**
+     * Call a render callback and strip its outer <div class="wrap"> and first <h1> so
+     * it embeds cleanly inside a combined tabbed page.
+     */
+    private static function render_embedded( $callback ) {
+        ob_start();
+        call_user_func( $callback );
+        $html = ob_get_clean();
+        // Remove leading <div class="wrap"> and its matching closing </div>
+        $html = preg_replace( '/^\s*<div[^>]*class="wrap"[^>]*>\s*/i', '', $html, 1 );
+        // Remove the last </div> (the closing wrap div)
+        $pos  = strrpos( $html, '</div>' );
+        if ( $pos !== false ) {
+            $html = substr( $html, 0, $pos ) . substr( $html, $pos + 6 );
+        }
+        // Remove the first <h1>…</h1> (page title, already shown by parent)
+        $html = preg_replace( '/<h1[^>]*>.*?<\/h1>/is', '', $html, 1 );
+        echo $html; // phpcs:ignore WordPress.Security.EscapeOutput -- sanitized render output
+    }
+
+    /**
+     * Render the combined Users & Groups page
+     */
+    public static function render_users_groups_page() {
+        if ( ! current_user_can( 'manage_options' ) ) return;
+        $tab = isset( $_GET['tab'] ) ? sanitize_key( $_GET['tab'] ) : 'users';
+        ?>
+        <div class="wrap">
+            <h1><?php esc_html_e( 'Users & Groups', 'schedule-collaboration-tracking' ); ?></h1>
+            <h2 class="nav-tab-wrapper">
+                <a href="?post_type=ftt_event&page=ftt-users-groups&tab=users"
+                   class="nav-tab <?php echo $tab === 'users' ? 'nav-tab-active' : ''; ?>">
+                    <span class="dashicons dashicons-admin-users"></span> <?php esc_html_e( 'Manage Users', 'schedule-collaboration-tracking' ); ?>
+                </a>
+                <a href="?post_type=ftt_event&page=ftt-users-groups&tab=groups"
+                   class="nav-tab <?php echo $tab === 'groups' ? 'nav-tab-active' : ''; ?>">
+                    <span class="dashicons dashicons-groups"></span> <?php esc_html_e( 'Manage Groups', 'schedule-collaboration-tracking' ); ?>
+                </a>
+            </h2>
+            <div style="margin-top:20px;">
+            <?php
+            if ( $tab === 'groups' ) {
+                self::render_embedded( array( 'FTT_Admin_Group_Management', 'render_page' ) );
+            } else {
+                self::render_embedded( array( 'FTT_Roles', 'render_admin_page' ) );
+            }
+            ?>
+            </div>
+        </div>
+        <?php
+    }
+
+    /**
+     * Render the combined System page (Cron + Migrate)
+     */
+    public static function render_system_page() {
+        if ( ! current_user_can( 'manage_options' ) ) return;
+        $tab = isset( $_GET['tab'] ) ? sanitize_key( $_GET['tab'] ) : 'cron';
+        ?>
+        <div class="wrap">
+            <h1><?php esc_html_e( 'System', 'schedule-collaboration-tracking' ); ?></h1>
+            <h2 class="nav-tab-wrapper">
+                <a href="?post_type=ftt_event&page=ftt-system&tab=cron"
+                   class="nav-tab <?php echo $tab === 'cron' ? 'nav-tab-active' : ''; ?>">
+                    <span class="dashicons dashicons-clock"></span> <?php esc_html_e( 'Cron Setup', 'schedule-collaboration-tracking' ); ?>
+                </a>
+                <a href="?post_type=ftt_event&page=ftt-system&tab=docs"
+                   class="nav-tab <?php echo $tab === 'docs' ? 'nav-tab-active' : ''; ?>">
+                    <span class="dashicons dashicons-book-alt"></span> <?php esc_html_e( 'Cron Docs', 'schedule-collaboration-tracking' ); ?>
+                </a>
+                <a href="?post_type=ftt_event&page=ftt-system&tab=migrate"
+                   class="nav-tab <?php echo $tab === 'migrate' ? 'nav-tab-active' : ''; ?>">
+                    <span class="dashicons dashicons-migrate"></span> <?php esc_html_e( 'Migrate Events', 'schedule-collaboration-tracking' ); ?>
+                </a>
+            </h2>
+            <div style="margin-top:20px;">
+            <?php
+            switch ( $tab ) {
+                case 'docs':
+                    self::render_embedded( array( 'FTT_Cron_Setup', 'render_docs_page' ) );
+                    break;
+                case 'migrate':
+                    if ( class_exists('FTT_Event_Migration') ) {
+                        self::render_embedded( array( 'FTT_Event_Migration', 'render_page' ) );
+                    } else {
+                        echo '<p>' . esc_html__('Migration module not available.', 'schedule-collaboration-tracking') . '</p>';
+                    }
+                    break;
+                case 'cron':
+                default:
+                    self::render_embedded( array( 'FTT_Cron_Setup', 'render_page' ) );
+                    break;
+            }
+            ?>
+            </div>
+        </div>
+        <?php
     }
     
     /**
@@ -222,25 +486,25 @@ class FTT_Settings {
         );
         
         add_settings_field(
-            'enable_hcaptcha',
-            __('Enable hCaptcha', 'schedule-collaboration-tracking'),
-            array(__CLASS__, 'render_enable_hcaptcha_field'),
+            'enable_recaptcha',
+            __('Enable Google reCAPTCHA v3', 'schedule-collaboration-tracking'),
+            array(__CLASS__, 'render_enable_recaptcha_field'),
             'ftt-settings-security',
             'ftt_security_section'
         );
         
         add_settings_field(
-            'hcaptcha_site_key',
-            __('hCaptcha Site Key', 'schedule-collaboration-tracking'),
-            array(__CLASS__, 'render_hcaptcha_site_key_field'),
+            'recaptcha_site_key',
+            __('reCAPTCHA Site Key', 'schedule-collaboration-tracking'),
+            array(__CLASS__, 'render_recaptcha_site_key_field'),
             'ftt-settings-security',
             'ftt_security_section'
         );
         
         add_settings_field(
-            'hcaptcha_secret_key',
-            __('hCaptcha Secret Key', 'schedule-collaboration-tracking'),
-            array(__CLASS__, 'render_hcaptcha_secret_key_field'),
+            'recaptcha_secret_key',
+            __('reCAPTCHA Secret Key', 'schedule-collaboration-tracking'),
+            array(__CLASS__, 'render_recaptcha_secret_key_field'),
             'ftt-settings-security',
             'ftt_security_section'
         );
@@ -329,17 +593,39 @@ class FTT_Settings {
             $sanitized['ical_require_auth'] = (bool) $input['ical_require_auth'];
         }
         
-        // Sanitize hCaptcha settings
-        if (isset($input['enable_hcaptcha'])) {
-            $sanitized['enable_hcaptcha'] = (bool) $input['enable_hcaptcha'];
+        // Sanitize reCAPTCHA settings
+        if (isset($input['enable_recaptcha'])) {
+            $sanitized['enable_recaptcha'] = (bool) $input['enable_recaptcha'];
         }
-        if (isset($input['hcaptcha_site_key'])) {
-            $sanitized['hcaptcha_site_key'] = sanitize_text_field($input['hcaptcha_site_key']);
+        if (isset($input['recaptcha_site_key'])) {
+            $sanitized['recaptcha_site_key'] = sanitize_text_field($input['recaptcha_site_key']);
         }
-        if (isset($input['hcaptcha_secret_key'])) {
-            $sanitized['hcaptcha_secret_key'] = sanitize_text_field($input['hcaptcha_secret_key']);
+        if (isset($input['recaptcha_secret_key'])) {
+            $sanitized['recaptcha_secret_key'] = sanitize_text_field($input['recaptcha_secret_key']);
         }
-        
+
+        // Policy & Communications keys (written by FTT_Email_Templates::handle_save_policy).
+        // Must be listed here because register_setting() attaches this callback to
+        // sanitize_option_ftt_settings, which fires on every update_option() call.
+        if (isset($input['policy_privacy_page'])) {
+            $sanitized['policy_privacy_page'] = absint($input['policy_privacy_page']);
+        }
+        if (isset($input['policy_terms_page'])) {
+            $sanitized['policy_terms_page'] = absint($input['policy_terms_page']);
+        }
+        if (isset($input['policy_cookie_page'])) {
+            $sanitized['policy_cookie_page'] = absint($input['policy_cookie_page']);
+        }
+        if (isset($input['policy_sms_page'])) {
+            $sanitized['policy_sms_page'] = absint($input['policy_sms_page']);
+        }
+        if (isset($input['policy_acceptance_wording'])) {
+            $sanitized['policy_acceptance_wording'] = wp_kses_post($input['policy_acceptance_wording']);
+        }
+        if (isset($input['email_test_address'])) {
+            $sanitized['email_test_address'] = sanitize_email($input['email_test_address']);
+        }
+
         return $sanitized;
     }
     
@@ -1233,66 +1519,66 @@ class FTT_Settings {
      * Render security section description
      */
     public static function render_security_section() {
-        echo '<p>' . esc_html__('Protect your registration and login forms from spam and bots using hCaptcha.', 'schedule-collaboration-tracking') . '</p>';
+        echo '<p>' . esc_html__('Protect your registration and login forms from spam and bots using Google reCAPTCHA v3.', 'schedule-collaboration-tracking') . '</p>';
         echo '<p>' . wp_kses_post(
             sprintf(
-                __('Get your free hCaptcha keys at <a href="%s" target="_blank">hCaptcha.com</a>. Free tier includes unlimited requests.', 'schedule-collaboration-tracking'),
-                'https://dashboard.hcaptcha.com/signup'
+                __('Get your free keys at <a href="%s" target="_blank">Google reCAPTCHA Admin Console</a>. Choose <strong>reCAPTCHA v3</strong> and add your domain.', 'schedule-collaboration-tracking'),
+                'https://www.google.com/recaptcha/admin/create'
             )
         ) . '</p>';
     }
     
     /**
-     * Render enable hCaptcha field
+     * Render enable reCAPTCHA field
      */
-    public static function render_enable_hcaptcha_field() {
+    public static function render_enable_recaptcha_field() {
         $settings = get_option('ftt_settings', array());
-        $value = $settings['enable_hcaptcha'] ?? false;
+        $value = $settings['enable_recaptcha'] ?? false;
         ?>
         <label>
-            <input type="checkbox" name="ftt_settings[enable_hcaptcha]" value="1" <?php checked($value, true); ?>>
-            <?php esc_html_e('Enable hCaptcha on registration and login forms', 'schedule-collaboration-tracking'); ?>
+            <input type="checkbox" name="ftt_settings[enable_recaptcha]" value="1" <?php checked($value, true); ?>>
+            <?php esc_html_e('Enable Google reCAPTCHA v3 on registration and login forms', 'schedule-collaboration-tracking'); ?>
         </label>
-        <p class="description"><?php esc_html_e('Protects against spam and bot registrations.', 'schedule-collaboration-tracking'); ?></p>
+        <p class="description"><?php esc_html_e('Invisible bot protection — no checkbox shown to users. Scores each submission 0.0–1.0; submissions below 0.5 are rejected.', 'schedule-collaboration-tracking'); ?></p>
         <?php
     }
     
     /**
-     * Render hCaptcha site key field
+     * Render reCAPTCHA site key field
      */
-    public static function render_hcaptcha_site_key_field() {
+    public static function render_recaptcha_site_key_field() {
         $settings = get_option('ftt_settings', array());
-        $value = $settings['hcaptcha_site_key'] ?? '';
-        $enabled = $settings['enable_hcaptcha'] ?? false;
+        $value = $settings['recaptcha_site_key'] ?? '';
+        $enabled = $settings['enable_recaptcha'] ?? false;
         ?>
         <input type="text" 
-               name="ftt_settings[hcaptcha_site_key]" 
+               name="ftt_settings[recaptcha_site_key]" 
                value="<?php echo esc_attr($value); ?>" 
                class="regular-text"
-               placeholder="10000000-ffff-ffff-ffff-000000000001"
+               placeholder="6Le..."
                <?php disabled(!$enabled); ?>>
         <p class="description">
-            <?php esc_html_e('Your hCaptcha Site Key (public key). Found in your hCaptcha dashboard under Settings.', 'schedule-collaboration-tracking'); ?>
+            <?php esc_html_e('Your reCAPTCHA v3 Site Key (public). Loaded on the page — safe to expose.', 'schedule-collaboration-tracking'); ?>
         </p>
         <?php
     }
     
     /**
-     * Render hCaptcha secret key field
+     * Render reCAPTCHA secret key field
      */
-    public static function render_hcaptcha_secret_key_field() {
+    public static function render_recaptcha_secret_key_field() {
         $settings = get_option('ftt_settings', array());
-        $value = $settings['hcaptcha_secret_key'] ?? '';
-        $enabled = $settings['enable_hcaptcha'] ?? false;
+        $value = $settings['recaptcha_secret_key'] ?? '';
+        $enabled = $settings['enable_recaptcha'] ?? false;
         ?>
         <input type="password" 
-               name="ftt_settings[hcaptcha_secret_key]" 
+               name="ftt_settings[recaptcha_secret_key]" 
                value="<?php echo esc_attr($value); ?>" 
                class="regular-text"
-               placeholder="0x0000000000000000000000000000000000000000"
+               placeholder="6Le..."
                <?php disabled(!$enabled); ?>>
         <p class="description">
-            <?php esc_html_e('Your hCaptcha Secret Key (private key). Keep this secure and never share it publicly.', 'schedule-collaboration-tracking'); ?>
+            <?php esc_html_e('Your reCAPTCHA v3 Secret Key (private). Never expose this publicly.', 'schedule-collaboration-tracking'); ?>
         </p>
         <?php
     }
@@ -1363,9 +1649,21 @@ class FTT_Settings {
                 <a href="?post_type=ftt_event&page=ftt-settings&tab=security" class="nav-tab <?php echo $active_tab === 'security' ? 'nav-tab-active' : ''; ?>">
                     <span class="dashicons dashicons-shield"></span> <?php _e('Security', 'schedule-collaboration-tracking'); ?>
                 </a>
+                <a href="?post_type=ftt_event&page=ftt-settings&tab=billing-settings" class="nav-tab <?php echo $active_tab === 'billing-settings' ? 'nav-tab-active' : ''; ?>">
+                    <span class="dashicons dashicons-admin-generic"></span> <?php _e('Billing Settings', 'schedule-collaboration-tracking'); ?>
+                </a>
+                <a href="?post_type=ftt_event&page=ftt-settings&tab=billing" class="nav-tab <?php echo $active_tab === 'billing' ? 'nav-tab-active' : ''; ?>">
+                    <span class="dashicons dashicons-chart-bar"></span> <?php _e('Billing Dashboard', 'schedule-collaboration-tracking'); ?>
+                </a>
+                <a href="?post_type=ftt_event&page=ftt-settings&tab=seo" class="nav-tab <?php echo $active_tab === 'seo' ? 'nav-tab-active' : ''; ?>">
+                    <span class="dashicons dashicons-search"></span> <?php _e('SEO', 'schedule-collaboration-tracking'); ?>
+                </a>
+                <a href="?post_type=ftt_event&page=ftt-settings&tab=policy-comms" class="nav-tab <?php echo $active_tab === 'policy-comms' ? 'nav-tab-active' : ''; ?>">
+                                <span class="dashicons dashicons-shield"></span> <?php _e('Policy &amp; Communications', 'schedule-collaboration-tracking'); ?>
+                                </a>
             </h2>
-            
-            <form action="options.php" method="post">
+
+            <form method="post" action="options.php">
                 <?php
                 settings_fields('ftt_settings_group');
                 
@@ -1383,13 +1681,53 @@ class FTT_Settings {
                     case 'security':
                         do_settings_sections('ftt-settings-security');
                         break;
+                    case 'billing-settings':
+                        // Stripe settings has its own form — close ours first.
+                        // render_embedded() strips the nested <div class="wrap"> and <h1>
+                        // so the content sits cleanly inside our outer wrap.
+                        echo '</form>';
+                        if ( class_exists('FTT_Stripe_Settings') ) {
+                            self::render_embedded( array( 'FTT_Stripe_Settings', 'render_settings_page' ) );
+                        } else {
+                            echo '<p>' . esc_html__('Stripe library not available.', 'schedule-collaboration-tracking') . '</p>';
+                        }
+                        echo '<form style="display:none">';
+                        break;
+                    case 'billing':
+                        echo '</form>';
+                        if ( class_exists('FTT_Admin_Billing_Dashboard') ) {
+                            self::render_embedded( array( 'FTT_Admin_Billing_Dashboard', 'render_dashboard' ) );
+                        } else {
+                            echo '<p>' . esc_html__('Stripe library not available.', 'schedule-collaboration-tracking') . '</p>';
+                        }
+                        echo '<form style="display:none">';
+                        break;
+                    case 'seo':
+                        echo '</form>';
+                        if ( class_exists('FTT_SEO') ) {
+                            self::render_embedded( array( 'FTT_SEO', 'render_settings_page' ) );
+                        }
+                        echo '<form style="display:none">';
+                        break;
+                    case 'policy-comms':
+                        echo '</form>';
+                        if ( class_exists('FTT_Email_Templates') ) {
+                            self::render_embedded( array( 'FTT_Email_Templates', 'render_settings_page' ) );
+                        }
+                        if ( class_exists('FTT_Cookie_Consent') ) {
+                            FTT_Cookie_Consent::render_settings_section();
+                        }
+                        echo '<form style="display:none">';
+                        break;
                     case 'general':
                     default:
                         do_settings_sections('ftt-settings-general');
                         break;
                 }
                 
-                submit_button(__('Save Settings', 'schedule-collaboration-tracking'));
+                if ( ! in_array( $active_tab, array( 'billing-settings', 'billing', 'seo', 'policy-comms' ) ) ) {
+                    submit_button(__('Save Settings', 'schedule-collaboration-tracking'));
+                }
                 ?>
             </form>
             

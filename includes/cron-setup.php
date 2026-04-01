@@ -16,7 +16,6 @@ class FTT_Cron_Setup {
      * Initialize hooks
      */
     public static function init() {
-        add_action('admin_menu', array(__CLASS__, 'add_admin_page'));
         add_action('admin_notices', array(__CLASS__, 'cron_status_notice'));
         add_action('admin_post_ftt_setup_cron', array(__CLASS__, 'handle_setup_cron'));
         add_action('admin_post_ftt_manual_price_check', array(__CLASS__, 'handle_manual_price_check'));
