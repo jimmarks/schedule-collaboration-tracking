@@ -349,6 +349,14 @@ class FTT_Settings {
             'ftt-settings-general',
             'ftt_general_section'
         );
+
+        add_settings_field(
+            'mobile_menu_location',
+            __('Mobile Menu Location Slug', 'schedule-collaboration-tracking'),
+            array(__CLASS__, 'render_mobile_menu_location_field'),
+            'ftt-settings-general',
+            'ftt_general_section'
+        );
         
         add_settings_field(
             'notification_from_email',
@@ -413,7 +421,15 @@ class FTT_Settings {
             'ftt-settings-api',
             'ftt_api_section'
         );
-        
+
+        add_settings_field(
+            'openai_api_key',
+            __('OpenAI API Key (AI Event Parser)', 'schedule-collaboration-tracking'),
+            array(__CLASS__, 'render_openai_api_key_field'),
+            'ftt-settings-api',
+            'ftt_api_section'
+        );
+
         // TAB 3: EVENTS
         add_settings_section(
             'ftt_event_categories_section',
@@ -477,6 +493,11 @@ class FTT_Settings {
             'ftt_calendar_section'
         );
         
+        // TAB 6: NEWSLETTER SYNC
+        if ( class_exists('FTT_Newsletter_Sync') ) {
+            FTT_Newsletter_Sync::register_settings_fields();
+        }
+
         // TAB 5: SECURITY
         add_settings_section(
             'ftt_security_section',
@@ -532,6 +553,11 @@ class FTT_Settings {
             $sanitized['login_menu_mode'] = in_array($input['login_menu_mode'], array('login_only', 'both')) ? 
                 $input['login_menu_mode'] : 'both';
         }
+        if (isset($input['mobile_menu_location'])) {
+            // Comma-separated slugs — sanitize each one
+            $slugs = array_map( 'sanitize_key', explode( ',', $input['mobile_menu_location'] ) );
+            $sanitized['mobile_menu_location'] = implode( ',', array_filter( $slugs ) );
+        }
         if (isset($input['notification_from_email'])) {
             $sanitized['notification_from_email'] = sanitize_email($input['notification_from_email']);
         }
@@ -555,7 +581,9 @@ class FTT_Settings {
         if (isset($input['serpapi_api_key'])) {
             $sanitized['serpapi_api_key'] = sanitize_text_field($input['serpapi_api_key']);
         }
-        
+        if (isset($input['openai_api_key'])) {
+            $sanitized['openai_api_key'] = sanitize_text_field($input['openai_api_key']);
+        }
         // Sanitize event categories
         if (isset($input['event_categories']) && is_array($input['event_categories'])) {
             $sanitized['event_categories'] = array();
@@ -624,6 +652,11 @@ class FTT_Settings {
         }
         if (isset($input['email_test_address'])) {
             $sanitized['email_test_address'] = sanitize_email($input['email_test_address']);
+        }
+
+        // Newsletter sync settings (delegated to the Newsletter sync class).
+        if ( class_exists('FTT_Newsletter_Sync') ) {
+            $sanitized = FTT_Newsletter_Sync::sanitize_settings_fields( $input, $sanitized );
         }
 
         return $sanitized;
@@ -721,6 +754,26 @@ class FTT_Settings {
         <?php
     }
     
+    /**
+     * Render mobile menu location slug field
+     */
+    public static function render_mobile_menu_location_field() {
+        $settings = get_option( 'ftt_settings', array() );
+        $value    = $settings['mobile_menu_location'] ?? '';
+        ?>
+        <input type="text"
+               name="ftt_settings[mobile_menu_location]"
+               value="<?php echo esc_attr( $value ); ?>"
+               class="regular-text"
+               placeholder="e.g. mobile_header" />
+        <p class="description">
+            <?php esc_html_e( 'The WordPress nav menu location slug that your theme uses for its mobile/off-canvas menu. When a logged-in user visits the site, this location will be swapped to the "Mobile Navigation (Members)" menu (Appearance → Menus). Leave blank if your mobile menu uses the same location as desktop (Primary).', 'schedule-collaboration-tracking' ); ?><br><br>
+            <strong><?php esc_html_e( 'How to find the slug:', 'schedule-collaboration-tracking' ); ?></strong> <?php esc_html_e( 'On your site\'s front-end, right-click the mobile hamburger nav and choose Inspect. Look for a <nav> element with an aria-label or class that includes the location name. Common Astra slugs: ', 'schedule-collaboration-tracking' ); ?>
+            <code>primary</code>, <code>mobile_header</code>, <code>handheld</code>. <?php esc_html_e( 'You can enter multiple slugs separated by commas.', 'schedule-collaboration-tracking' ); ?>
+        </p>
+        <?php
+    }
+
     /**
      * Render notification from email field
      */
@@ -1608,6 +1661,25 @@ class FTT_Settings {
     }
     
     /**
+     * Render OpenAI API key field
+     */
+    public static function render_openai_api_key_field() {
+        $settings = get_option('ftt_settings', array());
+        $value    = $settings['openai_api_key'] ?? '';
+        ?>
+        <input type="password"
+               name="ftt_settings[openai_api_key]"
+               value="<?php echo esc_attr($value); ?>"
+               class="regular-text"
+               placeholder="sk-...">
+        <p class="description">
+            <?php _e('Used by the AI Event Parser to convert natural-language prompts into structured events. Get a key at <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com</a>.', 'schedule-collaboration-tracking'); ?><br>
+            <?php esc_html_e('Model: gpt-4o-mini (~$0.002 per 1,000 prompts).', 'schedule-collaboration-tracking'); ?>
+        </p>
+        <?php
+    }
+
+    /**
      * Render settings page
      */
     public static function render_settings_page() {
@@ -1661,6 +1733,9 @@ class FTT_Settings {
                 <a href="?post_type=ftt_event&page=ftt-settings&tab=policy-comms" class="nav-tab <?php echo $active_tab === 'policy-comms' ? 'nav-tab-active' : ''; ?>">
                                 <span class="dashicons dashicons-shield"></span> <?php _e('Policy &amp; Communications', 'schedule-collaboration-tracking'); ?>
                                 </a>
+                <a href="?post_type=ftt_event&page=ftt-settings&tab=newsletter" class="nav-tab <?php echo $active_tab === 'newsletter' ? 'nav-tab-active' : ''; ?>">
+                    <span class="dashicons dashicons-email-alt"></span> <?php _e('Newsletter', 'schedule-collaboration-tracking'); ?>
+                </a>
             </h2>
 
             <form method="post" action="options.php">
@@ -1719,13 +1794,16 @@ class FTT_Settings {
                         }
                         echo '<form style="display:none">';
                         break;
+                    case 'newsletter':
+                        do_settings_sections('ftt-settings-newsletter');
+                        break;
                     case 'general':
                     default:
                         do_settings_sections('ftt-settings-general');
                         break;
                 }
                 
-                if ( ! in_array( $active_tab, array( 'billing-settings', 'billing', 'seo', 'policy-comms' ) ) ) {
+                if ( ! in_array( $active_tab, array( 'billing-settings', 'billing', 'seo', 'policy-comms' ) ) ) { // phpcs:ignore
                     submit_button(__('Save Settings', 'schedule-collaboration-tracking'));
                 }
                 ?>

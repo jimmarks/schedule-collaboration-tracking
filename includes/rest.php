@@ -739,11 +739,54 @@ class FTT_REST {
                 ));
             }
 
-            $group_event_ids = $wpdb->get_col($wpdb->prepare(
+            // Events explicitly associated with the group (family events, etc.)
+            $from_group_table = $wpdb->get_col($wpdb->prepare(
                 "SELECT post_id FROM {$wpdb->prefix}ftt_event_groups WHERE group_id = %d",
                 $group_id
             ));
-            error_log('Group mode: found ' . count($group_event_ids) . ' events in group ' . $group_id);
+
+            // Also collect events via member_id of every group parent's children
+            // (covers events that predate or missed the ftt_event_groups insert).
+            $from_member_ids = array();
+            $group_parents = FTT_Family_Groups::get_group_members($group_id, 'parent');
+            foreach ($group_parents as $parent_member) {
+                $parent_child_ids = get_user_meta((int) $parent_member->user_id, 'ftt_parent_of', true);
+                if (is_array($parent_child_ids)) {
+                    foreach ($parent_child_ids as $cid) {
+                        $cid = (int) $cid;
+                        if ($cid && !in_array($cid, $from_member_ids, true)) {
+                            $from_member_ids[] = $cid;
+                        }
+                    }
+                }
+            }
+            // Also include children formally in group_members
+            $group_children = FTT_Family_Groups::get_group_members($group_id, 'child');
+            foreach ($group_children as $cm) {
+                $cid = (int) $cm->user_id;
+                if (!in_array($cid, $from_member_ids, true)) {
+                    $from_member_ids[] = $cid;
+                }
+            }
+
+            // Fetch event IDs for those member_ids
+            $member_based_ids = array();
+            if (!empty($from_member_ids)) {
+                $placeholders     = implode(',', array_fill(0, count($from_member_ids), '%d'));
+                $member_based_ids = $wpdb->get_col(
+                    $wpdb->prepare(
+                        "SELECT DISTINCT post_id FROM {$wpdb->postmeta}
+                         WHERE meta_key = 'member_id' AND meta_value IN ($placeholders)",
+                        $from_member_ids
+                    )
+                );
+            }
+
+            $group_event_ids = array_unique(array_merge(
+                array_map('intval', $from_group_table),
+                array_map('intval', $member_based_ids)
+            ));
+            error_log('Group mode: found ' . count($group_event_ids) . ' events (table:' . count($from_group_table) . ' + member_id:' . count($member_based_ids) . ')');
 
             if (empty($group_event_ids)) {
                 error_log('No events in group - returning empty data');
@@ -1008,26 +1051,34 @@ class FTT_REST {
         if ($request->has_param('group_id')) {
             $group_id = absint($request->get_param('group_id'));
             if ($group_id > 0) {
-                // Add event to group if not already associated
                 FTT_Family_Groups::add_event_to_group($post_id, $group_id);
             }
-        } elseif (!get_post_meta($post_id, 'group_id', true)) {
-            // Auto-assign to user's primary group if no group specified
-            $current_user_id = get_current_user_id();
-            $primary_group = get_user_meta($current_user_id, 'ftt_primary_group', true);
-            if ($primary_group) {
-                // Guard: verify the group still exists before inserting (avoids FK constraint error)
-                $group_exists = $wpdb->get_var( $wpdb->prepare(
-                    "SELECT id FROM {$wpdb->prefix}ftt_family_groups WHERE id = %d",
-                    $primary_group
-                ) );
-                if ($group_exists) {
-                    update_post_meta($post_id, 'group_id', $primary_group);
-                    FTT_Family_Groups::add_event_to_group($post_id, $primary_group);
+        } else {
+            // Use existing group_id meta if present, otherwise fall back to primary group.
+            $existing_group = absint(get_post_meta($post_id, 'group_id', true));
+            if (!$existing_group) {
+                $current_user_id = get_current_user_id();
+                $primary_group   = get_user_meta($current_user_id, 'ftt_primary_group', true);
+                if ($primary_group) {
+                    $group_exists = $wpdb->get_var($wpdb->prepare(
+                        "SELECT id FROM {$wpdb->prefix}ftt_family_groups WHERE id = %d",
+                        $primary_group
+                    ));
+                    if ($group_exists) {
+                        $existing_group = (int) $primary_group;
+                        update_post_meta($post_id, 'group_id', $existing_group);
+                    }
                 }
+            }
+            // Ensure the ftt_event_groups row exists for this event (idempotent).
+            if ($existing_group) {
+                FTT_Family_Groups::add_event_to_group($post_id, $existing_group);
             }
         }
         
+        // Fire action so other classes (e.g. AI parser) can react after all meta is written.
+        do_action( 'ftt_event_meta_saved', $post_id, $request );
+
         // Check for newly booked flights and delete associated price alerts
         if ($request->has_param('travel_legs')) {
             $raw_legs = $request->get_param('travel_legs');
