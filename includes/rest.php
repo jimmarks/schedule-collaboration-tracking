@@ -1547,6 +1547,20 @@ class FTT_REST {
         if ($timezone !== null) {
             update_user_meta($user_id, 'ftt_timezone', sanitize_text_field($timezone));
         }
+
+        // Handle airport reminder dismissed flag.
+        if ( ! empty( $params['airport_reminder_dismissed'] ) ) {
+            update_user_meta( $user_id, 'ftt_airport_reminder_dismissed', 1 );
+        }
+
+        // Handle AI-suggested home airport save (explicit user preference stated in prompt).
+        $save_home_airport = isset( $params['save_home_airport'] ) ? $params['save_home_airport'] : null;
+        if ( $save_home_airport !== null ) {
+            $clean = strtoupper( preg_replace( '/[^A-Za-z]/', '', $save_home_airport ) );
+            if ( strlen( $clean ) === 3 ) {
+                update_user_meta( $user_id, 'ftt_home_airport', $clean );
+            }
+        }
         
         return rest_ensure_response(array('success' => true, 'message' => 'Preferences updated'));
     }

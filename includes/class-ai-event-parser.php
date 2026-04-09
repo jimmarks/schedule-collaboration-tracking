@@ -92,6 +92,14 @@ class FTT_AI_Event_Parser {
             );
         }
 
+        // If the AI identified an explicit home airport preference, save it now.
+        if ( ! empty( $parsed['save_home_airport'] ) ) {
+            $clean_airport = strtoupper( preg_replace( '/[^A-Za-z]/', '', $parsed['save_home_airport'] ) );
+            if ( strlen( $clean_airport ) === 3 ) {
+                update_user_meta( get_current_user_id(), 'ftt_home_airport', $clean_airport );
+            }
+        }
+
         // Resolve member_name → member_id if the AI returned a name but no ID.
         if ( empty( $parsed['member_id'] ) && ! empty( $parsed['member_name'] ) && ! empty( $context['members'] ) ) {
             foreach ( $context['members'] as $member ) {
@@ -273,6 +281,9 @@ Return a JSON object with exactly these fields:
 - "track_prices" (bool): true if flights are present
 - "confidence" (string): "high", "medium", or "low" based on how clearly the prompt specified everything
 - "clarifications_needed" (array of strings): list any ambiguous details, e.g. ["Return date not specified"]
+- "suggest_save_home_airport" (string|null): if the user's home airport is "not set" AND you can identify a clear departure airport from the prompt, set this to that IATA code so the app can offer to save it. Otherwise null.
+- "save_home_airport" (string|null): if the user explicitly states their home airport as a preference (e.g. "my home airport is BDL", "I always fly out of Hartford", "save BDL as my home airport"), set this to that IATA code. Otherwise null.
+- "save_home_airport_confirmation" (string): if save_home_airport is set, a short natural-language confirmation message to show the user, e.g. "Got it — I'll use BDL as your home airport from now on." Otherwise empty string.
 
 Rules:
 - For relative dates like "the 25th", use the current month unless that date has passed.
@@ -280,6 +291,8 @@ Rules:
 - "Logan Airport" = BOS. Resolve common airport names to IATA codes.
 - If you cannot determine a start_date, set confidence to "low" and add to clarifications_needed.
 - Always include a return flight leg if the user says "flight home" or "return flight".
+- For suggest_save_home_airport: only set it when (a) home airport is "not set" AND (b) you can clearly identify a single departure airport from the prompt. Do not set it if the departure airport was explicitly mentioned as a one-off (e.g. "driving to Hartford to fly out").
+- For save_home_airport: only set it when the user clearly expresses a persistent preference, not just a trip-specific departure.
 - Never include markdown, code fences, or any text outside the JSON object.
 PROMPT;
     }
