@@ -11,7 +11,7 @@
  *    - fullcalendar.min.js
  *    - fullcalendar.min.css
  * 
- * OR use CDN by modifying summer-regiment-tracker.php:
+ * OR use CDN by modifying schedule-collaboration-tracking.php:
  * 
  * Replace the enqueue_script calls with CDN links:
  * 

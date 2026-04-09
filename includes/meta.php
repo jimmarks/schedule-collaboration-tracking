@@ -2,7 +2,7 @@
 /**
  * Meta Field Registration and Sanitization
  *
- * @package Summer_Regiment_Tracker
+ * @package Family_Travel_Tracker
  */
 
 // Exit if accessed directly
@@ -10,7 +10,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class SRT_Meta {
+class FTT_Meta {
     
     /**
      * Initialize hooks
@@ -151,7 +151,7 @@ class SRT_Meta {
         );
         
         foreach ($meta_fields as $key => $args) {
-            register_post_meta('srt_event', $key, $args);
+            register_post_meta('ftt_event', $key, $args);
         }
     }
     
@@ -176,7 +176,7 @@ class SRT_Meta {
      * Sanitize event type
      */
     public static function sanitize_event_type($value) {
-        $valid_types = array_keys(SRT_CPT::get_event_types());
+        $valid_types = array_keys(FTT_CPT::get_event_types());
         
         if (in_array($value, $valid_types, true)) {
             return $value;
@@ -189,7 +189,7 @@ class SRT_Meta {
      * Sanitize travel mode
      */
     public static function sanitize_travel_mode($value) {
-        $valid_modes = array_keys(SRT_CPT::get_travel_modes());
+        $valid_modes = array_keys(FTT_CPT::get_travel_modes());
         
         if (in_array($value, $valid_modes, true)) {
             return $value;
@@ -214,7 +214,7 @@ class SRT_Meta {
         }
         
         $sanitized = array();
-        $valid_block_types = array_keys(SRT_CPT::get_block_types());
+        $valid_block_types = array_keys(FTT_CPT::get_block_types());
         
         foreach ($blocks as $block) {
             if (!is_array($block)) {
@@ -255,16 +255,20 @@ class SRT_Meta {
             return '[]';
         }
         
-        // Decode JSON
-        $legs = json_decode($value, true);
-        
-        if (!is_array($legs)) {
+        // Value may arrive as an already-decoded array (REST API) or as a JSON string
+        if ( is_array( $value ) ) {
+            $legs = $value;
+        } else {
+            $legs = json_decode( $value, true );
+        }
+
+        if ( ! is_array( $legs ) ) {
             return '[]';
         }
         
         $sanitized = array();
-        $valid_modes = array_keys(SRT_CPT::get_travel_modes());
-        $valid_baggage = array_keys(SRT_CPT::get_baggage_types());
+        $valid_modes = array_keys(FTT_CPT::get_travel_modes());
+        $valid_baggage = array_keys(FTT_CPT::get_baggage_types());
         
         foreach ($legs as $leg) {
             if (!is_array($leg)) {
@@ -322,4 +326,4 @@ class SRT_Meta {
 }
 
 // Initialize
-SRT_Meta::init();
+FTT_Meta::init();

@@ -15,14 +15,13 @@ if (!defined('ABSPATH')) {
 /**
  * SRT Event Migration Class
  */
-class SRT_Event_Migration {
+class FTT_Event_Migration {
     
     /**
      * Initialize
      */
     public static function init() {
-        add_action('admin_menu', array(__CLASS__, 'add_admin_menu'));
-        add_action('admin_post_srt_migrate_events', array(__CLASS__, 'handle_migration'));
+        add_action('admin_post_ftt_migrate_events', array(__CLASS__, 'handle_migration'));
     }
     
     /**
@@ -30,11 +29,11 @@ class SRT_Event_Migration {
      */
     public static function add_admin_menu() {
         add_submenu_page(
-            'edit.php?post_type=srt_event',
+            'edit.php?post_type=ftt_event',
             __('Migrate Events', 'schedule-collaboration-tracking'),
             __('Migrate Events', 'schedule-collaboration-tracking'),
             'manage_options',
-            'srt-migrate-events',
+            'ftt-migrate-events',
             array(__CLASS__, 'render_page')
         );
     }
@@ -44,7 +43,7 @@ class SRT_Event_Migration {
      */
     public static function get_unassigned_events() {
         $args = array(
-            'post_type' => 'srt_event',
+            'post_type' => 'ftt_event',
             'posts_per_page' => -1,
             'post_status' => 'any',
             'author' => 0, // Events with no author
@@ -59,7 +58,7 @@ class SRT_Event_Migration {
      * Get all members
      */
     public static function get_all_members() {
-        return SRT_Roles::get_all_members();
+        return FTT_Roles::get_all_members();
     }
     
     /**
@@ -92,9 +91,9 @@ class SRT_Event_Migration {
                     <p><?php printf(esc_html__('Found %d unassigned event(s). Assign them to members below.', 'schedule-collaboration-tracking'), count($unassigned)); ?></p>
                 </div>
                 
-                <form method="post" action="<?php echo admin_url('admin-post.php'); ?>" id="srt-migration-form">
-                    <?php wp_nonce_field('srt_migrate_events', 'srt_migration_nonce'); ?>
-                    <input type="hidden" name="action" value="srt_migrate_events">
+                <form method="post" action="<?php echo admin_url('admin-post.php'); ?>" id="ftt-migration-form">
+                    <?php wp_nonce_field('ftt_migrate_events', 'ftt_migration_nonce'); ?>
+                    <input type="hidden" name="action" value="ftt_migrate_events">
                     
                     <table class="wp-list-table widefat fixed striped">
                         <thead>
@@ -112,7 +111,7 @@ class SRT_Event_Migration {
                             <?php foreach ($unassigned as $event): 
                                 $event_type = get_post_meta($event->ID, 'event_type', true);
                                 $start_date = get_post_meta($event->ID, 'start_datetime', true);
-                                $event_types = SRT_CPT::get_event_types();
+                                $event_types = FTT_CPT::get_event_types();
                                 $type_label = isset($event_types[$event_type]) ? $event_types[$event_type] : $event_type;
                             ?>
                                 <tr>
@@ -206,7 +205,7 @@ class SRT_Event_Migration {
                     });
                     
                     // Form validation
-                    $('#srt-migration-form').on('submit', function(e) {
+                    $('#ftt-migration-form').on('submit', function(e) {
                         var hasSelection = false;
                         $('.member-select').each(function() {
                             if ($(this).val()) {
@@ -247,7 +246,7 @@ class SRT_Event_Migration {
             wp_die(__('You do not have permission to perform this action.'));
         }
         
-        if (!isset($_POST['srt_migration_nonce']) || !wp_verify_nonce($_POST['srt_migration_nonce'], 'srt_migrate_events')) {
+        if (!isset($_POST['ftt_migration_nonce']) || !wp_verify_nonce($_POST['ftt_migration_nonce'], 'ftt_migrate_events')) {
             wp_die(__('Security check failed.'));
         }
         
@@ -264,12 +263,12 @@ class SRT_Event_Migration {
                 
                 // Verify event exists
                 $event = get_post($event_id);
-                if (!$event || $event->post_type !== 'srt_event') {
+                if (!$event || $event->post_type !== 'ftt_event') {
                     continue;
                 }
                 
                 // Verify member exists and is a member
-                if (!SRT_Roles::is_member($member_id)) {
+                if (!FTT_Roles::is_member($member_id)) {
                     continue;
                 }
                 
@@ -286,11 +285,11 @@ class SRT_Event_Migration {
         // Redirect back with success message
         $redirect = add_query_arg(
             array(
-                'page' => 'srt-migrate-events',
+                'page' => 'ftt-migrate-events',
                 'success' => '1',
                 'count' => $assigned_count,
             ),
-            admin_url('edit.php?post_type=srt_event')
+            admin_url('edit.php?post_type=ftt_event')
         );
         
         wp_safe_redirect($redirect);
@@ -299,4 +298,4 @@ class SRT_Event_Migration {
 }
 
 // Initialize
-SRT_Event_Migration::init();
+FTT_Event_Migration::init();

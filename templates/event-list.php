@@ -2,7 +2,7 @@
 /**
  * Template: Event List
  *
- * @package Summer_Regiment_Tracker
+ * @package Family_Travel_Tracker
  */
 
 // Exit if accessed directly
@@ -11,9 +11,22 @@ if (!defined('ABSPATH')) {
 }
 ?>
 
-<div class="srt-container">
-    <div class="srt-event-list">
-        <h2><?php esc_html_e('Upcoming Events', 'schedule-collaboration-tracking'); ?></h2>
+<div class="ftt-container">
+    <div class="ftt-event-list">
+        <div class="ftt-page-header">
+            <h2><?php esc_html_e('Upcoming Events', 'schedule-collaboration-tracking'); ?></h2>
+            <div class="ftt-page-nav">
+                <?php
+                $dashboard_url = FTT_Pages::get_page_url('dashboard');
+                $calendar_url = FTT_Pages::get_page_url('calendar');
+                if ($dashboard_url) : ?>
+                    <a href="<?php echo esc_url($dashboard_url); ?>" class="button"><?php esc_html_e('Dashboard', 'schedule-collaboration-tracking'); ?></a>
+                <?php endif; ?>
+                <?php if ($calendar_url) : ?>
+                    <a href="<?php echo esc_url($calendar_url); ?>" class="button button-primary"><?php esc_html_e('Calendar', 'schedule-collaboration-tracking'); ?></a>
+                <?php endif; ?>
+            </div>
+        </div>
         
         <?php if ($query->have_posts()) : ?>
             <?php while ($query->have_posts()) : $query->the_post(); ?>
@@ -27,7 +40,7 @@ if (!defined('ABSPATH')) {
                 $flight_needed = get_post_meta($event_id, 'flight_needed', true);
                 $member_id = get_post_meta($event_id, 'member_id', true);
                 
-                $event_types = SRT_CPT::get_event_types();
+                $event_types = FTT_CPT::get_event_types();
                 $event_type_label = $event_types[$event_type] ?? $event_type;
                 
                 $start_date = $start_datetime ? date_create($start_datetime) : null;
@@ -43,13 +56,13 @@ if (!defined('ABSPATH')) {
                 }
                 ?>
                 
-                <div class="srt-event-item" data-event-id="<?php echo esc_attr($event_id); ?>">
+                <div class="ftt-event-item" data-event-id="<?php echo esc_attr($event_id); ?>">
                     <?php if ($member_name) : ?>
-                        <div class="srt-member-name"><?php echo esc_html($member_name); ?></div>
+                        <div class="ftt-member-name"><?php echo esc_html($member_name); ?></div>
                     <?php endif; ?>
                     <h3><?php the_title(); ?></h3>
                     
-                    <div class="srt-event-meta">
+                    <div class="ftt-event-meta">
                         <?php if ($start_date) : ?>
                             <span>
                                 <strong><?php esc_html_e('Date:', 'schedule-collaboration-tracking'); ?></strong>
@@ -73,15 +86,15 @@ if (!defined('ABSPATH')) {
                         <?php endif; ?>
                     </div>
                     
-                    <div class="srt-event-badges">
+                    <div class="ftt-event-badges">
                         <?php if ($travel_needed) : ?>
-                            <span class="srt-event-badge srt-event-badge-travel">
+                            <span class="ftt-event-badge ftt-event-badge-travel">
                                 <?php esc_html_e('Travel', 'schedule-collaboration-tracking'); ?>
                             </span>
                         <?php endif; ?>
                         
                         <?php if ($flight_needed) : ?>
-                            <span class="srt-event-badge srt-event-badge-flight">
+                            <span class="ftt-event-badge ftt-event-badge-flight">
                                 <?php esc_html_e('Flight', 'schedule-collaboration-tracking'); ?>
                             </span>
                         <?php endif; ?>
@@ -89,7 +102,16 @@ if (!defined('ABSPATH')) {
                     
                     <?php if (current_user_can('edit_posts')) : ?>
                         <p>
-                            <a href="<?php echo esc_url(get_permalink() . '?event_id=' . $event_id); ?>" class="button">
+                            <?php
+                            $event_form_url = FTT_Pages::get_page_url('event_form');
+                            if ($event_form_url) {
+                                $separator = strpos($event_form_url, '?') !== false ? '&' : '?';
+                                $edit_url = $event_form_url . $separator . 'event_id=' . $event_id;
+                            } else {
+                                $edit_url = home_url('/ftt-manage-events/') . '?event_id=' . $event_id;
+                            }
+                            ?>
+                            <a href="<?php echo esc_url($edit_url); ?>" class="button">
                                 <?php esc_html_e('Edit', 'schedule-collaboration-tracking'); ?>
                             </a>
                         </p>
@@ -97,7 +119,7 @@ if (!defined('ABSPATH')) {
                 </div>
             <?php endwhile; ?>
         <?php else : ?>
-            <p class="srt-no-events"><?php esc_html_e('No upcoming events found.', 'schedule-collaboration-tracking'); ?></p>
+            <p class="ftt-no-events"><?php esc_html_e('No upcoming events found.', 'schedule-collaboration-tracking'); ?></p>
         <?php endif; ?>
     </div>
 </div>

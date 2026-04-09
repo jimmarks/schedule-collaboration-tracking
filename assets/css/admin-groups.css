@@ -1,0 +1,269 @@
+/**
+ * Admin Group Management Styles
+ */
+
+.ftt-admin-groups-wrap {
+    margin-top: 20px;
+}
+
+/* Stats Cards */
+.ftt-groups-stats {
+    display: flex;
+    gap: 20px;
+    margin: 25px 0;
+}
+
+.ftt-stat-card {
+    flex: 1;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 25px;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    color: white;
+    text-align: center;
+}
+
+.ftt-stat-number {
+    font-size: 42px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    line-height: 1;
+}
+
+.ftt-stat-label {
+    font-size: 14px;
+    opacity: 0.9;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 500;
+}
+
+/* Table Styles */
+.ftt-groups-table {
+    margin-top: 20px;
+    background: white;
+}
+
+.ftt-groups-table th {
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 12px;
+    letter-spacing: 0.5px;
+}
+
+.ftt-groups-table td {
+    vertical-align: middle;
+}
+
+.ftt-groups-table .column-id {
+    width: 60px;
+}
+
+.ftt-groups-table .column-name {
+    width: 20%;
+}
+
+.ftt-groups-table .column-owner {
+    width: 18%;
+}
+
+.ftt-groups-table .column-members {
+    width: 12%;
+    text-align: center;
+}
+
+.ftt-groups-table .column-billing {
+    width: 15%;
+}
+
+.ftt-groups-table .column-created {
+    width: 12%;
+}
+
+.ftt-groups-table .column-actions {
+    width: 15%;
+    text-align: right;
+}
+
+.ftt-groups-table .description {
+    color: #666;
+    font-style: italic;
+}
+
+/* Member Badges */
+.ftt-member-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    margin-right: 5px;
+}
+
+.ftt-parent-badge {
+    background: #e3f2fd;
+    color: #1976d2;
+}
+
+.ftt-child-badge {
+    background: #fff3e0;
+    color: #f57c00;
+}
+
+/* Status Badges */
+.ftt-status-badge {
+    display: inline-block;
+    padding: 5px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: capitalize;
+}
+
+.ftt-status-active {
+    background: #d4edda;
+    color: #155724;
+}
+
+.ftt-status-trialing {
+    background: #cce5ff;
+    color: #004085;
+}
+
+.ftt-status-canceled,
+.ftt-status-cancelled {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.ftt-status-past-due,
+.ftt-status-past_due {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.ftt-status-none {
+    background: #e2e3e5;
+    color: #383d41;
+}
+
+/* Empty State */
+.ftt-no-groups {
+    text-align: center;
+    padding: 60px 20px;
+    background: white;
+    border: 2px dashed #ddd;
+    border-radius: 8px;
+    margin-top: 20px;
+}
+
+.ftt-no-groups p {
+    color: #666;
+    font-size: 16px;
+    margin: 0;
+}
+
+/* Modal Styles */
+.ftt-modal {
+    position: fixed;
+    z-index: 100000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0, 0, 0, 0.6);
+}
+
+.ftt-modal-content {
+    background-color: #fefefe;
+    margin: 10% auto;
+    padding: 0;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    width: 90%;
+    max-width: 500px;
+}
+
+.ftt-modal-content h2 {
+    margin: 0;
+    padding: 20px 25px;
+    border-bottom: 1px solid #ddd;
+    font-size: 20px;
+}
+
+.ftt-modal-body {
+    padding: 25px;
+}
+
+.ftt-modal-footer {
+    padding: 15px 25px;
+    border-top: 1px solid #ddd;
+    text-align: right;
+    background: #f9f9f9;
+    border-radius: 0 0 8px 8px;
+}
+
+.ftt-modal-close {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    line-height: 20px;
+    margin-right: 10px;
+    cursor: pointer;
+}
+
+.ftt-modal-close:hover,
+.ftt-modal-close:focus {
+    color: #000;
+}
+
+.ftt-warning-text {
+    font-size: 16px;
+    font-weight: 600;
+    color: #856404;
+    margin-bottom: 15px;
+}
+
+.ftt-danger-text {
+    color: #721c24;
+    background: #f8d7da;
+    padding: 12px;
+    border-radius: 4px;
+    margin-top: 15px;
+    font-size: 13px;
+}
+
+.ftt-delete-details {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 4px;
+    margin: 15px 0;
+}
+
+.ftt-delete-details p {
+    margin: 8px 0;
+}
+
+.button-danger {
+    background: #dc3545 !important;
+    border-color: #dc3545 !important;
+    color: white !important;
+}
+
+.button-danger:hover {
+    background: #c82333 !important;
+    border-color: #bd2130 !important;
+}
+
+/* Responsive */
+@media (max-width: 782px) {
+    .ftt-groups-stats {
+        flex-direction: column;
+    }
+    
+    .ftt-stat-card {
+        width: 100%;
+    }
+}

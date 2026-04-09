@@ -34,32 +34,41 @@ echo ""
 
 echo -e "${YELLOW}Step 1: Checking current version...${NC}"
 
-CURRENT_VERSION=$(grep -oP "Version: \K[0-9]+\.[0-9]+\.[0-9]+" schedule-collaboration-tracking.php)
+# Extract version, strip any 'v' prefix if present
+CURRENT_VERSION=$(grep -oP "Version: \Kv?[0-9]+\.[0-9]+\.[0-9]+" schedule-collaboration-tracking.php | sed 's/^v//')
+
+if [ -z "$CURRENT_VERSION" ]; then
+    echo -e "${RED}✗ Failed to extract current version from plugin file${NC}"
+    exit 1
+fi
+
 echo -e "${GREEN}✓ Current version: ${CURRENT_VERSION}${NC}"
 echo ""
 
 ###############################################################################
-# Step 2: Determine new version
+# Step 2: Determine new version (applied AFTER lint passes)
 ###############################################################################
 
-echo -e "${YELLOW}Step 2: Version management...${NC}"
+echo -e "${YELLOW}Step 2: Determining new version...${NC}"
 
 if [ "$#" -eq 1 ]; then
-    NEW_VERSION="$1"
+    # Strip 'v' prefix if user provided it
+    NEW_VERSION=$(echo "$1" | sed 's/^v//')
     echo -e "${GREEN}✓ Using specified version: ${NEW_VERSION}${NC}"
 else
     # Auto-increment patch version
     IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
     PATCH=$((PATCH + 1))
     NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
-    echo -e "${GREEN}✓ Auto-incrementing version: ${CURRENT_VERSION} → ${NEW_VERSION}${NC}"
+    echo -e "${GREEN}✓ Will auto-increment version: ${CURRENT_VERSION} → ${NEW_VERSION}${NC}"
 fi
 
-# Update version in plugin file
-sed -i "s/Version: ${CURRENT_VERSION}/Version: ${NEW_VERSION}/" schedule-collaboration-tracking.php
-sed -i "s/define('SRT_VERSION', '${CURRENT_VERSION}');/define('SRT_VERSION', '${NEW_VERSION}');/" schedule-collaboration-tracking.php
-
-echo -e "${GREEN}✓ Version updated to ${NEW_VERSION}${NC}"
+# Validate version format
+if ! [[ "$NEW_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    echo -e "${RED}✗ Invalid version format: ${NEW_VERSION}${NC}"
+    echo -e "${RED}  Version must be in format: X.Y.Z (e.g., 2.1.0)${NC}"
+    exit 1
+fi
 
 VERSION="$NEW_VERSION"
 echo ""
@@ -80,32 +89,42 @@ else
     LINT_FAILED=1
 fi
 
-# Check includes
-for file in includes/*.php; do
+# Check includes (top-level + subdirectories in one pass, avoiding subshell)
+while IFS= read -r file; do
     if php -l "$file" > /dev/null 2>&1; then
         echo -e "${GREEN}✓ $file${NC}"
     else
         echo -e "${RED}✗ $file - SYNTAX ERROR${NC}"
         LINT_FAILED=1
     fi
-done
-
-# Check templates
-for file in templates/*.php; do
-    if php -l "$file" > /dev/null 2>&1; then
-        echo -e "${GREEN}✓ $file${NC}"
-    else
-        echo -e "${RED}✗ $file - SYNTAX ERROR${NC}"
-        LINT_FAILED=1
-    fi
-done
+done < <(find includes templates -type f -name "*.php")
 
 if [ $LINT_FAILED -eq 1 ]; then
-    echo -e "${RED}✗ Lint check FAILED. Please fix syntax errors before packaging.${NC}"
+    echo -e "${RED}✗ Lint check FAILED. Version has NOT been changed. Fix syntax errors and re-run.${NC}"
     exit 1
 fi
 
 echo -e "${GREEN}✓ All PHP files passed syntax check${NC}"
+echo ""
+
+###############################################################################
+# Step 3b: Apply version bump (lint passed — safe to write)
+###############################################################################
+
+echo -e "${YELLOW}Step 3b: Applying version bump...${NC}"
+
+# Update version in plugin file (handle both with and without 'v' prefix)
+sed -i "s/Version: v\?${CURRENT_VERSION}/Version: ${NEW_VERSION}/" schedule-collaboration-tracking.php
+sed -i "s/define('FTT_VERSION', '${CURRENT_VERSION}');/define('FTT_VERSION', '${NEW_VERSION}');/" schedule-collaboration-tracking.php
+
+# Verify the update worked
+NEW_FILE_VERSION=$(grep -oP "Version: \Kv?[0-9]+\.[0-9]+\.[0-9]+" schedule-collaboration-tracking.php | sed 's/^v//')
+if [ "$NEW_FILE_VERSION" != "$NEW_VERSION" ]; then
+    echo -e "${RED}✗ Failed to update version in plugin file${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}✓ Version updated: ${CURRENT_VERSION} → ${NEW_VERSION}${NC}"
 echo ""
 
 ###############################################################################
@@ -138,12 +157,44 @@ echo -e "${YELLOW}Step 5: Copying plugin files...${NC}"
 cp schedule-collaboration-tracking.php "$PLUGIN_DIR/"
 echo -e "${GREEN}✓ Copied main plugin file${NC}"
 
+# Copy test runner if present (temporary — delete from server after testing)
+if [ -f "ftt-test-runner.php" ]; then
+    cp ftt-test-runner.php "$PLUGIN_DIR/"
+    echo -e "${YELLOW}✓ Copied ftt-test-runner.php (TEMPORARY — delete after testing)${NC}"
+fi
+
 # Copy directories
 cp -r includes "$PLUGIN_DIR/"
 echo -e "${GREEN}✓ Copied includes/${NC}"
 
 cp -r lib "$PLUGIN_DIR/"
 echo -e "${GREEN}✓ Copied lib/${NC}"
+
+# Strip production-irrelevant files from vendored libraries.
+# We exclude by CATEGORY (not by filename) so future Stripe API additions
+# are automatically included — only things that are structurally useless in
+# a production WordPress plugin are removed here.
+
+# stripe-php: remove test helpers (never run in production), the bundled CA
+# cert bundle (WordPress/PHP uses its own), and markdown docs/metadata files.
+rm -rf  "$PLUGIN_DIR/lib/stripe-php/lib/TestHelpers"
+rm -rf  "$PLUGIN_DIR/lib/stripe-php/lib/Service/TestHelpers"
+# Patch init.php: remove require lines for both TestHelpers directories so PHP
+# doesn't fatal when the files are missing at runtime.
+sed -i '/TestHelpers/d' "$PLUGIN_DIR/lib/stripe-php/init.php"
+rm -f   "$PLUGIN_DIR/lib/stripe-php/data/ca-certificates.crt"
+rm -f   "$PLUGIN_DIR/lib/stripe-php/CHANGELOG.md"
+rm -f   "$PLUGIN_DIR/lib/stripe-php/README.md"
+rm -f   "$PLUGIN_DIR/lib/stripe-php/OPENAPI_VERSION"
+rm -f   "$PLUGIN_DIR/lib/stripe-php/.gitignore"
+
+# plugin-update-checker: remove .po source translation files (the compiled
+# .mo files are what PHP actually loads, and even those are unused since this
+# plugin ships in English only).
+find "$PLUGIN_DIR/lib/plugin-update-checker/languages" -name "*.po" -delete
+rm -f "$PLUGIN_DIR/lib/plugin-update-checker/README.md"
+
+echo -e "${GREEN}✓ Stripped vendor docs/test files${NC}"
 
 cp -r assets "$PLUGIN_DIR/"
 echo -e "${GREEN}✓ Copied assets/${NC}"
@@ -166,6 +217,11 @@ echo -e "${GREEN}✓ Copied setup-cron.sh${NC}"
 if [ -f "test-digest.php" ]; then
     cp test-digest.php "$PLUGIN_DIR/"
     echo -e "${GREEN}✓ Copied test-digest.php${NC}"
+fi
+
+if [ -f "test-invite-validation.php" ]; then
+    cp test-invite-validation.php "$PLUGIN_DIR/"
+    echo -e "${GREEN}✓ Copied test-invite-validation.php${NC}"
 fi
 
 echo ""

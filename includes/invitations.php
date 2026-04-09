@@ -2,7 +2,7 @@
 /**
  * Parent-Child Invitation System
  *
- * @package Schedule_Collaboration_Tracking
+ * @package Family_Travel_Tracker
  */
 
 // Exit if accessed directly
@@ -15,7 +15,7 @@ if (!defined('ABSPATH')) {
  * 
  * Manages member-to-parent invitations with unique codes
  */
-class SRT_Invitations {
+class FTT_Invitations {
     
     /**
      * Initialize
@@ -29,7 +29,7 @@ class SRT_Invitations {
      */
     public static function register_routes() {
         // Generate new invite code
-        register_rest_route('srt/v1', '/invite/generate', array(
+        register_rest_route('ftt/v1', '/invite/generate', array(
             'methods' => 'POST',
             'callback' => array(__CLASS__, 'generate_invite_code'),
             'permission_callback' => function() {
@@ -46,17 +46,17 @@ class SRT_Invitations {
                     return true;
                 }
                 
-                if (!class_exists('SRT_Roles')) {
-                    error_log('Invite generate: SRT_Roles class not found');
+                if (!class_exists('FTT_Roles')) {
+                    error_log('Invite generate: FTT_Roles class not found');
                     return false;
                 }
                 
-                $is_member = SRT_Roles::is_member($user_id);
+                $is_member = FTT_Roles::is_member($user_id);
                 
                 // If not marked as member, auto-promote if they have the right capability
                 if (!$is_member && current_user_can('edit_posts')) {
                     error_log('Invite generate: User ' . $user_id . ' has edit_posts cap but not member flag, auto-promoting');
-                    SRT_Roles::make_member($user_id);
+                    FTT_Roles::make_member($user_id);
                     $is_member = true;
                 }
                 
@@ -67,28 +67,28 @@ class SRT_Invitations {
         ));
         
         // Get member's invitations
-        register_rest_route('srt/v1', '/invitations', array(
+        register_rest_route('ftt/v1', '/invitations', array(
             'methods' => 'GET',
             'callback' => array(__CLASS__, 'get_invitations'),
             'permission_callback' => 'is_user_logged_in'
         ));
         
         // Revoke/delete invitation
-        register_rest_route('srt/v1', '/invite/(?P<code>[a-zA-Z0-9\-]+)/revoke', array(
+        register_rest_route('ftt/v1', '/invite/(?P<code>[a-zA-Z0-9\-]+)/revoke', array(
             'methods' => 'POST',
             'callback' => array(__CLASS__, 'revoke_invitation'),
             'permission_callback' => 'is_user_logged_in'
         ));
         
         // Parent accepts invitation by code
-        register_rest_route('srt/v1', '/invite/accept', array(
+        register_rest_route('ftt/v1', '/invite/accept', array(
             'methods' => 'POST',
             'callback' => array(__CLASS__, 'accept_invitation_by_code'),
             'permission_callback' => 'is_user_logged_in'
         ));
         
         // Validate invite code (for registration page)
-        register_rest_route('srt/v1', '/invite/(?P<code>[a-zA-Z0-9\-]+)/validate', array(
+        register_rest_route('ftt/v1', '/invite/(?P<code>[a-zA-Z0-9\-]+)/validate', array(
             'methods' => 'GET',
             'callback' => array(__CLASS__, 'validate_invite_code'),
             'permission_callback' => '__return_true'
@@ -103,12 +103,12 @@ class SRT_Invitations {
      * @return string Member code (e.g., M-ABC123)
      */
     public static function get_member_code($member_id) {
-        $code = get_user_meta($member_id, 'srt_member_code', true);
+        $code = get_user_meta($member_id, 'ftt_member_code', true);
         
         if (empty($code)) {
             // Generate new permanent code
             $code = 'M-' . strtoupper(substr(md5($member_id . time()), 0, 6));
-            update_user_meta($member_id, 'srt_member_code', $code);
+            update_user_meta($member_id, 'ftt_member_code', $code);
         }
         
         return $code;
@@ -122,7 +122,7 @@ class SRT_Invitations {
      */
     public static function get_member_by_code($code) {
         $users = get_users(array(
-            'meta_key' => 'srt_member_code',
+            'meta_key' => 'ftt_member_code',
             'meta_value' => $code,
             'number' => 1
         ));
@@ -149,12 +149,12 @@ class SRT_Invitations {
         );
         
         // Store in member's meta
-        $invitations = get_user_meta($member_id, 'srt_invitations', true);
+        $invitations = get_user_meta($member_id, 'ftt_invitations', true);
         if (!is_array($invitations)) {
             $invitations = array();
         }
         $invitations[$code] = $invitation;
-        update_user_meta($member_id, 'srt_invitations', $invitations);
+        update_user_meta($member_id, 'ftt_invitations', $invitations);
         
         return $invitation;
     }
@@ -168,12 +168,12 @@ class SRT_Invitations {
     public static function get_invitation_by_code($code) {
         // Search through all users' invitations
         $users = get_users(array(
-            'meta_key' => 'srt_invitations',
+            'meta_key' => 'ftt_invitations',
             'meta_compare' => 'EXISTS'
         ));
         
         foreach ($users as $user) {
-            $invitations = get_user_meta($user->ID, 'srt_invitations', true);
+            $invitations = get_user_meta($user->ID, 'ftt_invitations', true);
             if (isset($invitations[$code])) {
                 return $invitations[$code];
             }
@@ -192,12 +192,12 @@ class SRT_Invitations {
     public static function update_invitation_status($code, $status, $parent_id = null) {
         // Find the invitation
         $users = get_users(array(
-            'meta_key' => 'srt_invitations',
+            'meta_key' => 'ftt_invitations',
             'meta_compare' => 'EXISTS'
         ));
         
         foreach ($users as $user) {
-            $invitations = get_user_meta($user->ID, 'srt_invitations', true);
+            $invitations = get_user_meta($user->ID, 'ftt_invitations', true);
             if (isset($invitations[$code])) {
                 $invitations[$code]['status'] = $status;
                 
@@ -206,7 +206,7 @@ class SRT_Invitations {
                     $invitations[$code]['used_at'] = current_time('mysql');
                 }
                 
-                update_user_meta($user->ID, 'srt_invitations', $invitations);
+                update_user_meta($user->ID, 'ftt_invitations', $invitations);
                 return true;
             }
         }
@@ -221,7 +221,7 @@ class SRT_Invitations {
      * @return array Invitations with parent details
      */
     public static function get_member_invitations($member_id) {
-        $invitations = get_user_meta($member_id, 'srt_invitations', true);
+        $invitations = get_user_meta($member_id, 'ftt_invitations', true);
         if (!is_array($invitations)) {
             return array();
         }
@@ -250,7 +250,7 @@ class SRT_Invitations {
         }
         
         // Update user meta to remove expired revoked invitations
-        update_user_meta($member_id, 'srt_invitations', $invitations);
+        update_user_meta($member_id, 'ftt_invitations', $invitations);
         
         return $invitations;
     }
@@ -266,23 +266,25 @@ class SRT_Invitations {
         
         // Find parents waiting to link to this email
         $users = get_users(array(
-            'meta_key' => 'srt_pending_child_email',
+            'meta_key' => 'ftt_pending_child_email',
             'meta_value' => $member_email
         ));
         
         foreach ($users as $parent) {
             // Link them
-            SRT_Roles::add_parent_child($parent->ID, $member_id);
+            FTT_Roles::add_parent_child($parent->ID, $member_id);
             
             // Clear pending status
-            delete_user_meta($parent->ID, 'srt_pending_child_email');
+            delete_user_meta($parent->ID, 'ftt_pending_child_email');
             
             // Send notification
-            $subject = sprintf('[%s] Parent Account Linked', get_bloginfo('name'));
-            $message = sprintf(
-                "Your parent account has been automatically linked to %s.\n\nYou can now view their events and receive price alerts.",
-                get_userdata($member_id)->display_name
-            );
+            $subject = FTT_Email_Templates::render_subject('parent_linked', [
+                'site_name' => get_bloginfo('name'),
+            ]);
+            $message = FTT_Email_Templates::render_body('parent_linked', [
+                'site_name'  => get_bloginfo('name'),
+                'child_name' => get_userdata($member_id)->display_name,
+            ]);
             wp_mail($parent->user_email, $subject, $message);
         }
     }
@@ -305,7 +307,7 @@ class SRT_Invitations {
      */
     public static function get_invitations($request) {
         $user_id = get_current_user_id();
-        $is_member = SRT_Roles::is_member($user_id);
+        $is_member = FTT_Roles::is_member($user_id);
         
         if ($is_member) {
             // Return member's sent invitations
@@ -331,12 +333,12 @@ class SRT_Invitations {
         $current_user_id = get_current_user_id();
         
         // First check if the invitation belongs to the current user
-        $invitations = get_user_meta($current_user_id, 'srt_invitations', true);
+        $invitations = get_user_meta($current_user_id, 'ftt_invitations', true);
         
         if (isset($invitations[$code]) && $invitations[$code]['member_id'] == $current_user_id) {
             // User is revoking their own invitation
             $invitations[$code]['status'] = 'revoked';
-            update_user_meta($current_user_id, 'srt_invitations', $invitations);
+            update_user_meta($current_user_id, 'ftt_invitations', $invitations);
             
             return rest_ensure_response(array(
                 'success' => true,
@@ -345,16 +347,16 @@ class SRT_Invitations {
         }
         
         // If not found, check if current user is a parent of the member who created it
-        if (SRT_Roles::is_parent($current_user_id)) {
-            $children = SRT_Roles::get_children($current_user_id);
+        if (FTT_Roles::is_parent($current_user_id)) {
+            $children = FTT_Roles::get_children($current_user_id);
             
-            foreach ($children as $child) {
-                $child_invitations = get_user_meta($child->ID, 'srt_invitations', true);
+            foreach ($children as $child_id) {
+                $child_invitations = get_user_meta($child_id, 'ftt_invitations', true);
                 
-                if (isset($child_invitations[$code]) && $child_invitations[$code]['member_id'] == $child->ID) {
+                if (isset($child_invitations[$code]) && $child_invitations[$code]['member_id'] == $child_id) {
                     // Parent is revoking their child's invitation
                     $child_invitations[$code]['status'] = 'revoked';
-                    update_user_meta($child->ID, 'srt_invitations', $child_invitations);
+                    update_user_meta($child_id, 'ftt_invitations', $child_invitations);
                     
                     return rest_ensure_response(array(
                         'success' => true,
@@ -384,13 +386,13 @@ class SRT_Invitations {
             }
             
             // Check if already linked
-            $children = SRT_Roles::get_children($parent_id);
+            $children = FTT_Roles::get_children($parent_id);
             if (in_array($member_id, $children)) {
                 return new WP_Error('already_linked', 'You are already linked to this member', array('status' => 400));
             }
             
             // Link them
-            SRT_Roles::add_parent_child($parent_id, $member_id);
+            FTT_Roles::add_parent_child($parent_id, $member_id);
             
             $member = get_userdata($member_id);
             
@@ -418,13 +420,13 @@ class SRT_Invitations {
             $member_id = $invitation['member_id'];
             
             // Check if already linked
-            $children = SRT_Roles::get_children($parent_id);
+            $children = FTT_Roles::get_children($parent_id);
             if (in_array($member_id, $children)) {
                 return new WP_Error('already_linked', 'You are already linked to this member', array('status' => 400));
             }
             
             // Link them
-            SRT_Roles::add_parent_child($parent_id, $member_id);
+            FTT_Roles::add_parent_child($parent_id, $member_id);
             
             // Update invitation status
             self::update_invitation_status($code, 'accepted', $parent_id);
@@ -450,43 +452,362 @@ class SRT_Invitations {
     public static function validate_invite_code($request) {
         $code = $request['code'];
         
-        // Check member codes
-        if (strpos($code, 'M-') === 0) {
-            $member_id = self::get_member_by_code($code);
-            if ($member_id) {
-                $member = get_userdata($member_id);
-                return rest_ensure_response(array(
-                    'valid' => true,
-                    'type' => 'member_code',
-                    'member' => array(
-                        'id' => $member_id,
-                        'name' => $member->display_name
-                    )
-                ));
-            }
+        if (defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
+            error_log('FTT Invitation validation: Code received - ' . $code);
         }
         
-        // Check invitation codes
-        if (strpos($code, 'INV-') === 0) {
-            $invitation = self::get_invitation_by_code($code);
-            if ($invitation && $invitation['status'] === 'pending') {
-                $member = get_userdata($invitation['member_id']);
+        try {
+            // Validate code format before processing
+            if (!preg_match('/^(M-[A-Z0-9]{6,}|INV-[A-Z0-9]{8,}|[a-zA-Z0-9]{12})$/', $code)) {
                 return rest_ensure_response(array(
-                    'valid' => true,
-                    'type' => 'invitation',
-                    'member' => array(
-                        'id' => $invitation['member_id'],
-                        'name' => $member->display_name
-                    )
+                    'valid' => false,
+                    'error' => 'invalid_format',
+                    'message' => 'Invalid invitation code format'
                 ));
             }
+            
+            // Check member codes
+            if (strpos($code, 'M-') === 0) {
+                if (defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
+                    error_log('FTT Invitation validation: Checking member code');
+                }
+                $member_id = self::get_member_by_code($code);
+                if ($member_id) {
+                    $member = get_userdata($member_id);
+                    return rest_ensure_response(array(
+                        'valid' => true,
+                        'type' => 'member_code',
+                        'member' => array(
+                            'id' => $member_id,
+                            'name' => $member->display_name
+                        )
+                    ));
+                }
+            }
+            
+            // Check invitation codes
+            if (strpos($code, 'INV-') === 0) {
+                if (defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
+                    error_log('FTT Invitation validation: Checking invitation code');
+                }
+                $invitation = self::get_invitation_by_code($code);
+                if ($invitation && $invitation['status'] === 'pending') {
+                    $member = get_userdata($invitation['member_id']);
+                    return rest_ensure_response(array(
+                        'valid' => true,
+                        'type' => 'invitation',
+                        'member' => array(
+                            'id' => $invitation['member_id'],
+                            'name' => $member->display_name
+                        )
+                    ));
+                }
+            }
+            
+            // Check adult invitation codes (random alphanumeric)
+            if (defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
+                error_log('FTT Invitation validation: Checking adult invitation code');
+            }
+            // Search all users for this invite code
+            $users = get_users(array('meta_key' => 'ftt_adult_invitations'));
+            if (defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
+                error_log('FTT Invitation validation: Found ' . count($users) . ' users with adult invitations');
+            }
+            
+            foreach ($users as $user) {
+                $invitations = get_user_meta($user->ID, 'ftt_adult_invitations', true);
+                if (defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
+                    error_log('FTT Invitation validation: User ' . $user->ID . ' has ' . count($invitations) . ' invitations');
+                }
+                
+                if (is_array($invitations) && isset($invitations[$code])) {
+                    $invitation = $invitations[$code];
+                    if (defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
+                        error_log('FTT Invitation validation: Found matching invitation for user ' . $user->ID);
+                    }
+                    
+                    // Check if expired
+                    if (isset($invitation['expires']) && $invitation['expires'] < time()) {
+                        if (defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
+                            error_log('FTT Invitation validation: Invitation expired');
+                        }
+                        return rest_ensure_response(array(
+                            'valid' => false,
+                            'error' => 'expired',
+                            'message' => 'This invitation has expired'
+                        ));
+                    }
+                    
+                    // Check if already used (default to pending if not set)
+                    $status = isset($invitation['status']) ? $invitation['status'] : 'pending';
+                    if ($status !== 'pending') {
+                        if (defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
+                            error_log('FTT Invitation validation: Invitation already used, status: ' . $status);
+                        }
+                        return rest_ensure_response(array(
+                            'valid' => false,
+                            'error' => 'used',
+                            'message' => 'This invitation has already been used'
+                        ));
+                    }
+                    
+                    // Get inviter details
+                    $inviter = get_userdata($user->ID);
+                    
+                    // Get billing status - check if invitation has group_id
+                    if (defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
+                        error_log('FTT Invitation validation: Getting billing info');
+                    }
+                    $group_id = isset($invitation['group_id']) ? $invitation['group_id'] : 0;
+                    $billing_info = self::get_billing_info($user->ID, $group_id);
+                    
+                    // Get linked adults (co-parents)
+                    if (defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
+                        error_log('FTT Invitation validation: Getting linked adults');
+                    }
+                    $linked_adults = self::get_linked_adults($user->ID);
+                    
+                    if (defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
+                        error_log('FTT Invitation validation: Returning valid adult invitation');
+                    }
+                    return rest_ensure_response(array(
+                        'valid' => true,
+                        'type' => 'adult_invitation',
+                        'inviter' => array(
+                            'name' => $inviter->display_name,
+                            'email' => $inviter->user_email,
+                        ),
+                        'invitee_email' => isset($invitation['email']) ? $invitation['email'] : '',
+                        'relationship' => isset($invitation['relationship']) ? $invitation['relationship'] : 'co-parent',
+                        'expires' => date_i18n(get_option('date_format'), $invitation['expires']),
+                        'billing' => $billing_info,
+                        'linked_adults' => $linked_adults,
+                    ));
+                }
+            }
+            
+            if (defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
+                error_log('FTT Invitation validation: No valid invitation found');
+            }
+
+            // Final fallback: check ftt_group_invitations DB table (group invitations)
+            if (class_exists('FTT_Family_Groups')) {
+                global $wpdb;
+                $inv_table = $wpdb->prefix . 'ftt_group_invitations';
+                $db_invite = $wpdb->get_row($wpdb->prepare(
+                    "SELECT * FROM {$inv_table} WHERE invite_code = %s AND status = 'pending' AND expires_at > %s",
+                    $code,
+                    current_time('mysql')
+                ));
+
+                if ($db_invite) {
+                    $inviter = get_userdata($db_invite->invited_by);
+                    $group   = FTT_Family_Groups::get_group((int) $db_invite->group_id);
+                    return rest_ensure_response(array(
+                        'valid'         => true,
+                        'type'          => 'adult_invitation',
+                        'inviter'       => array(
+                            'name'  => $inviter ? $inviter->display_name : '',
+                            'email' => $inviter ? $inviter->user_email : '',
+                        ),
+                        'invitee_email' => $db_invite->email,
+                        'relationship'  => $db_invite->relationship ?: 'co-parent',
+                        'expires'       => date_i18n(get_option('date_format'), strtotime($db_invite->expires_at)),
+                        'group_name'    => $group ? $group->name : '',
+                        'billing'       => array('has_billing' => true, 'invited_user' => true),
+                        'linked_adults' => array(),
+                    ));
+                }
+            }
+
+            return rest_ensure_response(array(
+                'valid' => false,
+                'error' => 'not_found',
+                'message' => 'Invalid invitation code'
+            ));
+        } catch (Exception $e) {
+            if (defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
+                error_log('FTT Invitation validation: Exception - ' . $e->getMessage());
+                error_log('FTT Invitation validation: Stack trace - ' . $e->getTraceAsString());
+            }
+            return new WP_Error('validation_error', $e->getMessage(), array('status' => 500));
         }
+    }
+    
+    /**
+     * Get billing information for a user or group
+     */
+    private static function get_billing_info($user_id, $group_id = 0) {
+        global $wpdb;
         
-        return rest_ensure_response(array(
-            'valid' => false
-        ));
+        try {
+            if (defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
+                error_log('FTT get_billing_info: Starting for user ' . $user_id . ', group ' . $group_id);
+            }
+            
+            // If group_id is provided, get billing info from the group
+            if ($group_id > 0) {
+                $table_name = $wpdb->prefix . 'ftt_groups';
+                $group = $wpdb->get_row($wpdb->prepare(
+                    "SELECT subscription_status, billing_interval, trial_ends_at FROM $table_name WHERE id = %d",
+                    $group_id
+                ));
+                
+                if ($group && !empty($group->subscription_status)) {
+                    $status = $group->subscription_status;
+                    $interval = $group->billing_interval ?: 'monthly';
+                    
+                    if (defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
+                        error_log('FTT get_billing_info: Group Status=' . $status . ', Interval=' . $interval);
+                    }
+                    
+                    $status_labels = array(
+                        'active' => 'Active',
+                        'trialing' => 'Free Trial',
+                        'past_due' => 'Payment Past Due',
+                        'canceled' => 'Canceled',
+                        'unpaid' => 'Unpaid',
+                    );
+                    
+                    $interval_labels = array(
+                        'monthly' => 'Monthly',
+                        'yearly' => 'Yearly',
+                    );
+                    
+                    $status_text = isset($status_labels[$status]) ? $status_labels[$status] : ucfirst($status);
+                    $interval_text = isset($interval_labels[$interval]) ? $interval_labels[$interval] : ucfirst($interval);
+                    
+                    return array(
+                        'status' => $status,
+                        'status_label' => $status_text,
+                        'interval' => $interval,
+                        'interval_label' => $interval_text,
+                        'message' => $status_text . ' (' . $interval_text . ')'
+                    );
+                }
+            }
+            
+            // Fallback to legacy user-based billing
+            $status = get_user_meta($user_id, 'ftt_subscription_status', true);
+            $interval = get_user_meta($user_id, 'ftt_subscription_interval', true);
+            
+            if (defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
+                error_log('FTT get_billing_info: Status=' . ($status ?: 'EMPTY') . ', Interval=' . ($interval ?: 'EMPTY'));
+            }
+            
+            // If no subscription data, assume trial or no billing required
+            if (empty($status)) {
+                if (defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
+                    error_log('FTT get_billing_info: No subscription found, returning trial/free');
+                }
+                return array(
+                    'status' => 'trialing',
+                    'interval' => 'monthly',
+                    'message' => 'Free Trial'
+                );
+            }
+            
+            $status_labels = array(
+                'active' => 'Active',
+                'trialing' => 'Free Trial',
+                'past_due' => 'Payment Past Due',
+                'canceled' => 'Canceled',
+                'unpaid' => 'Unpaid',
+            );
+            
+            $interval_labels = array(
+                'month' => 'Monthly',
+                'year' => 'Yearly',
+            );
+            
+            $interval = $interval ?: 'month';
+            
+            $status_text = strtolower(isset($status_labels[$status]) ? $status_labels[$status] : 'active');
+            $interval_text = strtolower(isset($interval_labels[$interval]) ? $interval_labels[$interval] : 'monthly');
+            
+            // Use correct article (a/an) based on first letter
+            $article = (in_array($status_text[0], ['a', 'e', 'i', 'o', 'u'])) ? 'an' : 'a';
+            
+            $result = array(
+                'status' => $status,
+                'status_label' => isset($status_labels[$status]) ? $status_labels[$status] : 'Unknown',
+                'interval' => $interval,
+                'interval_label' => isset($interval_labels[$interval]) ? $interval_labels[$interval] : 'Monthly',
+                'message' => sprintf(
+                    'This group has %s %s subscription billed %s',
+                    $article,
+                    $status_text,
+                    $interval_text
+                )
+            );
+            
+            if (defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
+                error_log('FTT get_billing_info: Returning - ' . print_r($result, true));
+            }
+            return $result;
+        } catch (Exception $e) {
+            if (defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
+                error_log('FTT get_billing_info: Exception - ' . $e->getMessage());
+            }
+            return array(
+                'status' => 'unknown',
+                'interval' => 'unknown',
+                'message' => 'Join this family calendar group'
+            );
+        }
+    }
+    
+    /**
+     * Get linked adults (co-parents) for a user
+     */
+    private static function get_linked_adults($user_id) {
+        try {
+            if (defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
+                error_log('FTT get_linked_adults: Starting for user ' . $user_id);
+            }
+            
+            $parents = get_user_meta($user_id, 'ftt_parents', true);
+            if (defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
+                error_log('FTT get_linked_adults: ftt_parents meta - ' . print_r($parents, true));
+            }
+            
+            if (!is_array($parents) || empty($parents)) {
+                if (defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
+                    error_log('FTT get_linked_adults: No parents found, returning empty');
+                }
+                return array();
+            }
+            
+            $linked = array();
+            foreach ($parents as $parent_id) {
+                if (defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
+                    error_log('FTT get_linked_adults: Processing parent_id ' . $parent_id);
+                }
+                $parent = get_userdata($parent_id);
+                if ($parent) {
+                    $relationship = get_user_meta($user_id, 'relationship_to_' . $parent_id, true);
+                    $linked[] = array(
+                        'name' => $parent->display_name,
+                        'relationship' => $relationship ?: 'Co-parent',
+                    );
+                    if (defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
+                        error_log('FTT get_linked_adults: Added parent - ' . $parent->display_name);
+                    }
+                }
+            }
+            
+            if (defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
+                error_log('FTT get_linked_adults: Returning ' . count($linked) . ' linked adults');
+            }
+            return $linked;
+        } catch (Exception $e) {
+            if (defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
+                error_log('FTT get_linked_adults: Exception - ' . $e->getMessage());
+            }
+            return array();
+        }
     }
 }
 
 // Initialize
-SRT_Invitations::init();
+FTT_Invitations::init();

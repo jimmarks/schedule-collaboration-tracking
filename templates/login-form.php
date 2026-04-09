@@ -2,7 +2,7 @@
 /**
  * Custom Login Form Template
  *
- * @package Summer_Regiment_Tracker
+ * @package Family_Travel_Tracker
  */
 
 // Exit if accessed directly
@@ -10,22 +10,44 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-// If user is already logged in, redirect to dashboard
+// If user is already logged in, show message or redirect based on context
 if (is_user_logged_in()) {
-    wp_redirect(home_url('/sc-dashboard/'));
-    exit;
+    // Check if we're in a shortcode rendering context (ob_get_level > 1)
+    // If so, return message instead of redirecting to avoid breaking page render
+    if (ob_get_level() > 1) {
+        ?>
+        <div class="ftt-login-wrapper">
+            <div class="ftt-login-container">
+                <div class="ftt-login-message ftt-success">
+                    <span class="dashicons dashicons-yes-alt"></span>
+                    <p><?php esc_html_e('You are already logged in.', 'schedule-collaboration-tracking'); ?></p>
+                    <p><a href="<?php echo esc_url(home_url('/ftt-dashboard/')); ?>" class="ftt-btn ftt-btn-primary"><?php esc_html_e('Go to Dashboard', 'schedule-collaboration-tracking'); ?></a></p>
+                </div>
+            </div>
+        </div>
+        <?php
+        return;
+    } else {
+        // Direct page access - safe to redirect
+        wp_redirect(home_url('/ftt-dashboard/'));
+        exit;
+    }
 }
 
 // Get redirect destination
-$redirect_to = isset($_GET['redirect_to']) ? esc_url_raw($_GET['redirect_to']) : home_url('/sc-dashboard/');
+$redirect_to = isset($_GET['redirect_to']) ? esc_url_raw($_GET['redirect_to']) : home_url('/ftt-dashboard/');
 
 $login_url = wp_login_url($redirect_to);
-$register_url = home_url('/sc-register/');
+$register_url = home_url('/ftt-register/');
 $lost_password_url = wp_lostpassword_url($redirect_to);
 
 // Check for login errors/messages
 $login_errors = array();
 $login_message = '';
+
+if (isset($_GET['access_denied']) && $_GET['access_denied'] === '1') {
+    $login_errors[] = '<strong>Access Denied:</strong> Your account access has been restricted by an administrator. Please contact support at <a href="mailto:support@familytraveltracker.app">support@familytraveltracker.app</a> for assistance.';
+}
 
 if (isset($_GET['login']) && $_GET['login'] === 'failed') {
     $login_errors[] = 'Invalid username or password. Please try again.';
@@ -52,22 +74,22 @@ if (isset($_GET['checkemail']) && $_GET['checkemail'] === 'confirm') {
 }
 ?>
 
-<div class="srt-login-wrapper">
-    <div class="srt-login-container">
-        <div class="srt-login-header">
+<div class="ftt-login-wrapper">
+    <div class="ftt-login-container">
+        <div class="ftt-login-header">
             <h1>Schedule Login</h1>
             <p>Sign in to access your schedule and flight tracking</p>
         </div>
         
         <?php if (!empty($login_message)): ?>
-            <div class="srt-login-message srt-success">
+            <div class="ftt-login-message ftt-success">
                 <span class="dashicons dashicons-yes-alt"></span>
                 <?php echo esc_html($login_message); ?>
             </div>
         <?php endif; ?>
         
         <?php if (!empty($login_errors)): ?>
-            <div class="srt-login-message srt-error">
+            <div class="ftt-login-message ftt-error">
                 <span class="dashicons dashicons-warning"></span>
                 <?php foreach ($login_errors as $error): ?>
                     <p><?php echo esc_html($error); ?></p>
@@ -75,24 +97,24 @@ if (isset($_GET['checkemail']) && $_GET['checkemail'] === 'confirm') {
             </div>
         <?php endif; ?>
         
-        <form name="loginform" id="srt-loginform" action="<?php echo esc_url(site_url('wp-login.php', 'login_post')); ?>" method="post">
-            <div class="srt-form-field">
+        <form name="loginform" id="ftt-loginform" action="<?php echo esc_url(site_url('wp-login.php', 'login_post')); ?>" method="post">
+            <div class="ftt-form-field">
                 <label for="user_login">
                     <span class="dashicons dashicons-admin-users"></span>
                     Username or Email
                 </label>
-                <input type="text" name="log" id="user_login" class="srt-input" value="" size="20" autocapitalize="off" required />
+                <input type="text" name="log" id="user_login" class="ftt-input" value="" size="20" autocapitalize="off" required />
             </div>
             
-            <div class="srt-form-field">
+            <div class="ftt-form-field">
                 <label for="user_pass">
                     <span class="dashicons dashicons-lock"></span>
                     Password
                 </label>
-                <input type="password" name="pwd" id="user_pass" class="srt-input" value="" size="20" required />
+                <input type="password" name="pwd" id="user_pass" class="ftt-input" value="" size="20" required />
             </div>
             
-            <div class="srt-form-field srt-remember-me">
+            <div class="ftt-form-field ftt-remember-me">
                 <label>
                     <input name="rememberme" type="checkbox" id="rememberme" value="forever" />
                     Remember Me
@@ -100,23 +122,68 @@ if (isset($_GET['checkemail']) && $_GET['checkemail'] === 'confirm') {
             </div>
             
             <input type="hidden" name="redirect_to" value="<?php echo esc_attr($redirect_to); ?>" />
+            <input type="hidden" name="ftt_custom_login" value="1" />
             <input type="hidden" name="testcookie" value="1" />
             
-            <div class="srt-form-actions">
-                <button type="submit" name="wp-submit" id="wp-submit" class="srt-btn srt-btn-primary">
+            <?php
+            // reCAPTCHA v3 integration — invisible, token injected on submit
+            $settings = get_option('ftt_settings', array());
+            $enable_recaptcha = $settings['enable_recaptcha'] ?? false;
+            $recaptcha_site_key = $settings['recaptcha_site_key'] ?? '';
+            
+            if ($enable_recaptcha && !empty($recaptcha_site_key)) :
+            ?>
+            <!-- Google reCAPTCHA v3 hidden token field -->
+            <input type="hidden" name="g-recaptcha-response" id="ftt-login-recaptcha-token" value="">
+            <?php endif; ?>
+            
+            <div class="ftt-form-actions">
+                <button type="submit" name="wp-submit" id="wp-submit" class="ftt-btn ftt-btn-primary">
                     <span class="dashicons dashicons-unlock"></span>
                     Log In
                 </button>
             </div>
-        </form>
+
+            <?php
+            // Passive policy acknowledgment notice
+            $ftt_login_s = get_option('ftt_settings', []);
+            $ftt_privacy_url = '';
+            $ftt_terms_url   = '';
+            if ( ! empty( $ftt_login_s['policy_privacy_page'] ) ) {
+                $ftt_privacy_url = get_permalink( (int) $ftt_login_s['policy_privacy_page'] );
+            }
+            if ( ! empty( $ftt_login_s['policy_terms_page'] ) ) {
+                $ftt_terms_url = get_permalink( (int) $ftt_login_s['policy_terms_page'] );
+            }
+            $ftt_policy_links = [];
+            if ( $ftt_terms_url ) {
+                $ftt_policy_links[] = '<a href="' . esc_url($ftt_terms_url) . '" target="_blank">' . esc_html__('Terms of Service', 'schedule-collaboration-tracking') . '</a>';
+            }
+            if ( $ftt_privacy_url ) {
+                $ftt_policy_links[] = '<a href="' . esc_url($ftt_privacy_url) . '" target="_blank">' . esc_html__('Privacy Policy', 'schedule-collaboration-tracking') . '</a>';
+            }
+            ?>
+            <p class="ftt-login-policy-notice" style="font-size:12px;color:#888;text-align:center;margin:12px 0 0;line-height:1.5;">
+                <?php
+                if ( ! empty( $ftt_policy_links ) ) {
+                    printf(
+                        /* translators: %s = comma-separated policy links */
+                        esc_html__('By logging in, you confirm your continued acceptance of the %s accepted at registration.', 'schedule-collaboration-tracking'),
+                        implode( ' ' . esc_html__('and', 'schedule-collaboration-tracking') . ' ', $ftt_policy_links ) // phpcs:ignore WordPress.Security.EscapeOutput -- links already escaped above
+                    );
+                } else {
+                    esc_html_e('By logging in, you confirm your continued acceptance of the policies accepted at registration.', 'schedule-collaboration-tracking');
+                }
+                ?>
+            </p>
         
-        <div class="srt-login-links">
-            <a href="<?php echo esc_url($lost_password_url); ?>" class="srt-link">
+        <div class="ftt-login-links">
+            <a href="<?php echo esc_url($lost_password_url); ?>" class="ftt-link">
                 <span class="dashicons dashicons-sos"></span>
                 Forgot Password?
             </a>
-            <span class="srt-separator">|</span>
-            <a href="<?php echo esc_url($register_url); ?>" class="srt-link">
+            <span class="ftt-separator">|</span>
+            <a href="<?php echo esc_url($register_url); ?>" class="ftt-link">
                 <span class="dashicons dashicons-admin-users"></span>
                 Create Account
             </a>
@@ -125,7 +192,7 @@ if (isset($_GET['checkemail']) && $_GET['checkemail'] === 'confirm') {
 </div>
 
 <style>
-.srt-login-wrapper {
+.ftt-login-wrapper {
     display: flex;
     justify-content: center;
     align-items: center;
@@ -133,7 +200,7 @@ if (isset($_GET['checkemail']) && $_GET['checkemail'] === 'confirm') {
     padding: 40px 20px;
 }
 
-.srt-login-container {
+.ftt-login-container {
     background: #fff;
     border-radius: 12px;
     box-shadow: 0 4px 20px rgba(0,0,0,0.1);
@@ -142,25 +209,25 @@ if (isset($_GET['checkemail']) && $_GET['checkemail'] === 'confirm') {
     width: 100%;
 }
 
-.srt-login-header {
+.ftt-login-header {
     text-align: center;
     margin-bottom: 30px;
 }
 
-.srt-login-header h1 {
-    color: #0066cc;
+.ftt-login-header h1 {
+    color: #6A3E8E;
     font-size: 28px;
     margin: 0 0 10px 0;
     font-weight: 600;
 }
 
-.srt-login-header p {
+.ftt-login-header p {
     color: #666;
     font-size: 14px;
     margin: 0;
 }
 
-.srt-login-message {
+.ftt-login-message {
     padding: 15px;
     border-radius: 6px;
     margin-bottom: 20px;
@@ -169,32 +236,32 @@ if (isset($_GET['checkemail']) && $_GET['checkemail'] === 'confirm') {
     gap: 10px;
 }
 
-.srt-login-message .dashicons {
+.ftt-login-message .dashicons {
     flex-shrink: 0;
     margin-top: 2px;
 }
 
-.srt-login-message.srt-success {
+.ftt-login-message.ftt-success {
     background: #d4edda;
     color: #155724;
     border: 1px solid #c3e6cb;
 }
 
-.srt-login-message.srt-error {
+.ftt-login-message.ftt-error {
     background: #f8d7da;
     color: #721c24;
     border: 1px solid #f5c6cb;
 }
 
-.srt-login-message p {
+.ftt-login-message p {
     margin: 0;
 }
 
-#srt-loginform .srt-form-field {
+#ftt-loginform .ftt-form-field {
     margin-bottom: 20px;
 }
 
-#srt-loginform label {
+#ftt-loginform label {
     display: block;
     font-weight: 500;
     color: #333;
@@ -204,44 +271,44 @@ if (isset($_GET['checkemail']) && $_GET['checkemail'] === 'confirm') {
     gap: 8px;
 }
 
-#srt-loginform label .dashicons {
-    color: #0066cc;
+#ftt-loginform label .dashicons {
+    color: #6A3E8E;
     font-size: 18px;
     width: 18px;
     height: 18px;
 }
 
-#srt-loginform .srt-input {
+#ftt-loginform .ftt-input {
     width: 100%;
     padding: 12px 15px;
-    border: 2px solid #ddd;
+    border: 2px solid #E9E3F2;
     border-radius: 6px;
     font-size: 15px;
     transition: all 0.2s;
 }
 
-#srt-loginform .srt-input:focus {
+#ftt-loginform .ftt-input:focus {
     outline: none;
-    border-color: #0066cc;
-    box-shadow: 0 0 0 3px rgba(0,102,204,0.1);
+    border-color: #6A3E8E;
+    box-shadow: 0 0 0 3px rgba(106,62,142,0.1);
 }
 
-.srt-remember-me label {
+.ftt-remember-me label {
     font-weight: normal;
     font-size: 14px;
     color: #666;
     cursor: pointer;
 }
 
-.srt-remember-me input[type="checkbox"] {
+.ftt-remember-me input[type="checkbox"] {
     margin-right: 6px;
 }
 
-.srt-form-actions {
+.ftt-form-actions {
     margin-top: 25px;
 }
 
-.srt-btn {
+.ftt-btn {
     width: 100%;
     padding: 14px 20px;
     border: none;
@@ -256,33 +323,33 @@ if (isset($_GET['checkemail']) && $_GET['checkemail'] === 'confirm') {
     gap: 8px;
 }
 
-.srt-btn-primary {
-    background: #0066cc;
+.ftt-btn-primary {
+    background: #F05A5A;
     color: #fff;
 }
 
-.srt-btn-primary:hover {
-    background: #0052a3;
+.ftt-btn-primary:hover {
+    background: #E84E4E;
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0,102,204,0.3);
+    box-shadow: 0 4px 12px rgba(240,90,90,0.3);
 }
 
-.srt-btn .dashicons {
+.ftt-btn .dashicons {
     font-size: 20px;
     width: 20px;
     height: 20px;
 }
 
-.srt-login-links {
+.ftt-login-links {
     margin-top: 25px;
     padding-top: 25px;
-    border-top: 1px solid #e0e0e0;
+    border-top: 1px solid #E9E3F2;
     text-align: center;
     font-size: 14px;
 }
 
-.srt-login-links .srt-link {
-    color: #0066cc;
+.ftt-login-links .ftt-link {
+    color: #6A3E8E;
     text-decoration: none;
     display: inline-flex;
     align-items: center;
@@ -290,29 +357,56 @@ if (isset($_GET['checkemail']) && $_GET['checkemail'] === 'confirm') {
     transition: color 0.2s;
 }
 
-.srt-login-links .srt-link:hover {
-    color: #0052a3;
+.ftt-login-links .ftt-link:hover {
+    color: #5B347A;
     text-decoration: underline;
 }
 
-.srt-login-links .srt-link .dashicons {
+.ftt-login-links .ftt-link .dashicons {
     font-size: 16px;
     width: 16px;
     height: 16px;
 }
 
-.srt-separator {
+.ftt-separator {
     color: #ccc;
     margin: 0 10px;
 }
 
 @media (max-width: 600px) {
-    .srt-login-container {
+    .ftt-login-container {
         padding: 30px 20px;
     }
     
-    .srt-login-header h1 {
+    .ftt-login-header h1 {
         font-size: 24px;
     }
 }
 </style>
+<?php
+// Load reCAPTCHA v3 script if enabled
+$settings = get_option('ftt_settings', array());
+$enable_recaptcha = $settings['enable_recaptcha'] ?? false;
+$recaptcha_site_key = $settings['recaptcha_site_key'] ?? '';
+
+if ($enable_recaptcha && !empty($recaptcha_site_key)) :
+?>
+<script src="https://www.google.com/recaptcha/api.js?render=<?php echo esc_attr($recaptcha_site_key); ?>" async defer></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var form = document.querySelector('.ftt-login-form');
+    if (!form) return;
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        var submitBtn = form.querySelector('[type="submit"]');
+        if (submitBtn) submitBtn.disabled = true;
+        grecaptcha.ready(function() {
+            grecaptcha.execute('<?php echo esc_js($recaptcha_site_key); ?>', {action: 'login'}).then(function(token) {
+                document.getElementById('ftt-login-recaptcha-token').value = token;
+                form.submit();
+            });
+        });
+    });
+});
+</script>
+<?php endif; ?>

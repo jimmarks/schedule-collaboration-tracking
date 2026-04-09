@@ -318,12 +318,12 @@ Override plugin styles in your theme:
 
 ```css
 /* Override event type colors */
-.srt-event-type-performance_day {
+.ftt-event-type-performance_day {
     background-color: #your-color !important;
 }
 
 /* Customize dashboard items */
-.srt-dashboard-item {
+.ftt-dashboard-item {
     /* Your custom styles */
 }
 ```

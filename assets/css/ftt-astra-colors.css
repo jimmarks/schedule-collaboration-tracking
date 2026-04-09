@@ -1,0 +1,335 @@
+/**
+ * Family Travel Tracker - Astra Theme Color Integration
+ * 
+ * This overrides plugin colors to match the Astra theme color scheme:
+ * - Primary Plum: #6A3E8E
+ * - Primary Hover: #5B347A
+ * - Coral Accent: #F05A5A
+ * - Coral Hover: #E84E4E
+ * - Light Purple Border: #E9E3F2
+ * - Body Text: #333333
+ * 
+ * @package Family_Travel_Tracker
+ */
+
+/* ==================== Primary Colors (Plum) ==================== */
+
+/* Links and primary accents */
+.ftt-back-link a,
+.ftt-dashboard-item h4,
+.ftt-event-item h3,
+.ftt-modal-content h2,
+.ftt-modal-content h3,
+.ftt-dashboard-section h4 .dashicons,
+.ftt-setting-card:hover {
+    color: #6A3E8E !important;
+    border-color: #6A3E8E !important;
+}
+
+.ftt-back-link a:hover {
+    color: #5B347A !important;
+}
+
+/* Section borders and headers */
+.ftt-form-section h3,
+.ftt-dashboard-section h3 {
+    border-bottom-color: #6A3E8E !important;
+}
+
+/* Primary buttons */
+.ftt-add-button,
+.ftt-button-primary,
+.button-primary,
+.ftt-code-form .button-primary {
+    background: #6A3E8E !important;
+    border-color: #6A3E8E !important;
+    color: #FFFFFF !important;
+}
+
+.ftt-add-button:hover,
+.ftt-button-primary:hover,
+.button-primary:hover,
+.ftt-code-form .button-primary:hover {
+    background: #5B347A !important;
+    border-color: #5B347A !important;
+}
+
+/* Dashboard member badges */
+.ftt-member-name {
+    background: #E9E3F2 !important;
+    color: #6A3E8E !important;
+}
+
+.ftt-calendar-member-name {
+    color: #6A3E8E !important;
+}
+
+/* Form inputs on focus */
+.ftt-input-large:focus,
+.ftt-select-large:focus,
+.ftt-code-input:focus {
+    border-color: #6A3E8E !important;
+    box-shadow: 0 0 0 1px #6A3E8E !important;
+}
+
+/* Event hover states */
+.ftt-dashboard-item:hover {
+    border-color: #6A3E8E !important;
+    box-shadow: 0 2px 8px rgba(106, 62, 142, 0.1) !important;
+}
+
+.ftt-event-item:hover {
+    border-color: #6A3E8E !important;
+}
+
+/* Setting cards */
+.ftt-setting-card:hover {
+    box-shadow: 0 2px 8px rgba(106, 62, 142, 0.1) !important;
+}
+
+/* ==================== Coral Action Buttons ==================== */
+
+/* Danger/Remove buttons use Coral */
+.ftt-remove-block,
+.ftt-button-danger,
+.ftt-revoke-invite,
+.ftt-unlink-flight-btn {
+    background: #F05A5A !important;
+    border-color: #F05A5A !important;
+    color: #FFFFFF !important;
+}
+
+.ftt-remove-block:hover,
+.ftt-button-danger:hover,
+.ftt-revoke-invite:hover,
+.ftt-unlink-flight-btn:hover {
+    background: #E84E4E !important;
+    border-color: #E84E4E !important;
+}
+
+/* ==================== Gradients ==================== */
+
+/* Primary gradient - Plum */
+.ftt-setting-icon {
+    background: linear-gradient(135deg, #6A3E8E, #5B347A) !important;
+}
+
+/* Light background gradient - Soft purple */
+.ftt-setting-action {
+    background: linear-gradient(135deg, #F8F5FB, #E9E3F2) !important;
+    border-color: #6A3E8E !important;
+}
+
+/* Member code card - Purple gradient */
+.ftt-member-code-card {
+    background: linear-gradient(135deg, #6A3E8E 0%, #5B347A 100%) !important;
+}
+
+.ftt-member-code-card .button {
+    background: white !important;
+    color: #6A3E8E !important;
+}
+
+.ftt-member-code-card .button:hover {
+    background: rgba(255, 255, 255, 0.9) !important;
+}
+
+/* ==================== Borders and Backgrounds ==================== */
+
+/* Light purple borders */
+.ftt-child-filter {
+    background: #F8F5FB !important;
+    border: 1px solid #E9E3F2 !important;
+}
+
+.ftt-filter-item {
+    background: #ffffff !important;
+    border: 1px solid #E9E3F2 !important;
+}
+
+.ftt-filter-item:hover {
+    background: #F8F5FB !important;
+    border-color: #6A3E8E !important;
+}
+
+/* Form sections */
+.ftt-form-section,
+.ftt-dashboard-section {
+    border: 1px solid #E9E3F2 !important;
+}
+
+.ftt-time-block,
+.ftt-travel-leg {
+    background: #F8F5FB !important;
+    border: 1px solid #E9E3F2 !important;
+}
+
+/* Event items */
+.ftt-event-item {
+    border: 1px solid #E9E3F2 !important;
+}
+
+.ftt-event-item:hover {
+    background: #F8F5FB !important;
+}
+
+/* Dashboard items */
+.ftt-dashboard-item {
+    background: #F8F5FB !important;
+    border: 1px solid #E9E3F2 !important;
+}
+
+.ftt-dashboard-item:hover {
+    background: #FFFFFF !important;
+}
+
+/* ==================== Text Colors ==================== */
+
+/* Body text */
+.ftt-child-name,
+.ftt-dashboard-item p,
+.ftt-event-item .ftt-event-meta,
+.ftt-help-text,
+.description {
+    color: #333333 !important;
+}
+
+.ftt-child-filter h3 {
+    color: #6A3E8E !important;
+}
+
+/* ==================== Success States (Keep Green) ==================== */
+
+/* Success colors stay green for clarity */
+.ftt-link-flight-btn {
+    background: #4CAF50 !important;
+}
+
+.ftt-link-flight-btn:hover {
+    background: #45a049 !important;
+}
+
+.ftt-linked-flight-group {
+    background: #d4edda !important;
+    border-color: #4CAF50 !important;
+}
+
+.ftt-linked-flight-title,
+.ftt-invite-accepted .ftt-invitation-status {
+    color: #28a745 !important;
+}
+
+.ftt-price-savings,
+.ftt-booked {
+    color: #28a745 !important;
+}
+
+.ftt-message.success {
+    background: #d4edda !important;
+    color: #155724 !important;
+    border: 1px solid #c3e6cb !important;
+}
+
+/* ==================== Alert/Warning States ==================== */
+
+/* Alerts use warm coral-adjacent colors */
+.ftt-flight-suggestions {
+    background: #FFF3E0 !important;
+    border-color: #F05A5A !important;
+}
+
+.ftt-flight-suggestions h5 {
+    color: #C84438 !important;
+}
+
+.ftt-suggestion-card {
+    border-color: #E9E3F2 !important;
+}
+
+.ftt-invite-pending {
+    border-left-color: #F05A5A !important;
+}
+
+.ftt-invite-pending .ftt-invitation-status {
+    color: #F05A5A !important;
+}
+
+/* Error messages */
+.ftt-message.error {
+    background: #f8d7da !important;
+    color: #721c24 !important;
+    border: 1px solid #f5c6cb !important;
+}
+
+/* ==================== Badges ==================== */
+
+/* Alert badges */
+.ftt-alert-badge {
+    background: #E9E3F2 !important;
+    color: #6A3E8E !important;
+}
+
+/* Flight badges */
+.ftt-flight-leg-badge {
+    background: #E9E3F2 !important;
+    color: #6A3E8E !important;
+}
+
+.ftt-event-badge-flight {
+    background: #6A3E8E !important;
+    color: white !important;
+}
+
+.ftt-event-badge-travel {
+    background: #F05A5A !important;
+    color: white !important;
+}
+
+/* ==================== Invitation Cards ==================== */
+
+.ftt-invitation-card {
+    border: 1px solid #E9E3F2 !important;
+}
+
+.ftt-invitation-card:hover {
+    box-shadow: 0 4px 8px rgba(106, 62, 142, 0.1) !important;
+}
+
+.ftt-invitation-code {
+    background: #E9E3F2 !important;
+    color: #6A3E8E !important;
+}
+
+/* ==================== Modal ==================== */
+
+.ftt-modal {
+    background-color: rgba(106, 62, 142, 0.3) !important;
+}
+
+.ftt-modal-content {
+    border: 1px solid #E9E3F2 !important;
+}
+
+.ftt-travel-leg-details {
+    background: #F8F5FB !important;
+}
+
+/* ==================== Booking Section ==================== */
+
+.ftt-booking-section {
+    background: #F8F5FB !important;
+}
+
+.ftt-booking-details {
+    border-top: 1px solid #E9E3F2 !important;
+}
+
+/* ==================== Responsive Utilities ==================== */
+
+/* Maintain color scheme on mobile */
+@media (max-width: 768px) {
+    .ftt-dashboard-item:hover {
+        background: #FFFFFF !important;
+        border-color: #6A3E8E !important;
+    }
+}

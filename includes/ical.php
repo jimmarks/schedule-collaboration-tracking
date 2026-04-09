@@ -2,7 +2,7 @@
 /**
  * iCalendar Feed Generation
  *
- * @package Summer_Regiment_Tracker
+ * @package Family_Travel_Tracker
  */
 
 // Exit if accessed directly
@@ -13,7 +13,7 @@ if (!defined('ABSPATH')) {
 /**
  * Class for generating iCalendar feeds
  */
-class SRT_ICal {
+class FTT_ICal {
     
     /**
      * Initialize hooks
@@ -28,7 +28,7 @@ class SRT_ICal {
      */
     public static function handle_calendar_request() {
         // Check if this is a calendar feed request
-        if (!isset($_GET['srt_calendar']) || $_GET['srt_calendar'] != '1') {
+        if (!isset($_GET['ftt_calendar']) || $_GET['ftt_calendar'] != '1') {
             return;
         }
         
@@ -42,10 +42,48 @@ class SRT_ICal {
         }
         
         // Check if user exists and token matches
-        $stored_token = get_user_meta($user_id, 'srt_calendar_token', true);
+        $stored_token = get_user_meta($user_id, 'ftt_calendar_token', true);
         
         if ($token !== $stored_token) {
             wp_die('Invalid or expired calendar token. Please generate a new subscription link from the calendar page.', 'Invalid Token', array('response' => 403));
+        }
+        
+        // Check if Stripe is configured and validate subscription
+        $stripe_settings = get_option('ftt_stripe_settings', []);
+        $mode = $stripe_settings['mode'] ?? 'test';
+        $secret_key = $mode === 'live' 
+            ? ($stripe_settings['live_secret_key'] ?? '')
+            : ($stripe_settings['test_secret_key'] ?? '');
+        
+        if (!empty($secret_key) && !empty($stripe_settings['price_base_monthly'])) {
+            // Skip check for admins and billing-exempt users
+            $skip_billing_check = user_can($user_id, 'manage_options')
+                || (class_exists('FTT_Billing_Manager') && FTT_Billing_Manager::is_billing_exempt($user_id));
+            if (!$skip_billing_check) {
+                // Check for admin-imposed access denial
+                $access_denied = get_user_meta($user_id, 'ftt_access_denied', true);
+                if ($access_denied) {
+                    wp_die('Calendar access denied. Please contact support.', 'Access Denied', array('response' => 403));
+                }
+
+                // v2.1+: use group-based access check (trial, active Stripe subscription, etc.)
+                if (class_exists('FTT_Family_Groups') && method_exists('FTT_Family_Groups', 'user_has_group_access')) {
+                    if (!FTT_Family_Groups::user_has_group_access($user_id)) {
+                        wp_die('Calendar access requires an active subscription. Please visit the website to upgrade.', 'Subscription Required', array('response' => 402));
+                    }
+                } else {
+                    // Legacy fallback: per-user subscription meta
+                    $status = get_user_meta($user_id, 'ftt_subscription_status', true);
+                    $blocked_statuses = ['suspended', 'incomplete', 'incomplete_expired'];
+                    if (empty($status) || in_array($status, $blocked_statuses)) {
+                        wp_die('Calendar access requires an active subscription. Please visit the website to upgrade.', 'Subscription Required', array('response' => 402));
+                    }
+                    $period_end = get_user_meta($user_id, 'ftt_current_period_end', true);
+                    if (!empty($period_end) && strtotime($period_end) < time()) {
+                        wp_die('Calendar access expired. Please renew your subscription at the website.', 'Subscription Expired', array('response' => 402));
+                    }
+                }
+            }
         }
         
         // Valid token - generate calendar feed
@@ -57,7 +95,7 @@ class SRT_ICal {
         
         // Get events for this user
         $args = array(
-            'post_type' => 'srt_event',
+            'post_type' => 'ftt_event',
             'post_status' => 'publish',
             'posts_per_page' => -1,
             'orderby' => 'meta_value',
@@ -67,38 +105,41 @@ class SRT_ICal {
         
         // Filter events by user (unless admin)
         if (!user_can($user_id, 'manage_options')) {
-            // Check if user is a parent
-            $child_ids = get_user_meta($user_id, 'srt_children', true);
-            
-            if (!empty($child_ids) && is_array($child_ids)) {
-                // Parent - show their children's events
-                $member_ids = $child_ids;
-                $member_ids[] = $user_id; // Include parent's own events
-                
-                $args['meta_query'] = array(
-                    array(
-                        'key'     => 'member_id',
-                        'value'   => $member_ids,
-                        'compare' => 'IN',
-                    ),
-                );
+            // Collect all member IDs visible to this user across ALL groups
+            $visible_member_ids = array( $user_id );
+
+            if ( class_exists('FTT_Family_Groups') ) {
+                $user_groups = FTT_Family_Groups::get_user_groups( $user_id );
+                foreach ( $user_groups as $group ) {
+                    $members = FTT_Family_Groups::get_group_members( $group->id );
+                    foreach ( $members as $member ) {
+                        $visible_member_ids[] = intval( $member->user_id );
+                    }
+                }
             } else {
-                // Member - show only their events
-                $args['meta_query'] = array(
-                    array(
-                        'key'     => 'member_id',
-                        'value'   => $user_id,
-                        'compare' => '=',
-                    ),
-                );
+                // Fallback: legacy user meta parent-of relationship
+                $child_ids = get_user_meta( $user_id, 'ftt_parent_of', true );
+                if ( !empty($child_ids) && is_array($child_ids) ) {
+                    $visible_member_ids = array_merge( $visible_member_ids, array_map('intval', $child_ids) );
+                }
             }
+
+            $visible_member_ids = array_unique( $visible_member_ids );
+
+            $args['meta_query'] = array(
+                array(
+                    'key'     => 'member_id',
+                    'value'   => $visible_member_ids,
+                    'compare' => 'IN',
+                ),
+            );
         }
         // Admins get all events (no filter)
         
         $events = get_posts($args);
         
-        // Generate iCal content
-        $ical = self::generate_ical($events);
+        // Generate iCal content using this user's personal timezone
+        $ical = self::generate_ical($events, $user_id);
         
         // Set headers for .ics file
         header('Content-Type: text/calendar; charset=utf-8');
@@ -115,14 +156,14 @@ class SRT_ICal {
      */
     public static function register_routes() {
         // Public calendar feed
-        register_rest_route('srt/v1', '/calendar.ics', array(
+        register_rest_route('ftt/v1', '/calendar.ics', array(
             'methods' => 'GET',
             'callback' => array(__CLASS__, 'get_calendar_feed'),
             'permission_callback' => array(__CLASS__, 'check_calendar_permission'),
         ));
         
         // Generate new calendar token (admin only)
-        register_rest_route('srt/v1', '/calendar/token', array(
+        register_rest_route('ftt/v1', '/calendar/token', array(
             'methods' => 'POST',
             'callback' => array(__CLASS__, 'generate_calendar_token'),
             'permission_callback' => function() {
@@ -135,7 +176,7 @@ class SRT_ICal {
      * Check calendar permission
      */
     public static function check_calendar_permission($request) {
-        $settings = get_option('srt_settings', array());
+        $settings = get_option('ftt_settings', array());
         
         // Check if calendar feed is enabled
         if (empty($settings['enable_ical_feed'])) {
@@ -150,7 +191,7 @@ class SRT_ICal {
                 return new WP_Error('auth_required', 'Authentication token required', array('status' => 401));
             }
             
-            $valid_tokens = get_option('srt_calendar_tokens', array());
+            $valid_tokens = get_option('ftt_calendar_tokens', array());
             
             if (!in_array($token, $valid_tokens)) {
                 return new WP_Error('invalid_token', 'Invalid authentication token', array('status' => 403));
@@ -166,7 +207,7 @@ class SRT_ICal {
     public static function get_calendar_feed($request) {
         // Get all published events
         $args = array(
-            'post_type' => 'srt_event',
+            'post_type' => 'ftt_event',
             'post_status' => 'publish',
             'posts_per_page' => -1,
             'orderby' => 'meta_value',
@@ -190,9 +231,14 @@ class SRT_ICal {
     /**
      * Generate iCalendar content
      */
-    public static function generate_ical($events) {
-        $settings = get_option('srt_settings', array());
-        $timezone = $settings['default_timezone'] ?? wp_timezone_string();
+    public static function generate_ical($events, $user_id = 0) {
+        // Use the requesting user's personal timezone when available
+        if ($user_id && class_exists('FTT_User_Profile')) {
+            $timezone = FTT_User_Profile::get_user_timezone($user_id);
+        } else {
+            $settings = get_option('ftt_settings', array());
+            $timezone = $settings['default_timezone'] ?? wp_timezone_string();
+        }
         $site_name = get_bloginfo('name');
         
         // Start iCal file
@@ -292,7 +338,7 @@ class SRT_ICal {
         $uid = $post_id . '@' . parse_url(home_url(), PHP_URL_HOST);
         
         // Get event type label
-        $event_types = SRT_CPT::get_event_types();
+        $event_types = FTT_CPT::get_event_types();
         $type_label = $event_types[$event_type] ?? 'Event';
         
         // Build description
@@ -460,15 +506,15 @@ class SRT_ICal {
     public static function generate_calendar_token($request) {
         $token = wp_generate_password(32, false);
         
-        $tokens = get_option('srt_calendar_tokens', array());
+        $tokens = get_option('ftt_calendar_tokens', array());
         $tokens[] = $token;
         
-        update_option('srt_calendar_tokens', $tokens);
+        update_option('ftt_calendar_tokens', $tokens);
         
         return rest_ensure_response(array(
             'success' => true,
             'token' => $token,
-            'url' => rest_url('srt/v1/calendar.ics') . '?token=' . $token,
+            'url' => rest_url('ftt/v1/calendar.ics') . '?token=' . $token,
         ));
     }
     
@@ -476,12 +522,12 @@ class SRT_ICal {
      * Delete calendar token
      */
     public static function delete_calendar_token($token) {
-        $tokens = get_option('srt_calendar_tokens', array());
+        $tokens = get_option('ftt_calendar_tokens', array());
         $tokens = array_filter($tokens, function($t) use ($token) {
             return $t !== $token;
         });
         
-        update_option('srt_calendar_tokens', array_values($tokens));
+        update_option('ftt_calendar_tokens', array_values($tokens));
         
         return true;
     }
@@ -490,9 +536,20 @@ class SRT_ICal {
      * Get all calendar tokens
      */
     public static function get_calendar_tokens() {
-        return get_option('srt_calendar_tokens', array());
+        return get_option('ftt_calendar_tokens', array());
+    }
+    
+    /**
+     * Invalidate user's calendar token
+     * Called when subscription becomes invalid
+     *
+     * @param int $user_id User ID
+     */
+    public static function invalidate_user_token($user_id) {
+        delete_user_meta($user_id, 'ftt_calendar_token');
+        error_log("FTT ICAL: Invalidated calendar token for user ID: {$user_id}");
     }
 }
 
 // Initialize
-SRT_ICal::init();
+FTT_ICal::init();

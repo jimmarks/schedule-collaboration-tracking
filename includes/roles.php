@@ -2,7 +2,7 @@
 /**
  * User Roles Management
  *
- * @package Summer_Regiment_Tracker
+ * @package Family_Travel_Tracker
  */
 
 // Exit if accessed directly
@@ -13,34 +13,42 @@ if (!defined('ABSPATH')) {
 /**
  * SRT User Management Class
  * 
- * Manages schedule members and parent relationships using user meta
+ * Manages children and parent relationships using user meta
  * instead of custom roles to allow flexibility (admin can also be parent, etc.)
  */
-class SRT_Roles {
+class FTT_Roles {
     
     /**
      * Initialize
      */
     public static function init() {
-        add_action('admin_menu', array(__CLASS__, 'add_admin_menu'));
         add_action('show_user_profile', array(__CLASS__, 'show_user_profile_fields'));
         add_action('edit_user_profile', array(__CLASS__, 'show_user_profile_fields'));
         add_action('personal_options_update', array(__CLASS__, 'save_user_profile_fields'));
         add_action('edit_user_profile_update', array(__CLASS__, 'save_user_profile_fields'));
+        
+        // Add custom columns to admin users list
+        add_filter('manage_users_columns', array(__CLASS__, 'add_user_columns'));
+        add_filter('manage_users_custom_column', array(__CLASS__, 'populate_user_columns'), 10, 3);
     }
     
     /**
-     * Make user a schedule member
+     * Make user a child/student in the system
      */
     public static function make_member($user_id) {
-        update_user_meta($user_id, 'srt_is_member', true);
-        update_user_meta($user_id, 'srt_member_since', current_time('mysql'));
+        update_user_meta($user_id, 'ftt_is_member', true);
+        update_user_meta($user_id, 'ftt_member_since', current_time('mysql'));
         
         // Grant event editing capabilities
         $user = get_user_by('id', $user_id);
         if ($user) {
-            $user->add_cap('edit_posts');
             $user->add_cap('read');
+            $user->add_cap('edit_posts');
+            $user->add_cap('edit_published_posts');
+            $user->add_cap('publish_posts');
+            $user->add_cap('delete_posts');
+            $user->add_cap('delete_published_posts');
+            $user->add_cap('upload_files');
         }
     }
     
@@ -48,7 +56,7 @@ class SRT_Roles {
      * Remove member status
      */
     public static function remove_member($user_id) {
-        delete_user_meta($user_id, 'srt_is_member');
+        delete_user_meta($user_id, 'ftt_is_member');
         
         // Don't remove capabilities - user might be admin or have other reasons for them
     }
@@ -57,7 +65,7 @@ class SRT_Roles {
      * Check if user is a member
      */
     public static function is_member($user_id) {
-        return (bool) get_user_meta($user_id, 'srt_is_member', true);
+        return (bool) get_user_meta($user_id, 'ftt_is_member', true);
     }
     
     /**
@@ -65,16 +73,37 @@ class SRT_Roles {
      */
     public static function add_parent_child($parent_id, $child_id) {
         $children = self::get_children($parent_id);
-        if (!in_array($child_id, $children)) {
+        $is_new_child = !in_array($child_id, $children);
+        
+        if ($is_new_child) {
             $children[] = $child_id;
-            update_user_meta($parent_id, 'srt_parent_of', $children);
+            update_user_meta($parent_id, 'ftt_parent_of', $children);
         }
         
         // Also store reverse relationship
         $parents = self::get_parents($child_id);
         if (!in_array($parent_id, $parents)) {
             $parents[] = $parent_id;
-            update_user_meta($child_id, 'srt_parents', $parents);
+            update_user_meta($child_id, 'ftt_parents', $parents);
+        }
+        
+        // Auto-assign color to child when first added to a parent
+        if ($is_new_child && class_exists('FTT_Child_Colors')) {
+            FTT_Child_Colors::assign_color($child_id, $parent_id);
+        }
+        
+        // Auto-share child with all co-parents (linked adults)
+        if ($is_new_child) {
+            $co_parents = get_user_meta($parent_id, 'ftt_parents', true);
+            if (is_array($co_parents) && !empty($co_parents)) {
+                foreach ($co_parents as $co_parent_id) {
+                    // Recursively add child to each co-parent
+                    // The is_new_child check in recursive calls prevents infinite loops
+                    if ($co_parent_id != $parent_id) {
+                        self::add_parent_child($co_parent_id, $child_id);
+                    }
+                }
+            }
         }
     }
     
@@ -84,19 +113,19 @@ class SRT_Roles {
     public static function remove_parent_child($parent_id, $child_id) {
         $children = self::get_children($parent_id);
         $children = array_diff($children, array($child_id));
-        update_user_meta($parent_id, 'srt_parent_of', $children);
+        update_user_meta($parent_id, 'ftt_parent_of', $children);
         
         // Remove reverse relationship
         $parents = self::get_parents($child_id);
         $parents = array_diff($parents, array($parent_id));
-        update_user_meta($child_id, 'srt_parents', $parents);
+        update_user_meta($child_id, 'ftt_parents', $parents);
     }
     
     /**
      * Get children for a parent user
      */
     public static function get_children($parent_id) {
-        $children = get_user_meta($parent_id, 'srt_parent_of', true);
+        $children = get_user_meta($parent_id, 'ftt_parent_of', true);
         return is_array($children) ? $children : array();
     }
     
@@ -104,14 +133,22 @@ class SRT_Roles {
      * Get parents for a user
      */
     public static function get_parents($user_id) {
-        $parents = get_user_meta($user_id, 'srt_parents', true);
+        $parents = get_user_meta($user_id, 'ftt_parents', true);
         return is_array($parents) ? $parents : array();
     }
     
     /**
      * Check if user is a parent
+     * Returns true if user registered as parent OR has children linked
      */
     public static function is_parent($user_id) {
+        // Check if registered as parent
+        $user_type = get_user_meta($user_id, 'user_type', true);
+        if ($user_type === 'parent') {
+            return true;
+        }
+        
+        // Also check if they have children linked (legacy check)
         $children = self::get_children($user_id);
         return !empty($children);
     }
@@ -121,7 +158,7 @@ class SRT_Roles {
      */
     public static function get_all_members() {
         $args = array(
-            'meta_key'   => 'srt_is_member',
+            'meta_key'   => 'ftt_is_member',
             'meta_value' => '1',
             'orderby'    => 'display_name',
             'order'      => 'ASC',
@@ -130,28 +167,49 @@ class SRT_Roles {
     }
     
     /**
-     * Get all parents
+     * Get all parents (legacy: users with children linked)
      */
     public static function get_all_parents() {
         $args = array(
-            'meta_key'     => 'srt_parent_of',
+            'meta_key'     => 'ftt_parent_of',
             'meta_compare' => 'EXISTS',
             'orderby'      => 'display_name',
             'order'        => 'ASC',
         );
         return get_users($args);
     }
-    
+
+    /**
+     * Get all adult accounts (registered with user_type = 'parent')
+     */
+    public static function get_all_adults() {
+        $args = array(
+            'meta_key'   => 'user_type',
+            'meta_value' => 'parent',
+            'orderby'    => 'display_name',
+            'order'      => 'ASC',
+        );
+        return get_users($args);
+    }
+
+    /**
+     * Check if user is an adult account
+     */
+    public static function is_adult($user_id) {
+        $user_type = get_user_meta($user_id, 'user_type', true);
+        return $user_type === 'parent';
+    }
+
     /**
      * Add admin menu
      */
     public static function add_admin_menu() {
         add_submenu_page(
-            'edit.php?post_type=srt_event',
+            'edit.php?post_type=ftt_event',
             __('Manage Users', 'schedule-collaboration-tracking'),
             __('Manage Users', 'schedule-collaboration-tracking'),
             'manage_options',
-            'srt-manage-users',
+            'ftt-manage-users',
             array(__CLASS__, 'render_admin_page')
         );
     }
@@ -165,44 +223,74 @@ class SRT_Roles {
         }
         
         // Handle form submissions
-        if (isset($_POST['srt_action']) && check_admin_referer('srt_manage_users')) {
+        if (isset($_POST['ftt_action']) && check_admin_referer('ftt_manage_users')) {
             self::handle_admin_actions();
         }
         
-        include SRT_PLUGIN_DIR . 'templates/admin-manage-users.php';
+        include FTT_PLUGIN_DIR . 'templates/admin-manage-users.php';
     }
     
     /**
      * Handle admin actions
      */
     private static function handle_admin_actions() {
-        $action = sanitize_text_field($_POST['srt_action']);
+        $action = sanitize_text_field($_POST['ftt_action']);
         
         switch ($action) {
             case 'make_member':
                 $user_id = intval($_POST['user_id']);
                 self::make_member($user_id);
-                add_settings_error('srt_messages', 'success', __('User marked as member.', 'schedule-collaboration-tracking'), 'updated');
+                add_settings_error('ftt_messages', 'success', __('User marked as member.', 'schedule-collaboration-tracking'), 'updated');
                 break;
                 
             case 'remove_member':
                 $user_id = intval($_POST['user_id']);
                 self::remove_member($user_id);
-                add_settings_error('srt_messages', 'success', __('Member status removed.', 'schedule-collaboration-tracking'), 'updated');
+                add_settings_error('ftt_messages', 'success', __('Member status removed.', 'schedule-collaboration-tracking'), 'updated');
                 break;
                 
             case 'add_parent':
                 $parent_id = intval($_POST['parent_id']);
                 $child_id = intval($_POST['child_id']);
                 self::add_parent_child($parent_id, $child_id);
-                add_settings_error('srt_messages', 'success', __('Parent relationship added.', 'schedule-collaboration-tracking'), 'updated');
+                add_settings_error('ftt_messages', 'success', __('Parent relationship added.', 'schedule-collaboration-tracking'), 'updated');
                 break;
                 
             case 'remove_parent':
                 $parent_id = intval($_POST['parent_id']);
                 $child_id = intval($_POST['child_id']);
                 self::remove_parent_child($parent_id, $child_id);
-                add_settings_error('srt_messages', 'success', __('Parent relationship removed.', 'schedule-collaboration-tracking'), 'updated');
+                add_settings_error('ftt_messages', 'success', __('Parent relationship removed.', 'schedule-collaboration-tracking'), 'updated');
+                break;
+
+            case 'toggle_billing_exempt_user':
+                $user_id     = intval($_POST['user_id']);
+                $grant       = intval($_POST['exempt_value']) === 1;
+                if ($grant) {
+                    update_user_meta($user_id, 'ftt_billing_exempt', 1);
+                    add_settings_error('ftt_messages', 'success', __('Billing exemption granted for user.', 'schedule-collaboration-tracking'), 'updated');
+                } else {
+                    delete_user_meta($user_id, 'ftt_billing_exempt');
+                    add_settings_error('ftt_messages', 'success', __('Billing exemption removed for user.', 'schedule-collaboration-tracking'), 'updated');
+                }
+                break;
+
+            case 'toggle_billing_exempt_group':
+                $group_id     = intval($_POST['group_id']);
+                $grant        = intval($_POST['exempt_value']) === 1;
+                $exempt_groups = array_map('intval', (array) get_option('ftt_billing_exempt_groups', []));
+                if ($grant) {
+                    if (!in_array($group_id, $exempt_groups, true)) {
+                        $exempt_groups[] = $group_id;
+                    }
+                    add_settings_error('ftt_messages', 'success', __('Billing exemption granted for group.', 'schedule-collaboration-tracking'), 'updated');
+                } else {
+                    $exempt_groups = array_values(array_filter($exempt_groups, function($id) use ($group_id) {
+                        return $id !== $group_id;
+                    }));
+                    add_settings_error('ftt_messages', 'success', __('Billing exemption removed for group.', 'schedule-collaboration-tracking'), 'updated');
+                }
+                update_option('ftt_billing_exempt_groups', $exempt_groups);
                 break;
         }
     }
@@ -211,36 +299,113 @@ class SRT_Roles {
      * Show fields on user profile
      */
     public static function show_user_profile_fields($user) {
+        // Login redirect preference - visible to any user editing their own profile
+        $current_pref = get_user_meta($user->ID, 'ftt_login_redirect_preference', true) ?: 'dashboard';
+        ?>
+        <h2><?php esc_html_e('Login Preferences', 'schedule-collaboration-tracking'); ?></h2>
+        <table class="form-table">
+            <tr>
+                <th><label for="ftt_login_redirect_preference"><?php esc_html_e('After Login, Go To', 'schedule-collaboration-tracking'); ?></label></th>
+                <td>
+                    <select name="ftt_login_redirect_preference" id="ftt_login_redirect_preference">
+                        <option value="dashboard" <?php selected($current_pref, 'dashboard'); ?>><?php esc_html_e('Dashboard', 'schedule-collaboration-tracking'); ?></option>
+                        <option value="calendar" <?php selected($current_pref, 'calendar'); ?>><?php esc_html_e('Calendar', 'schedule-collaboration-tracking'); ?></option>
+                        <option value="account" <?php selected($current_pref, 'account'); ?>><?php esc_html_e('My Account / Subscription', 'schedule-collaboration-tracking'); ?></option>
+                    </select>
+                    <p class="description"><?php esc_html_e('Choose which page to land on after logging in.', 'schedule-collaboration-tracking'); ?></p>
+                </td>
+            </tr>
+        </table>
+        <?php
         if (!current_user_can('edit_users')) {
             return;
         }
         ?>
-        <h2><?php esc_html_e('Schedule Member Information', 'schedule-collaboration-tracking'); ?></h2>
+        <h2><?php esc_html_e('Family Travel Tracker Settings', 'schedule-collaboration-tracking'); ?></h2>
         <table class="form-table">
             <tr>
-                <th><label for="srt_is_member"><?php esc_html_e('Member', 'schedule-collaboration-tracking'); ?></label></th>
+                <th><label for="ftt_is_member"><?php esc_html_e('Is Child/Traveler', 'schedule-collaboration-tracking'); ?></label></th>
                 <td>
-                    <input type="checkbox" name="srt_is_member" id="srt_is_member" value="1" <?php checked(self::is_member($user->ID)); ?>>
-                    <p class="description"><?php esc_html_e('Check if this user is an active member.', 'schedule-collaboration-tracking'); ?></p>
+                    <input type="checkbox" name="ftt_is_member" id="ftt_is_member" value="1" <?php checked(self::is_member($user->ID)); ?>>
+                    <p class="description"><?php esc_html_e('Check if this user is a child/traveler who will have events and travel tracked.', 'schedule-collaboration-tracking'); ?></p>
                 </td>
             </tr>
             <tr>
-                <th><label><?php esc_html_e('Parent/Guardian Of', 'schedule-collaboration-tracking'); ?></label></th>
+                <th><label for="ftt_parent_of"><?php esc_html_e('Parent/Guardian Of', 'schedule-collaboration-tracking'); ?></label></th>
                 <td>
                     <?php
                     $children = self::get_children($user->ID);
-                    $all_users = get_users(array('orderby' => 'display_name'));
+                    // Only show members (children/travelers) and exclude admins
+                    $all_users = get_users(array(
+                        'orderby' => 'display_name',
+                        'meta_query' => array(
+                            array(
+                                'key' => 'ftt_is_member',
+                                'value' => '1',
+                                'compare' => '='
+                            )
+                        )
+                    ));
                     ?>
-                    <select name="srt_parent_of[]" multiple style="height: 150px; width: 100%;">
-                        <?php foreach ($all_users as $u) : ?>
-                            <?php if ($u->ID !== $user->ID) : ?>
-                                <option value="<?php echo esc_attr($u->ID); ?>" <?php selected(in_array($u->ID, $children)); ?>>
+                    <?php if (!empty($all_users)) : ?>
+                        <select name="ftt_parent_of[]" id="ftt_parent_of" multiple style="height: 200px; width: 100%; max-width: 500px;">
+                            <?php foreach ($all_users as $u) : ?>
+                                <?php if ($u->ID !== $user->ID) : ?>
+                                    <option value="<?php echo esc_attr($u->ID); ?>" <?php selected(in_array($u->ID, $children)); ?>>
+                                        <?php echo esc_html($u->display_name . ' (' . $u->user_email . ')'); ?>
+                                    </option>
+                                <?php endif; ?>
+                            <?php endforeach; ?>
+                        </select>
+                        <p class="description"><?php esc_html_e('Hold Ctrl (Cmd on Mac) to select multiple children. This parent will see events and receive price alerts for selected children.', 'schedule-collaboration-tracking'); ?></p>
+                    <?php else : ?>
+                        <p class="description" style="color: #666;"><?php esc_html_e('No children/travelers found. Check the "Is Child/Traveler" box on user profiles to make them available here.', 'schedule-collaboration-tracking'); ?></p>
+                    <?php endif; ?>
+                </td>
+            </tr>
+            
+            <tr>
+                <th><label for="ftt_parents"><?php esc_html_e('Parents/Guardians', 'schedule-collaboration-tracking'); ?></label></th>
+                <td>
+                    <?php
+                    $parents = self::get_parents($user->ID);
+                    // Get all users who could be parents (exclude the current user)
+                    $all_potential_parents = get_users(array(
+                        'orderby' => 'display_name',
+                        'exclude' => array($user->ID)
+                    ));
+                    ?>
+                    <?php if (!empty($all_potential_parents)) : ?>
+                        <select name="ftt_parents[]" id="ftt_parents" multiple style="height: 200px; width: 100%; max-width: 500px;">
+                            <?php foreach ($all_potential_parents as $u) : ?>
+                                <option value="<?php echo esc_attr($u->ID); ?>" <?php selected(in_array($u->ID, $parents)); ?>>
                                     <?php echo esc_html($u->display_name . ' (' . $u->user_email . ')'); ?>
                                 </option>
-                            <?php endif; ?>
-                        <?php endforeach; ?>
-                    </select>
-                    <p class="description"><?php esc_html_e('Hold Ctrl (Cmd on Mac) to select multiple. This user will receive price alerts for selected members.', 'schedule-collaboration-tracking'); ?></p>
+                            <?php endforeach; ?>
+                        </select>
+                        <p class="description"><?php esc_html_e('Hold Ctrl (Cmd on Mac) to select multiple parents. Selected parents will see this user\'s events and receive price alerts.', 'schedule-collaboration-tracking'); ?></p>
+                    <?php else : ?>
+                        <p class="description" style="color: #666;"><?php esc_html_e('No other users found to assign as parents.', 'schedule-collaboration-tracking'); ?></p>
+                    <?php endif; ?>
+                </td>
+            </tr>
+            
+            <tr>
+                <th><label for="ftt_home_airport"><?php esc_html_e('Home Airport', 'schedule-collaboration-tracking'); ?></label></th>
+                <td>
+                    <input type="text" name="ftt_home_airport" id="ftt_home_airport" value="<?php echo esc_attr(get_user_meta($user->ID, 'ftt_home_airport', true)); ?>" class="regular-text" maxlength="3" placeholder="ORD" style="text-transform: uppercase; width: 100px;">
+                    <p class="description"><?php esc_html_e('3-letter IATA airport code (e.g., ORD, JFK, LAX). Used as default for event forms and price tracking.', 'schedule-collaboration-tracking'); ?></p>
+                </td>
+            </tr>
+        </table>
+        
+        <h2><?php esc_html_e('Subscription Access', 'schedule-collaboration-tracking'); ?></h2>
+        <table class="form-table">
+            <tr>
+                <th><label for="ftt_access_denied"><?php esc_html_e('Deny Access', 'schedule-collaboration-tracking'); ?></label></th>
+                <td>
+                    <input type="checkbox" name="ftt_access_denied" id="ftt_access_denied" value="1" <?php checked(get_user_meta($user->ID, 'ftt_access_denied', true)); ?>>
+                    <p class="description"><?php esc_html_e('Check to manually deny site access regardless of subscription status. User will be redirected to pricing page.', 'schedule-collaboration-tracking'); ?></p>
                 </td>
             </tr>
         </table>
@@ -251,19 +416,46 @@ class SRT_Roles {
      * Save user profile fields
      */
     public static function save_user_profile_fields($user_id) {
+        // Login redirect preference - any user can save for their own profile
+        if (current_user_can('edit_user', $user_id) && isset($_POST['ftt_login_redirect_preference'])) {
+            $allowed = array('dashboard', 'calendar', 'account');
+            $pref = sanitize_key($_POST['ftt_login_redirect_preference']);
+            if (in_array($pref, $allowed, true)) {
+                update_user_meta($user_id, 'ftt_login_redirect_preference', $pref);
+            }
+        }
+
         if (!current_user_can('edit_users')) {
             return;
         }
         
+        // Home airport
+        if (isset($_POST['ftt_home_airport'])) {
+            $airport = strtoupper(sanitize_text_field($_POST['ftt_home_airport']));
+            update_user_meta($user_id, 'ftt_home_airport', $airport);
+        }
+        
+        // Access denial override
+        if (isset($_POST['ftt_access_denied'])) {
+            update_user_meta($user_id, 'ftt_access_denied', true);
+            
+            // Invalidate calendar token when access is denied
+            if (class_exists('FTT_Billing_Manager')) {
+                FTT_Billing_Manager::invalidate_calendar_access($user_id);
+            }
+        } else {
+            delete_user_meta($user_id, 'ftt_access_denied');
+        }
+        
         // Member status
-        if (isset($_POST['srt_is_member'])) {
+        if (isset($_POST['ftt_is_member'])) {
             self::make_member($user_id);
         } else {
             self::remove_member($user_id);
         }
         
-        // Parent relationships
-        $new_children = isset($_POST['srt_parent_of']) ? array_map('intval', $_POST['srt_parent_of']) : array();
+        // Parent relationships (this user is parent OF these children)
+        $new_children = isset($_POST['ftt_parent_of']) ? array_map('intval', $_POST['ftt_parent_of']) : array();
         $old_children = self::get_children($user_id);
         
         // Add new relationships
@@ -277,6 +469,24 @@ class SRT_Roles {
         foreach ($old_children as $child_id) {
             if (!in_array($child_id, $new_children)) {
                 self::remove_parent_child($user_id, $child_id);
+            }
+        }
+        
+        // Reverse parent relationships (these parents are parents OF this user)
+        $new_parents = isset($_POST['ftt_parents']) ? array_map('intval', $_POST['ftt_parents']) : array();
+        $old_parents = self::get_parents($user_id);
+        
+        // Add new parent relationships
+        foreach ($new_parents as $parent_id) {
+            if (!in_array($parent_id, $old_parents)) {
+                self::add_parent_child($parent_id, $user_id);
+            }
+        }
+        
+        // Remove old parent relationships
+        foreach ($old_parents as $parent_id) {
+            if (!in_array($parent_id, $new_parents)) {
+                self::remove_parent_child($parent_id, $user_id);
             }
         }
     }
@@ -320,7 +530,142 @@ class SRT_Roles {
         
         return array_unique($recipients);
     }
+    
+    /**
+     * Get user's home airport
+     *
+     * @param int $user_id User ID (defaults to current user)
+     * @return string Airport code (e.g., 'ORD') or empty string
+     */
+    public static function get_user_airport($user_id = null) {
+        if (!$user_id) {
+            $user_id = get_current_user_id();
+        }
+        
+        return get_user_meta($user_id, 'ftt_home_airport', true);
+    }
+    
+    /**
+     * Set user's home airport
+     *
+     * @param int $user_id User ID
+     * @param string $airport_code IATA airport code
+     * @return bool Success
+     */
+    public static function set_user_airport($user_id, $airport_code) {
+        $airport_code = strtoupper(sanitize_text_field($airport_code));
+        
+        // Basic validation - 3 letters
+        if (strlen($airport_code) !== 3 || !ctype_alpha($airport_code)) {
+            return false;
+        }
+        
+        return update_user_meta($user_id, 'ftt_home_airport', $airport_code);
+    }
+    
+    /**
+     * Add custom columns to users list
+     *
+     * @param array $columns Existing columns
+     * @return array Modified columns
+     */
+    public static function add_user_columns($columns) {
+        $columns['linked_adults'] = __('Linked Adults', 'schedule-collaboration-tracking');
+        $columns['linked_children'] = __('Linked Children', 'schedule-collaboration-tracking');
+        $columns['billing_status'] = __('Billing Status', 'schedule-collaboration-tracking');
+        $columns['next_billing'] = __('Next Billing', 'schedule-collaboration-tracking');
+        return $columns;
+    }
+    
+    /**
+     * Populate custom user columns
+     *
+     * @param string $output Custom column output
+     * @param string $column_name Column identifier
+     * @param int $user_id User ID
+     * @return string Column content
+     */
+    public static function populate_user_columns($output, $column_name, $user_id) {
+        switch ($column_name) {
+            case 'linked_adults':
+                $parents = self::get_parents($user_id);
+                if (!empty($parents)) {
+                    $names = array();
+                    foreach ($parents as $parent_id) {
+                        $parent = get_userdata($parent_id);
+                        if ($parent) {
+                            $names[] = esc_html($parent->display_name) . ' <span style="color: #666; font-size: 0.9em;">(' . esc_html($parent->user_login) . ')</span>';
+                        }
+                    }
+                    $output = implode(', ', $names);
+                } else {
+                    $output = '—';
+                }
+                break;
+                
+            case 'linked_children':
+                $children = self::get_children($user_id);
+                if (!empty($children)) {
+                    $names = array();
+                    foreach ($children as $child_id) {
+                        $child = get_userdata($child_id);
+                        if ($child) {
+                            $names[] = esc_html($child->display_name) . ' <span style="color: #666; font-size: 0.9em;">(' . esc_html($child->user_login) . ')</span>';
+                        }
+                    }
+                    $output = implode(', ', $names);
+                } else {
+                    $output = '—';
+                }
+                break;
+                
+            case 'billing_status':
+                if (class_exists('FTT_Billing_Manager')) {
+                    $billing = FTT_Billing_Manager::get_billing_summary($user_id);
+                    if ($billing && !empty($billing['status'])) {
+                        $status_class = 'ftt-status-' . esc_attr($billing['status']);
+                        $status_label = esc_html($billing['status_label']);
+                        $output = '<span class="' . $status_class . '">' . $status_label . '</span>';
+                        
+                        if ($billing['in_trial']) {
+                            $output .= '<br><small>' . sprintf(__('Trial (%d days left)', 'schedule-collaboration-tracking'), $billing['days_until_charge']) . '</small>';
+                        }
+                    } else {
+                        $output = '—';
+                    }
+                } else {
+                    $output = '—';
+                }
+                break;
+                
+            case 'next_billing':
+                if (class_exists('FTT_Billing_Manager')) {
+                    $billing = FTT_Billing_Manager::get_billing_summary($user_id);
+                    if ($billing && !empty($billing['next_billing_date'])) {
+                        if ($billing['in_trial']) {
+                            $output = '<span style="color: #2196F3;">' . esc_html($billing['next_billing_date']) . '</span>';
+                            $output .= '<br><small>' . __('(First charge)', 'schedule-collaboration-tracking') . '</small>';
+                        } else {
+                            $output = esc_html($billing['next_billing_date']);
+                        }
+                        
+                        // Show amount
+                        if (!empty($billing['total_price'])) {
+                            $output .= '<br><small>' . esc_html($billing['total_price']) . '</small>';
+                        }
+                    } else {
+                        $output = '—';
+                    }
+                } else {
+                    $output = '—';
+                }
+                break;
+        }
+        
+        return $output;
+    }
 }
 
+
 // Initialize
-SRT_Roles::init();
+FTT_Roles::init();

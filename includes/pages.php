@@ -2,7 +2,7 @@
 /**
  * Page Management Functions
  *
- * @package Summer_Regiment_Tracker
+ * @package Family_Travel_Tracker
  */
 
 // Exit if accessed directly
@@ -13,7 +13,7 @@ if (!defined('ABSPATH')) {
 /**
  * Class for managing plugin pages
  */
-class SRT_Pages {
+class FTT_Pages {
     
     /**
      * Page definitions
@@ -22,45 +22,108 @@ class SRT_Pages {
         return array(
             'dashboard' => array(
                 'title' => 'Schedule Dashboard',
-                'shortcode' => '[srt_dashboard]',
-                'slug' => 'sc-dashboard',
+                'shortcode' => '[ftt_dashboard]',
+                'slug' => 'ftt-dashboard',
                 'menu_order' => 1,
-                'description' => 'Main hub for schedule members, parents, and admins',
+                'description' => 'Main hub for children, parents, and administrators',
             ),
             'calendar' => array(
                 'title' => 'Schedule Events Calendar',
-                'shortcode' => '[srt_calendar]',
-                'slug' => 'sc-calendar',
+                'shortcode' => '[ftt_calendar]',
+                'slug' => 'ftt-calendar',
                 'menu_order' => 2,
                 'description' => 'Visual calendar view of all events',
             ),
             'event_list' => array(
                 'title' => 'Schedule Events List',
-                'shortcode' => '[srt_event_list]',
-                'slug' => 'sc-events',
+                'shortcode' => '[ftt_event_list]',
+                'slug' => 'ftt-events',
                 'menu_order' => 3,
                 'description' => 'List view of all schedule events',
             ),
             'event_form' => array(
                 'title' => 'Schedule Events Manager',
-                'shortcode' => '[srt_event_form]',
-                'slug' => 'sc-manage-events',
+                'shortcode' => '[ftt_event_form]',
+                'slug' => 'ftt-manage-events',
                 'menu_order' => 4,
                 'description' => 'Create and edit events (admin only)',
             ),
             'register' => array(
                 'title' => 'Schedule Registration',
-                'shortcode' => '[srt_register]',
-                'slug' => 'sc-register',
+                'shortcode' => '[ftt_register]',
+                'slug' => 'ftt-register',
                 'menu_order' => 5,
                 'description' => 'User registration page',
             ),
             'login' => array(
                 'title' => 'Schedule Login',
-                'shortcode' => '[srt_login]',
-                'slug' => 'sc-login',
+                'shortcode' => '[ftt_login]',
+                'slug' => 'ftt-login',
                 'menu_order' => 6,
                 'description' => 'Custom login page for schedule users',
+            ),
+            'pricing' => array(
+                'title' => 'Pricing',
+                'shortcode' => '[ftt_pricing_page]',
+                'slug' => 'pricing',
+                'menu_order' => 7,
+                'description' => 'Subscription pricing and signup page',
+            ),
+            'manage_subscription' => array(
+                'title' => 'Manage Subscription',
+                'shortcode' => '[ftt_manage_subscription]',
+                'slug' => 'manage-subscription',
+                'menu_order' => 8,
+                'description' => 'Manage billing and subscription',
+            ),
+            'checkout_success' => array(
+                'title' => 'Checkout Success',
+                'shortcode' => '[ftt_checkout_success]',
+                'slug' => 'checkout-success',
+                'menu_order' => 9,
+                'description' => 'Successful checkout confirmation',
+            ),
+            'checkout_cancel' => array(
+                'title' => 'Checkout Cancelled',
+                'shortcode' => '[ftt_checkout_cancel]',
+                'slug' => 'checkout-cancel',
+                'menu_order' => 10,
+                'description' => 'Checkout cancellation page',
+            ),
+            'family_management' => array(
+                'title' => 'Manage Family',
+                'shortcode' => '[ftt_family_management]',
+                'slug' => 'manage-family',
+                'menu_order' => 11,
+                'description' => 'Manage children, co-parents, and family settings',
+            ),
+            'groups' => array(
+                'title' => 'Family Groups',
+                'shortcode' => '[ftt_groups]',
+                'slug' => 'ftt-groups',
+                'menu_order' => 12,
+                'description' => 'Manage family groups, members, and group billing',
+            ),
+            'profile' => array(
+                'title' => 'My Settings',
+                'shortcode' => '[ftt_profile]',
+                'slug' => 'ftt-profile',
+                'menu_order' => 13,
+                'description' => 'Personal settings: name, email, phone, timezone, home airports, notifications',
+            ),
+            'onboarding' => array(
+                'title' => 'Welcome',
+                'shortcode' => '[ftt_onboarding]',
+                'slug' => 'ftt-onboarding',
+                'menu_order' => 14,
+                'description' => 'Post-registration onboarding wizard: calendar setup and billing offer',
+            ),
+            'trial_expired' => array(
+                'title' => 'Trial Ended',
+                'shortcode' => '[ftt_trial_expired]',
+                'slug' => 'ftt-trial-expired',
+                'menu_order' => 15,
+                'description' => 'Trial expiry page: prompts user to set up billing to restore access',
             ),
         );
     }
@@ -70,7 +133,7 @@ class SRT_Pages {
      */
     public static function create_pages() {
         $pages = self::get_page_definitions();
-        $page_ids = get_option('srt_page_ids', array());
+        $page_ids = get_option('ftt_page_ids', array());
         
         foreach ($pages as $key => $page_data) {
             // Check if page already exists by slug
@@ -107,7 +170,7 @@ class SRT_Pages {
                 $page_ids[$key] = $page_id;
                 
                 // Add page meta to identify as plugin page
-                update_post_meta($page_id, '_srt_page', true);
+                update_post_meta($page_id, '_ftt_page', true);
                 
                 // Set dashboard as front page (home page)
                 if ($key === 'dashboard') {
@@ -118,7 +181,7 @@ class SRT_Pages {
         }
         
         // Store page IDs in options
-        update_option('srt_page_ids', $page_ids);
+        update_option('ftt_page_ids', $page_ids);
         
         return $page_ids;
     }
@@ -127,16 +190,16 @@ class SRT_Pages {
      * Delete all plugin pages
      */
     public static function delete_pages() {
-        $page_ids = get_option('srt_page_ids', array());
+        $page_ids = get_option('ftt_page_ids', array());
         
         foreach ($page_ids as $page_id) {
             // Only delete if it's still marked as our page
-            if (get_post_meta($page_id, '_srt_page', true)) {
+            if (get_post_meta($page_id, '_ftt_page', true)) {
                 wp_delete_post($page_id, true);
             }
         }
         
-        delete_option('srt_page_ids');
+        delete_option('ftt_page_ids');
     }
     
     /**
@@ -146,7 +209,7 @@ class SRT_Pages {
      * @return string|false The page URL or false if not found
      */
     public static function get_page_url($page_key) {
-        $page_ids = get_option('srt_page_ids', array());
+        $page_ids = get_option('ftt_page_ids', array());
         
         if (!isset($page_ids[$page_key])) {
             return false;
@@ -164,8 +227,23 @@ class SRT_Pages {
      * @return int|false The page ID or false if not found
      */
     public static function get_page_id($page_key) {
-        $page_ids = get_option('srt_page_ids', array());
+        $page_ids = get_option('ftt_page_ids', array());
         return isset($page_ids[$page_key]) ? $page_ids[$page_key] : false;
+    }
+    
+    /**
+     * Check if current page is an FTT plugin page
+     *
+     * @return bool True if current page is an FTT page
+     */
+    public static function is_ftt_page() {
+        global $post;
+        if (!is_a($post, 'WP_Post')) {
+            return false;
+        }
+        
+        $page_ids = get_option('ftt_page_ids', array());
+        return in_array($post->ID, $page_ids, true);
     }
     
     /**
@@ -174,7 +252,7 @@ class SRT_Pages {
      * @return bool True if all pages exist
      */
     public static function pages_exist() {
-        $page_ids = get_option('srt_page_ids', array());
+        $page_ids = get_option('ftt_page_ids', array());
         $pages = self::get_page_definitions();
         
         if (count($page_ids) !== count($pages)) {
@@ -197,7 +275,7 @@ class SRT_Pages {
      */
     public static function get_missing_pages_notice() {
         $pages = self::get_page_definitions();
-        $page_ids = get_option('srt_page_ids', array());
+        $page_ids = get_option('ftt_page_ids', array());
         $missing = array();
         
         foreach ($pages as $key => $page_data) {
@@ -211,8 +289,8 @@ class SRT_Pages {
         }
         
         $recreate_url = wp_nonce_url(
-            add_query_arg('srt_recreate_pages', '1'),
-            'srt_recreate_pages'
+            add_query_arg('ftt_recreate_pages', '1'),
+            'ftt_recreate_pages'
         );
         
         echo sprintf(
@@ -226,11 +304,11 @@ class SRT_Pages {
      * Handle page recreation request
      */
     public static function handle_recreate_pages() {
-        if (!isset($_GET['srt_recreate_pages'])) {
+        if (!isset($_GET['ftt_recreate_pages'])) {
             return;
         }
         
-        if (!wp_verify_nonce($_GET['_wpnonce'], 'srt_recreate_pages')) {
+        if (!wp_verify_nonce($_GET['_wpnonce'], 'ftt_recreate_pages')) {
             wp_die('Security check failed');
         }
         
@@ -240,7 +318,7 @@ class SRT_Pages {
         
         self::create_pages();
         
-        wp_redirect(remove_query_arg(array('srt_recreate_pages', '_wpnonce')));
+        wp_redirect(remove_query_arg(array('ftt_recreate_pages', '_wpnonce')));
         exit;
     }
     
@@ -250,7 +328,7 @@ class SRT_Pages {
      * @return string|null Registration URL or null if page doesn't exist
      */
     public static function get_registration_url() {
-        $page_ids = get_option('srt_page_ids', array());
+        $page_ids = get_option('ftt_page_ids', array());
         
         // Try stored page ID first
         if (isset($page_ids['register']) && get_post($page_ids['register'])) {
@@ -258,9 +336,9 @@ class SRT_Pages {
         }
         
         // Fallback: search for page with registration shortcode
-        $pages = get_pages(array('meta_key' => '_srt_page'));
+        $pages = get_pages(array('meta_key' => '_ftt_page'));
         foreach ($pages as $page) {
-            if (has_shortcode($page->post_content, 'srt_register')) {
+            if (has_shortcode($page->post_content, 'ftt_register')) {
                 return get_permalink($page->ID);
             }
         }
@@ -268,7 +346,7 @@ class SRT_Pages {
         // Last resort: search all pages
         $all_pages = get_pages();
         foreach ($all_pages as $page) {
-            if (has_shortcode($page->post_content, 'srt_register')) {
+            if (has_shortcode($page->post_content, 'ftt_register')) {
                 return get_permalink($page->ID);
             }
         }

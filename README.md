@@ -1,22 +1,41 @@
-# 🎺 Summer Regiment Tracker - WordPress Plugin
+# ✈️ Family Travel Tracker - WordPress Plugin
 
-A comprehensive WordPress plugin for tracking Summer Phantom Regiment schedules with advanced travel and flight tracking.
+A comprehensive WordPress plugin for tracking children's activities, travel schedules, and flight prices. Perfect for busy families, divorced/co-parenting situations, blended families, and managing multiple children's events.
 
-## ✅ Project Status: COMPLETE & PRODUCTION READY
+## ✅ Project Status: v2.1.0 - MAJOR UPGRADE IN PROGRESS
 
-**Version**: 1.0.0  
+**Version**: 2.1.0 (Family Groups Architecture)  
+**Previous Stable**: 2.0.120  
 **License**: GPL v2  
 **Requirements**: WordPress 6.0+, PHP 8.0+
 
+### What's New in v2.1.0
+🎉 **Family Groups Architecture** - Complete overhaul enabling support for complex blended families where adults can belong to multiple family groups with independent billing and calendars.
+
+See [CHANGELOG.md](CHANGELOG.md) for full details.
+
 ---
 
-## 📊 Quick Stats
+## 👨‍👩‍👧‍👦 Who Is This For?
 
-- **25 Files Created** (14 code + 8 docs + 3 misc)
-- **5,649 Total Lines** (2,898 code + 2,751 docs)
-- **14 Core Features** implemented
-- **6 REST API Endpoints**
-- **4 Shortcodes**
+- **Blended Families**: Handle multiple family groups with separate billing (NEW in v2.1!)
+- **Busy Families**: Track all your children's activities in one place
+- **Divorced/Co-Parents**: Share calendars and travel schedules seamlessly  
+- **Complex Custody**: Kids in multiple households with different billing (NEW in v2.1!)
+- **Travel Sports Families**: Hockey, soccer, baseball tournaments with flight tracking
+- **Competitive Activities**: Dance, cheer, music competitions
+- **Multi-Child Households**: Manage complex schedules across multiple children
+- **Extended Family**: Grandparents and guardians can have view access
+
+---
+
+## 📊 Architecture Stats
+
+- **30+ Files** (20 code + 10+ docs)
+- **8,000+ Lines** (5,000+ code + 3,000+ docs)
+- **20+ Core Features** implemented
+- **18+ REST API Endpoints** (12 new in v2.1)
+- **6 Shortcodes** (1 new in v2.1)
 - **100% Requirements Met**
 
 ---
@@ -40,9 +59,15 @@ A comprehensive WordPress plugin for tracking Summer Phantom Regiment schedules 
 
 ## 🎯 Key Features
 
+✅ **Multi-Child Support**
+- Track events for multiple children
+- Parents can link to all their children
+- Divorced parents can both access same child's calendar
+- Each child has their own schedule
+
 ✅ **Event Management**
 - Custom post type with 12 metadata fields
-- 11 event types with color coding
+- Activity types (sports, music, dance, etc.)
 - Timezone support
 - Rich notes and descriptions
 
@@ -58,13 +83,15 @@ A comprehensive WordPress plugin for tracking Summer Phantom Regiment schedules 
 - Booking status tracking
 - Confirmation numbers
 - Baggage tracking
+- **Flight price alerts** - Get notified when prices drop!
 
 ✅ **User Interfaces**
-- Interactive calendar (FullCalendar)
+- Interactive family calendar (FullCalendar)
 - Event management form
-- Travel dashboard (3 views)
+- Personalized dashboards (parent/child views)
 - Simple event list
 - Mobile responsive
+- Calendar sync (iCal subscription)
 
 ✅ **REST API**
 - Complete CRUD operations
