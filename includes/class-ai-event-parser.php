@@ -45,8 +45,13 @@ class FTT_AI_Event_Parser {
                     'type'              => 'string',
                     'sanitize_callback' => 'sanitize_textarea_field',
                     'validate_callback' => function ( $value ) {
-                        return is_string( $value ) && strlen( trim( $value ) ) >= 10;
+                        return is_string( $value ) && strlen( trim( $value ) ) >= 1;
                     },
+                ],
+                'history' => [
+                    'required' => false,
+                    'type'     => 'array',
+                    'default'  => [],
                 ],
             ],
         ] );
@@ -72,11 +77,21 @@ class FTT_AI_Event_Parser {
 
         $user_id = get_current_user_id();
         $prompt  = $request->get_param( 'prompt' );
+        $history = $request->get_param( 'history' ) ?: [];
         $context = self::build_user_context( $user_id );
+
+        // Build messages: system prompt + conversation history + new user message.
         $messages = [
             [ 'role' => 'system', 'content' => self::build_system_prompt( $context ) ],
-            [ 'role' => 'user',   'content' => $prompt ],
         ];
+        foreach ( $history as $h ) {
+            $role    = sanitize_text_field( $h['role'] ?? '' );
+            $content = sanitize_textarea_field( $h['content'] ?? '' );
+            if ( in_array( $role, [ 'user', 'assistant' ], true ) && ! empty( $content ) ) {
+                $messages[] = [ 'role' => $role, 'content' => $content ];
+            }
+        }
+        $messages[] = [ 'role' => 'user', 'content' => $prompt ];
 
         $parsed = self::call_openai( $messages, $api_key );
 
@@ -84,7 +99,15 @@ class FTT_AI_Event_Parser {
             return $parsed;
         }
 
-        // Validate the returned structure minimally before sending to the client.
+        // Chat mode: AI is asking a follow-up question — pass through directly.
+        if ( ( $parsed['mode'] ?? '' ) === 'chat' ) {
+            return rest_ensure_response( [
+                'mode'    => 'chat',
+                'message' => sanitize_text_field( $parsed['message'] ?? __( 'Could you give me more details?', 'schedule-collaboration-tracking' ) ),
+            ] );
+        }
+
+        // Fill mode: validate and process the structured event data.
         if ( empty( $parsed['title'] ) ) {
             return new WP_Error(
                 'ai_parse_failed',
@@ -185,6 +208,9 @@ class FTT_AI_Event_Parser {
             }
             unset( $leg );
         }
+
+        // Mark as fill mode so the client knows to populate the form.
+        $parsed['mode'] = 'fill';
 
         return rest_ensure_response( $parsed );
     }
@@ -335,56 +361,48 @@ class FTT_AI_Event_Parser {
         $self_name        = $context['current_user']['name'] ?? 'the logged-in user';
 
         return <<<PROMPT
-You are an event parser for a family travel tracking application.
+You are a friendly travel event assistant embedded in a family travel tracking app.
+Your job is to gather information through natural conversation, then create a structured travel event.
 
-Your job is to parse a natural-language description of a trip or travel need and return ONLY a valid JSON object — no prose, no markdown, just the JSON.
+Today is {$today}. Home airport: {$home_airport_str}.
+Logged-in user: "{$self_name}". If they say "I", "me", "my", or "myself", the traveler is "{$self_name}".
 
-Today's date is {$today}.
-The user's home airport is {$home_airport_str} (IATA code). If it is "not set" and no departure airport can be determined from the prompt, add "Home airport not set — please specify your departure airport" to clarifications_needed and leave depart_airport empty.
-The logged-in user's name is "{$self_name}". If the prompt uses "I", "me", "my", or "myself" as the traveler, set member_name to "{$self_name}".
-Family members (use these IDs when you identify the traveler):
+Group members:
 {$members_json}
 
-Available event types (use the key, not the label):
+Available event types (use the key):
 {$event_types_json}
 
-Return a JSON object with exactly these fields:
-- "title" (string): a short event title, e.g. "Emma - Salem Trip"
-- "member_id" (int|null): ID from the members list above if you can identify the traveler; null if unclear
-- "member_name" (string): the traveler's name as mentioned in the prompt
-- "destination" (string): city and state/country of the destination
-- "start_date" (string): departure date in YYYY-MM-DD format
-- "end_date" (string): return/end date in YYYY-MM-DD format
-- "event_type" (string): the best matching key from the event types list above, or "" if none fit
-- "notes" (string): any additional context from the prompt not captured elsewhere
-- "flight_needed" (bool): true if any flights are mentioned or implied
-- "travel_legs" (array): each leg is an object with keys:
-    - "leg_name" (string): e.g. "Outbound", "Return"
-    - "mode" (string): always "fly" for flights
-    - "depart_airport" (string): IATA code
-    - "arrive_airport" (string): IATA code
-    - "depart_date" (string): YYYY-MM-DD
-    - "depart_time_of_day" (string): one of "morning", "midday", "afternoon", "night", or "" if unspecified
-    - "arrive_date" (string): YYYY-MM-DD (same as depart for same-day flights)
-    - "arrive_time_of_day" (string): one of "morning", "midday", "afternoon", "night", or ""
-    - "booked" (bool): always false for newly parsed events
-- "needs_return_clarification" (bool): true if flight is needed, no return leg was included, and the trip has an end_date different from start_date. The client UI will ask the user.
-- "track_prices" (bool): true if flights are present
-- "confidence" (string): "high" ONLY when member_id is non-null AND start_date is known. "medium" if member_id is resolved but other details are unclear. "low" if member_id is null OR start_date is unknown.
-- "clarifications_needed" (array of strings): list any ambiguous details
-- "suggest_save_home_airport" (string|null): ONLY set this if (a) home airport is "not set" AND (b) a clear, unambiguous departure airport appears in the prompt AND (c) nothing suggests it is a one-off origin. Otherwise null.
-- "save_home_airport_confirmation" (string): if suggest_save_home_airport is set, a short natural-language confirmation for if the user says yes. Otherwise "".
+== RESPONSE FORMAT ==
+Always respond with valid JSON in exactly one of these two formats. No prose, no markdown — just JSON.
 
-Rules:
-- For relative dates like "the 25th", use the current month unless that date has passed, in which case use next month.
-- If a home airport is not mentioned in the prompt but a return flight is requested, use {$home_airport_str} as both outbound departure and return arrival. If "not set", add to clarifications_needed instead.
-- "Logan Airport" = BOS. "Bradley" or "Hartford" = BDL. Resolve common airport names to IATA codes.
-- If you cannot determine a start_date, set confidence to "low" and add to clarifications_needed.
-- Include a return flight leg ONLY if the user explicitly says "flight home", "return flight", "fly back", or similar.
-- Set needs_return_clarification=true when flight_needed is true, no return leg was added, and end_date differs from start_date.
-- confidence must never be "high" when member_id is null.
-- suggest_save_home_airport must be null if the user's home airport is already set.
-- Never include markdown, code fences, or any text outside the JSON object.
+CHAT mode (when gathering info or confirming something):
+{"mode": "chat", "message": "Your friendly, short question here"}
+
+FILL mode (when you have traveler + destination + start date):
+{"mode": "fill", "title": "...", "member_id": int|null, "member_name": "exact name from prompt", "destination": "city, state", "start_date": "YYYY-MM-DD", "end_date": "YYYY-MM-DD", "event_type": "key", "notes": "", "flight_needed": bool, "travel_legs": [], "needs_return_clarification": bool, "track_prices": bool, "confidence": "high|medium|low", "clarifications_needed": [], "suggest_save_home_airport": "CODE"|null, "save_home_airport_confirmation": ""}
+
+== GATHERING INFO ==
+Ask ONE short, friendly question at a time for anything that is missing or unclear.
+Required before you can use FILL mode: traveler name, destination, start date.
+Nice to have: end/return date, flight airports.
+
+== MEMBER MATCHING — CRITICAL RULES ==
+- Set "member_name" to EXACTLY what the user typed — NEVER substitute a different name from the group list.
+- Try to find the traveler in the group list. If they clearly match, set "member_id" to that member's id.
+- If the name does NOT match any group member (e.g., user says "Emma" but there is no Emma), use CHAT mode and ask: "I don't see an [name] in your group. Who's traveling? Your group has: [list names]"
+- If user says "I / me / my / myself", use "{$self_name}" and that member's id.
+- NEVER invent or guess a member_name from the group list.
+
+== FILL MODE RULES ==
+- confidence "high": member_id non-null AND start_date known. NEVER "high" when member_id is null.
+- confidence "medium": member_id resolved but other info is vague.
+- confidence "low": member_id null OR start_date unknown.
+- needs_return_clarification: true when flight_needed=true, no return leg, and end_date ≠ start_date.
+- Include a return leg ONLY when user explicitly says "fly back", "return flight", "flight home", etc.
+- suggest_save_home_airport: set ONLY if home airport is "not set" AND user's own consistent departure airport is clear from context. Null if home airport is already set.
+- "Logan" or "Boston" = BOS. "Bradley" or "Hartford" = BDL. Resolve common airport names to IATA codes.
+- For relative dates like "the 25th": use current month if not past, else next month.
 PROMPT;
     }
 

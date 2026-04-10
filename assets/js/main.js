@@ -1630,37 +1630,6 @@
             // ── Show/hide the AI assistant panel ──────────────────────────
             // Keep it open so the user can see clarifications.
 
-            // ── Clarifications ────────────────────────────────────────────
-            var clarifications = res.clarifications_needed || [];
-            if (clarifications.length > 0) {
-                var $list = $('#ftt-ai-clarification-list').empty();
-                clarifications.forEach(function(c) {
-                    $list.append('<li>' + $('<span>').text(c).html() + '</li>');
-                });
-                $('#ftt-ai-clarifications').slideDown(200);
-            }
-
-            // ── Return flight prompt ──────────────────────────────────────
-            if (res.needs_return_clarification) {
-                $('#ftt-ai-return-prompt').slideDown(200);
-            }
-
-            // ── Airport save suggestion ───────────────────────────────────
-            if (res.suggest_save_home_airport) {
-                var confirmMsg = res.save_home_airport_confirmation ||
-                    ('Save ' + res.suggest_save_home_airport + ' as your home airport?');
-                $('#ftt-ai-airport-suggest-msg').text(confirmMsg);
-                $('#ftt-ai-airport-suggest').slideDown(200);
-            }
-
-            // ── Success notice ────────────────────────────────────────────
-            var confidence = res.confidence || 'medium';
-            var noticeClass = confidence === 'high' ? 'ftt-msg-ok' : 'ftt-msg-warn';
-            var noticeText  = confidence === 'high'
-                ? '✓ Form filled. Review and save when ready.'
-                : '⚠ Form partially filled — please check highlighted items above.';
-            $('#ftt-ai-msg').removeClass('ftt-msg-ok ftt-msg-error ftt-msg-warn')
-                            .addClass(noticeClass).text(noticeText).show();
         },
 
         /**
@@ -2986,89 +2955,183 @@
             }
         });
 
-        // ── AI Event Assistant ────────────────────────────────────────────
-        var fttAiParsed = null; // holds last AI response
+        // ── AI Event Assistant (conversational chat) ─────────────────────
+        var fttAiHistory = [];   // [{role:'user',content:'...'}, {role:'assistant',content:'...'}]
+        var fttAiParsed  = null; // last fill-mode response
+        var fttAiDone    = false; // true after form has been filled
 
+        function fttAiScrollChat() {
+            var el = document.getElementById('ftt-ai-chat');
+            if (el) el.scrollTop = el.scrollHeight;
+        }
+
+        // Append a plain text bubble to the chat window.
+        function fttAiAppendBubble(role, text) {
+            var cls = (role === 'user') ? 'ftt-ai-bubble-user' : 'ftt-ai-bubble-ai';
+            var $b = $('<div>').addClass('ftt-ai-bubble ' + cls).text(text);
+            $('#ftt-ai-chat').append($b);
+            fttAiScrollChat();
+            return $b;
+        }
+
+        // Append an AI bubble with Yes / No action buttons.
+        function fttAiAppendActionBubble(text, yesLabel, noLabel, onYes, onNo) {
+            var $b = $('<div>').addClass('ftt-ai-bubble ftt-ai-bubble-ai ftt-ai-bubble-action');
+            $b.append($('<p>').text(text));
+            var $yes = $('<button type="button">').addClass('ftt-btn ftt-btn-secondary ftt-btn-sm').text(yesLabel);
+            var $no  = $('<button type="button">').addClass('ftt-btn-link').text(noLabel);
+            function resolve() { $b.addClass('ftt-ai-bubble-resolved'); $yes.prop('disabled', true); $no.prop('disabled', true); }
+            $yes.on('click', function() { resolve(); onYes(); });
+            $no.on('click',  function() { resolve(); onNo();  });
+            $b.append($yes).append(' ').append($no);
+            $('#ftt-ai-chat').append($b);
+            fttAiScrollChat();
+        }
+
+        // Toggle the chat panel open/closed.
         $('#ftt-ai-toggle').on('click', function() {
             var $body = $('#ftt-ai-body');
             var open  = $body.is(':visible');
             $body.slideToggle(200);
-            $(this).attr('aria-expanded', !open)
-                   .text( open ? 'Describe your trip ▾' : 'Hide ▴' );
+            $(this).attr('aria-expanded', String(!open))
+                   .text( open ? 'Chat ▾' : 'Hide ▴' );
         });
 
-        $('#ftt-ai-parse-btn').on('click', function() {
+        // Send the current textarea content to the AI.
+        function fttAiSend() {
+            if (fttAiDone) return;
             var prompt = $.trim($('#ftt-ai-prompt').val());
             if (!prompt) return;
 
-            var $btn = $(this);
+            var $btn = $('#ftt-ai-parse-btn');
             $btn.prop('disabled', true);
             $('#ftt-ai-spinner').show();
-            $('#ftt-ai-msg').hide();
-            $('#ftt-ai-clarifications').hide();
-            $('#ftt-ai-return-prompt').hide();
-            $('#ftt-ai-airport-suggest').hide();
+
+            fttAiAppendBubble('user', prompt);
+            $('#ftt-ai-prompt').val('');
 
             $.ajax({
                 url:         fttData.restUrl + 'ai/parse-event',
                 method:      'POST',
                 beforeSend:  function(xhr) { xhr.setRequestHeader('X-WP-Nonce', fttData.nonce); },
                 contentType: 'application/json',
-                data:        JSON.stringify({ prompt: prompt }),
+                data:        JSON.stringify({ prompt: prompt, history: fttAiHistory }),
                 success: function(res) {
-                    fttAiParsed = res;
-                    FTT.fillFormFromAI(res);
+                    // Record both sides of this turn for next request.
+                    fttAiHistory.push({ role: 'user',      content: prompt });
+                    fttAiHistory.push({ role: 'assistant', content: JSON.stringify(res) });
+
+                    if (res.mode === 'chat') {
+                        // AI has a follow-up question — show it and keep input active.
+                        fttAiAppendBubble('ai', res.message);
+                        $('#ftt-ai-prompt').focus();
+
+                    } else {
+                        // Fill mode: populate the form.
+                        fttAiParsed = res;
+                        FTT.fillFormFromAI(res);
+
+                        // Confirmation bubble.
+                        var confidence = res.confidence || 'medium';
+                        var doneMsg = (confidence === 'high')
+                            ? '✓ Done! I\'ve filled in the form for "' + (res.title || 'this event') + '". Give it a look and save when you\'re ready.'
+                            : '⚠ I\'ve partially filled the form for "' + (res.title || 'this event') + '". A few items below need your attention.';
+                        fttAiAppendBubble('ai', doneMsg);
+
+                        // Clarifications as a follow-up bubble.
+                        var clarifications = res.clarifications_needed || [];
+                        if (clarifications.length > 0) {
+                            fttAiAppendBubble('ai', 'A few things to double-check:\n• ' + clarifications.join('\n• '));
+                        }
+
+                        // Return flight question (inline buttons).
+                        if (res.needs_return_clarification) {
+                            var returnDate = res.end_date ? ' for ' + res.end_date : '';
+                            fttAiAppendActionBubble(
+                                'No return flight was included — should I add one' + returnDate + '?',
+                                'Yes, add return flight',
+                                'No return needed',
+                                function() {
+                                    var outbound = (fttAiParsed.travel_legs || [])[0] || {};
+                                    FTT.addTravelLeg({
+                                        leg_name:           'Return',
+                                        mode:               'fly',
+                                        depart_airport:     outbound.arrive_airport || '',
+                                        arrive_airport:     outbound.depart_airport || '',
+                                        depart_date:        fttAiParsed.end_date   || '',
+                                        depart_time_of_day: '',
+                                        arrive_date:        fttAiParsed.end_date   || '',
+                                        booked:             false,
+                                    });
+                                    fttAiAppendBubble('ai', 'Return leg added!');
+                                },
+                                function() {}
+                            );
+                        }
+
+                        // Airport save suggestion (inline buttons).
+                        if (res.suggest_save_home_airport) {
+                            var airportMsg = res.save_home_airport_confirmation ||
+                                ('Save ' + res.suggest_save_home_airport + ' as your home airport?');
+                            fttAiAppendActionBubble(
+                                airportMsg,
+                                'Yes, save it',
+                                'No thanks',
+                                function() {
+                                    $.ajax({
+                                        url:         fttData.restUrl + 'user-preferences',
+                                        method:      'PUT',
+                                        beforeSend:  function(xhr) { xhr.setRequestHeader('X-WP-Nonce', fttData.nonce); },
+                                        contentType: 'application/json',
+                                        data:        JSON.stringify({ home_airport: res.suggest_save_home_airport }),
+                                    });
+                                },
+                                function() {}
+                            );
+                        }
+
+                        // Lock input, show restart.
+                        fttAiDone = true;
+                        $btn.text('Done').prop('disabled', true);
+                        $('#ftt-ai-prompt').prop('disabled', true);
+                        $('#ftt-ai-restart').show();
+                    }
                 },
                 error: function(xhr) {
                     var msg = (xhr.responseJSON && xhr.responseJSON.message)
                               ? xhr.responseJSON.message
-                              : 'AI could not parse that. Try adding more detail.';
-                    $('#ftt-ai-msg').removeClass('ftt-msg-ok').addClass('ftt-msg-error').text(msg).show();
+                              : 'Something went wrong — try rephrasing.';
+                    fttAiAppendBubble('ai', '⚠ ' + msg);
                 },
                 complete: function() {
-                    $btn.prop('disabled', false);
+                    if (!fttAiDone) { $btn.prop('disabled', false); }
                     $('#ftt-ai-spinner').hide();
-                }
+                },
             });
+        }
+
+        $('#ftt-ai-parse-btn').on('click', fttAiSend);
+
+        // Send on Enter (Shift+Enter = new line).
+        $('#ftt-ai-prompt').on('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                fttAiSend();
+            }
         });
 
-        // Add return flight from AI suggestion.
-        $(document).on('click', '#ftt-ai-add-return', function() {
-            if (!fttAiParsed) return;
-            var outbound = (fttAiParsed.travel_legs || [])[0] || {};
-            FTT.addTravelLeg({
-                leg_name:            'Return',
-                mode:                'fly',
-                depart_airport:      outbound.arrive_airport || '',
-                arrive_airport:      outbound.depart_airport || '',
-                depart_date:         fttAiParsed.end_date   || '',
-                depart_time_of_day:  '',
-                arrive_date:         fttAiParsed.end_date   || '',
-                booked:              false,
-            });
-            $('#ftt-ai-return-prompt').slideUp(150);
-        });
-
-        $(document).on('click', '#ftt-ai-skip-return', function() {
-            $('#ftt-ai-return-prompt').slideUp(150);
-        });
-
-        // Airport save suggestion.
-        $(document).on('click', '#ftt-ai-airport-yes', function() {
-            var code = fttAiParsed && fttAiParsed.suggest_save_home_airport;
-            if (!code) return;
-            $.ajax({
-                url:         fttData.restUrl + 'user-preferences',
-                method:      'PUT',
-                beforeSend:  function(xhr) { xhr.setRequestHeader('X-WP-Nonce', fttData.nonce); },
-                contentType: 'application/json',
-                data:        JSON.stringify({ home_airport: code }),
-                complete:    function() { $('#ftt-ai-airport-suggest').slideUp(150); }
-            });
-        });
-
-        $(document).on('click', '#ftt-ai-airport-no', function() {
-            $('#ftt-ai-airport-suggest').slideUp(150);
+        // Reset the whole conversation.
+        $('#ftt-ai-restart').on('click', function() {
+            fttAiHistory = [];
+            fttAiParsed  = null;
+            fttAiDone    = false;
+            $('#ftt-ai-chat').html(
+                '<div class="ftt-ai-bubble ftt-ai-bubble-ai">' +
+                'Tell me about the trip — who\'s going, where to, and when?</div>'
+            );
+            $('#ftt-ai-prompt').val('').prop('disabled', false).focus();
+            $('#ftt-ai-parse-btn').text('Send').prop('disabled', false);
+            $(this).hide();
         });
 
         // Calendar subscribe modal

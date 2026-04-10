@@ -39,54 +39,37 @@ $default_airport = get_user_meta($current_user->ID, 'ftt_home_airport', true);
     $has_openai_key = ! empty( $ftt_settings['openai_api_key'] );
     if ( $has_openai_key ) :
     ?>
-    <!-- ── AI Event Assistant ── -->
+    <!-- ── AI Event Assistant (conversational chat) ── -->
     <div class="ftt-ai-assistant" id="ftt-ai-assistant">
         <div class="ftt-ai-header">
             <span class="ftt-ai-icon">✨</span>
             <span class="ftt-ai-label"><?php esc_html_e( 'AI Event Assistant', 'schedule-collaboration-tracking' ); ?></span>
             <button type="button" class="ftt-ai-toggle" id="ftt-ai-toggle" aria-expanded="false">
-                <?php esc_html_e( 'Describe your trip', 'schedule-collaboration-tracking' ); ?> ▾
+                <?php esc_html_e( 'Chat', 'schedule-collaboration-tracking' ); ?> ▾
             </button>
         </div>
         <div class="ftt-ai-body" id="ftt-ai-body" style="display:none;">
-            <textarea id="ftt-ai-prompt"
-                      class="ftt-ai-prompt-input"
-                      rows="3"
-                      placeholder="<?php esc_attr_e( 'e.g. "Emma needs to fly from BDL to Boston on the 25th for 3 nights, morning flight out, flight home on the 28th"', 'schedule-collaboration-tracking' ); ?>"></textarea>
-            <div class="ftt-ai-actions">
-                <button type="button" class="ftt-btn ftt-btn-primary" id="ftt-ai-parse-btn">
-                    <?php esc_html_e( 'Fill form with AI ✨', 'schedule-collaboration-tracking' ); ?>
-                </button>
-                <span class="ftt-ai-spinner" id="ftt-ai-spinner" style="display:none;">⏳ <?php esc_html_e( 'Thinking…', 'schedule-collaboration-tracking' ); ?></span>
+            <div class="ftt-ai-chat" id="ftt-ai-chat" role="log" aria-live="polite">
+                <div class="ftt-ai-bubble ftt-ai-bubble-ai">
+                    <?php esc_html_e( 'Tell me about the trip — who\'s going, where to, and when?', 'schedule-collaboration-tracking' ); ?>
+                </div>
             </div>
-            <div id="ftt-ai-msg" class="ftt-onboard-msg" style="display:none;"></div>
-
-            <!-- Clarification bar: shown when AI has questions -->
-            <div id="ftt-ai-clarifications" class="ftt-ai-clarifications" style="display:none;">
-                <strong><?php esc_html_e( 'The AI needs a bit more info:', 'schedule-collaboration-tracking' ); ?></strong>
-                <ul id="ftt-ai-clarification-list"></ul>
-            </div>
-
-            <!-- Return flight prompt -->
-            <div id="ftt-ai-return-prompt" class="ftt-ai-return-prompt" style="display:none;">
-                <span><?php esc_html_e( 'No return flight was mentioned.', 'schedule-collaboration-tracking' ); ?></span>
-                <button type="button" class="ftt-btn ftt-btn-secondary ftt-btn-sm" id="ftt-ai-add-return">
-                    <?php esc_html_e( 'Add return flight', 'schedule-collaboration-tracking' ); ?>
-                </button>
-                <button type="button" class="ftt-btn-link" id="ftt-ai-skip-return">
-                    <?php esc_html_e( 'No return needed', 'schedule-collaboration-tracking' ); ?>
-                </button>
-            </div>
-
-            <!-- Airport save suggestion -->
-            <div id="ftt-ai-airport-suggest" class="ftt-ai-airport-suggest" style="display:none;">
-                <span id="ftt-ai-airport-suggest-msg"></span>
-                <button type="button" class="ftt-btn ftt-btn-secondary ftt-btn-sm" id="ftt-ai-airport-yes">
-                    <?php esc_html_e( 'Yes, save it', 'schedule-collaboration-tracking' ); ?>
-                </button>
-                <button type="button" class="ftt-btn-link" id="ftt-ai-airport-no">
-                    <?php esc_html_e( 'No thanks', 'schedule-collaboration-tracking' ); ?>
-                </button>
+            <div class="ftt-ai-chat-footer">
+                <textarea id="ftt-ai-prompt"
+                          class="ftt-ai-chat-input"
+                          rows="2"
+                          placeholder="<?php esc_attr_e( 'Type your reply…', 'schedule-collaboration-tracking' ); ?>"></textarea>
+                <div class="ftt-ai-chat-meta">
+                    <button type="button" class="ftt-btn ftt-btn-primary ftt-ai-send-btn" id="ftt-ai-parse-btn">
+                        <?php esc_html_e( 'Send', 'schedule-collaboration-tracking' ); ?>
+                    </button>
+                    <span class="ftt-ai-spinner" id="ftt-ai-spinner" style="display:none;">
+                        ✨ <?php esc_html_e( 'Thinking…', 'schedule-collaboration-tracking' ); ?>
+                    </span>
+                    <button type="button" class="ftt-btn-link ftt-ai-restart" id="ftt-ai-restart" style="display:none;">
+                        <?php esc_html_e( 'Start over', 'schedule-collaboration-tracking' ); ?>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
