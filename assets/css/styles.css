@@ -25,17 +25,66 @@
     }
 }
 
-.ftt-back-link {
-    margin: 0 0 10px 0;
+/* ── Global navigation header ──────────────────────────────────────── */
+.ftt-main-nav {
+    background: linear-gradient(135deg, #6A3E8E 0%, #5B347A 100%);
+    color: white;
+    padding: 20px;
+    margin: 0 0 30px 0;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
 }
-
-.ftt-back-link a {
-    color: #2271b1;
+.ftt-nav-home-link {
     text-decoration: none;
+}
+.ftt-nav-logo h1 {
+    margin: 0 0 15px 0;
+    font-size: 28px;
+    color: white;
+}
+.ftt-nav-menu {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+.ftt-nav-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 16px;
+    background: rgba(255,255,255,0.15);
+    color: white !important;
+    text-decoration: none;
+    border-radius: 6px;
+    transition: background 0.2s, transform 0.2s;
     font-size: 14px;
+    font-weight: 500;
+}
+.ftt-nav-link:hover {
+    background: rgba(255,255,255,0.28);
+    transform: translateY(-1px);
+}
+.ftt-nav-link.ftt-nav-active {
+    background: rgba(255,255,255,0.35);
+    box-shadow: inset 0 0 0 2px rgba(255,255,255,0.6);
+    pointer-events: none;
+}
+.ftt-nav-link .dashicons {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
 }
 
-.ftt-back-link a:hover {
+/* ── Contextual back-breadcrumb (used on event-form, family-management) */
+.ftt-breadcrumb {
+    margin: 0 0 18px;
+    font-size: 13px;
+}
+.ftt-breadcrumb a {
+    color: #6A3E8E;
+    text-decoration: none;
+}
+.ftt-breadcrumb a:hover {
     text-decoration: underline;
 }
 
@@ -49,12 +98,16 @@
     margin: 20px 0;
 }
 
-.fc .fc-view-harness {
-    height: auto !important;
+/* FC v6 auto-height fix: the view is position:absolute in FC's own CSS,
+   which collapses the harness to 0 unless FC's JS sets an explicit height.
+   Making it relative puts day rows in normal flow so the harness sizes itself. */
+.fc .fc-view-harness-active > .fc-view {
+    position: relative;
 }
 
-.fc .fc-scroller {
-    overflow: visible !important;
+/* Prevent the global * { max-width:100% } mobile rule from collapsing FC table cells */
+.fc table {
+    max-width: none;
 }
 
 .fc-event {
@@ -803,6 +856,39 @@
     margin-top: 0;
 }
 
+/* Subscribe modal: wider to fit the full instructions content */
+.ftt-subscribe-modal-content {
+    max-width: 680px;
+    padding: 0;
+}
+.ftt-subscribe-modal-content .ftt-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 18px 24px;
+    border-bottom: 1px solid #e0e0e0;
+}
+.ftt-subscribe-modal-content .ftt-modal-header h2 {
+    margin: 0;
+    font-size: 18px;
+    color: #333;
+}
+.ftt-subscribe-modal-content .ftt-modal-body {
+    padding: 24px;
+    overflow-y: auto;
+    max-height: calc(80vh - 70px);
+}
+/* Strip the page-level container padding from subscribe content inside modal */
+.ftt-subscribe-modal-content .ftt-subscribe-page {
+    padding: 0;
+    max-width: none;
+}
+
+/* Cal subscribe bar */
+.ftt-cal-subscribe-bar {
+    margin: 0 0 16px 0;
+}
+
 .ftt-travel-leg-details {
     background: #f9f9f9;
     padding: 10px 12px;
@@ -1098,6 +1184,7 @@
 
 .ftt-flight-buttons {
     display: flex;
+    align-items: center;
     gap: 8px;
     flex-wrap: wrap;
 }
@@ -1107,13 +1194,17 @@
     margin: 0;
     padding: 8px 16px;
     font-size: 13px;
+    line-height: 1.4;
     text-decoration: none;
     background: #2271b1;
     color: white;
     border: none;
     border-radius: 3px;
     cursor: pointer;
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    box-sizing: border-box;
     transition: background 0.2s;
 }
 
@@ -4520,7 +4611,7 @@ body.ftt-survey-open {
 .ftt-profile-page {
     max-width: 760px;
     margin: 0 auto;
-    padding: 24px 16px 60px;
+    padding: 20px 20px 60px;
     font-family: inherit;
 }
 
@@ -5310,4 +5401,475 @@ body.ftt-survey-open {
     .ftt-trial-expired-pricing { flex-direction: column; align-items: center; }
     .ftt-pricing-card { width: 100%; max-width: 320px; }
     .ftt-onboard-feed-row { flex-direction: column; }
+}
+
+/* ==================== Mobile Responsive (≤768px) ==================== */
+
+/* ── Global nav: compact on mobile ─────────────────────────────────── */
+@media (max-width: 768px) {
+    .ftt-main-nav {
+        margin: 0 0 20px 0;
+        padding: 12px 15px;
+    }
+    .ftt-nav-logo h1 {
+        font-size: 20px;
+        margin-bottom: 10px;
+    }
+    .ftt-nav-menu {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        flex-wrap: nowrap;
+        gap: 6px;
+        padding-bottom: 4px;
+    }
+    .ftt-nav-link {
+        font-size: 12px;
+        padding: 7px 10px;
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+    .ftt-nav-link .dashicons {
+        font-size: 14px;
+        width: 14px;
+        height: 14px;
+    }
+}
+
+/* ── Flight search buttons: 2-column grid ──────────────────────────── */
+@media (max-width: 768px) {
+    .ftt-flight-buttons {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+    }
+    /* Full-width for odd last button */
+    .ftt-flight-buttons > :last-child:nth-child(odd) {
+        grid-column: span 2;
+    }
+}
+@media (max-width: 400px) {
+    .ftt-flight-buttons {
+        grid-template-columns: 1fr;
+    }
+    .ftt-flight-buttons > :last-child:nth-child(odd) {
+        grid-column: span 1;
+    }
+}
+
+/* ── Event form: stack travel leg fields vertically ─────────────────── */
+@media (max-width: 768px) {
+    .ftt-form-row {
+        flex-direction: column;
+        gap: 10px;
+    }
+    .ftt-travel-leg {
+        padding: 12px;
+    }
+    .ftt-flight-dates-section {
+        flex-direction: column;
+        gap: 10px;
+    }
+    .ftt-date-group {
+        width: 100%;
+    }
+    .ftt-booking-section .ftt-form-row {
+        flex-direction: column;
+        gap: 8px;
+    }
+    /* Airport autocomplete dropdown fills width */
+    .ftt-airport-picker .ftt-airport-list {
+        min-width: 0;
+        width: 100%;
+    }
+    /* Baggage checkboxes stack */
+    .ftt-baggage-options {
+        flex-direction: column;
+        gap: 6px;
+    }
+}
+
+/* ── Manage Family: responsive tables → cards ───────────────────────── */
+@media (max-width: 768px) {
+    /* Hide table header; each cell shows its own label via data-label */
+    .ftt-admin-tabs .wp-list-table thead {
+        display: none;
+    }
+    .ftt-admin-tabs .wp-list-table,
+    .ftt-admin-tabs .wp-list-table tbody,
+    .ftt-admin-tabs .wp-list-table tr {
+        display: block;
+        width: 100%;
+    }
+    .ftt-admin-tabs .wp-list-table tr {
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        margin-bottom: 10px;
+        padding: 10px;
+        background: #fff;
+    }
+    .ftt-admin-tabs .wp-list-table td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 6px 0;
+        border: none;
+        border-bottom: 1px solid #f0f0f0;
+        font-size: 13px;
+    }
+    .ftt-admin-tabs .wp-list-table td:last-child {
+        border-bottom: none;
+    }
+    .ftt-admin-tabs .wp-list-table td::before {
+        content: attr(data-label);
+        font-weight: 600;
+        color: #555;
+        flex-shrink: 0;
+        margin-right: 10px;
+        font-size: 12px;
+        text-transform: uppercase;
+    }
+    /* Nav tabs scroll horizontally */
+    .ftt-admin-tabs .nav-tab-wrapper {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        white-space: nowrap;
+        display: flex;
+        flex-wrap: nowrap;
+        gap: 4px;
+        padding-bottom: 4px;
+    }
+    .ftt-admin-tabs .nav-tab {
+        flex-shrink: 0;
+    }
+}
+
+/* ── Modal: make modals full-screen on mobile ────────────────────────── */
+@media (max-width: 768px) {
+    .ftt-modal {
+        align-items: flex-end; /* slide up from bottom */
+    }
+    .ftt-modal-content {
+        width: 100% !important;
+        max-width: 100% !important;
+        max-height: 90vh;
+        overflow-y: auto;
+        border-radius: 16px 16px 0 0;
+        padding: 20px 15px;
+    }
+}
+
+/* ── Calendar page: QR code section ─────────────────────────────────── */
+.ftt-qr-code-section {
+    margin: 20px 0;
+    padding: 0;
+}
+.ftt-qr-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    font-size: 14px;
+    cursor: pointer;
+    background: #0073aa;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+.ftt-qr-toggle:hover { background: #005177; }
+.ftt-qr-toggle.active { background: #005177; }
+.ftt-qr-toggle .dashicons { font-size: 18px; width: 18px; height: 18px; }
+.ftt-qr-code-content {
+    margin-top: 15px;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 0;
+    overflow: hidden;
+}
+.ftt-qr-code-inner { padding: 20px; }
+.ftt-qr-code-inner h4 { margin: 0 0 10px 0; font-size: 18px; color: #23282d; }
+.ftt-qr-code-image {
+    text-align: center;
+    margin: 20px 0;
+    padding: 20px;
+    background: #f9f9f9;
+    border-radius: 4px;
+}
+.ftt-qr-code-image img {
+    display: inline-block;
+    border: 3px solid #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    border-radius: 4px;
+}
+.ftt-qr-instructions {
+    background: #f0f6fc;
+    padding: 15px;
+    border-left: 4px solid #0073aa;
+    margin: 20px 0;
+    border-radius: 4px;
+}
+.ftt-qr-instructions p { margin: 8px 0; font-size: 14px; }
+.ftt-qr-alternative {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #ddd;
+}
+.ftt-webcal-url {
+    width: 100%;
+    max-width: 500px;
+    padding: 8px;
+    font-family: monospace;
+    font-size: 12px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    margin: 10px 0;
+}
+.ftt-copy-url { margin-left: 10px; }
+
+/* ── Calendar legend ─────────────────────────────────────────────────── */
+.ftt-calendar-legend {
+    margin-top: 30px;
+    padding: 20px;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+.ftt-legend-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 10px;
+    margin-top: 15px;
+}
+.ftt-legend-item { display: flex; align-items: center; gap: 10px; }
+.ftt-legend-color { width: 20px; height: 20px; border-radius: 3px; }
+.ftt-legend-label { font-size: 14px; }
+
+/* ── Calendar event type filter panel ───────────────────────────────── */
+.ftt-event-filters {
+    margin: 20px 0;
+    position: relative;
+}
+#ftt-filter-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    font-size: 14px;
+    cursor: pointer;
+    background: #6A3E8E;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+#ftt-filter-toggle:hover { background: #5B347A; }
+#ftt-filter-toggle.active { background: #5B347A; }
+#ftt-filter-toggle .dashicons { font-size: 18px; width: 18px; height: 18px; }
+.ftt-filter-panel {
+    margin-top: 15px;
+    background: #fff;
+    border: 2px solid #6A3E8E;
+    border-radius: 8px;
+    padding: 20px;
+}
+.ftt-filter-panel h4 { margin: 0 0 15px 0; color: #6A3E8E; font-size: 16px; }
+.ftt-filter-categories {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+}
+.ftt-filter-category {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 15px;
+    border: 2px solid #e0e0e0;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: white;
+}
+.ftt-filter-category:hover { border-color: #6A3E8E; background: #f5f5f5; }
+.ftt-filter-category input[type="checkbox"] { margin: 0; }
+.ftt-filter-category input[type="checkbox"]:checked + .ftt-category-icon { transform: scale(1.2); }
+.ftt-filter-category .ftt-category-icon { font-size: 20px; transition: transform 0.2s; }
+.ftt-filter-category .ftt-category-label { flex: 1; font-weight: 500; font-size: 14px; }
+.ftt-filter-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    padding-top: 15px;
+    border-top: 1px solid #e0e0e0;
+}
+.ftt-filter-actions .button { min-width: 100px; }
+
+/* ── Calendar: toolbar title + event filter panel on mobile ─────────── */
+@media (max-width: 768px) {
+    /* Allow month grid to scroll horizontally on very narrow screens */
+    #ftt-calendar {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        max-width: 100%;
+    }
+    /* Compact month grid cells so 7 columns fit on ~360px screens */
+    .fc .fc-col-header-cell-cushion {
+        font-size: 10px;
+        padding: 4px 1px;
+    }
+    .fc .fc-daygrid-day-number {
+        font-size: 11px;
+        padding: 2px 3px;
+    }
+    .fc .fc-daygrid-day-frame {
+        min-height: 38px;
+    }
+    .fc .fc-daygrid-event .fc-event-title {
+        font-size: 9px;
+    }
+    /* Hide time in month cells — saves width */
+    .fc .fc-daygrid-event .fc-event-time {
+        display: none;
+    }
+    /* Two-row toolbar: row 1 = nav+views, row 2 = title full-width */
+    .fc .fc-toolbar {
+        display: grid;
+        grid-template-areas:
+            "nav . views"
+            "title title title";
+        grid-template-columns: auto 1fr auto;
+        align-items: center;
+        gap: 4px 6px;
+    }
+    .fc .fc-toolbar-chunk:nth-child(1) { grid-area: nav; }
+    .fc .fc-toolbar-chunk:nth-child(2) { grid-area: title; }
+    .fc .fc-toolbar-chunk:nth-child(3) { grid-area: views; }
+    .fc .fc-toolbar-title {
+        font-size: 1.0em;
+        text-align: left;
+    }
+    /* Event type filter panel: 2-column compact grid */
+    .ftt-filter-categories {
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
+    }
+    /* Cap panel height so it doesn't push the whole page down */
+    .ftt-filter-panel {
+        max-height: 60vh;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    /* Legend: 2-column grid to halve vertical footprint */
+    .ftt-legend-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    /* Legend heading acts as collapsible toggle */
+    .ftt-calendar-legend h3.ftt-mob-toggle-hdr {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        cursor: pointer;
+        margin-bottom: 0;
+    }
+    .ftt-mob-chevron {
+        font-size: 20px;
+        line-height: 1;
+        color: #6A3E8E;
+        font-weight: 300;
+        flex-shrink: 0;
+    }
+}
+
+/* ── AI Event Assistant ──────────────────────────────────────────────────── */
+.ftt-ai-assistant {
+    background: linear-gradient(135deg, #f8f4ff 0%, #f0e8ff 100%);
+    border: 1px solid #c9a8e8;
+    border-radius: 10px;
+    margin-bottom: 24px;
+    overflow: hidden;
+}
+.ftt-ai-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 18px;
+    cursor: pointer;
+}
+.ftt-ai-icon { font-size: 1.3em; }
+.ftt-ai-label {
+    font-weight: 600;
+    color: #6A3E8E;
+    flex: 1;
+}
+.ftt-ai-toggle {
+    background: none;
+    border: 1px solid #6A3E8E;
+    border-radius: 20px;
+    color: #6A3E8E;
+    padding: 4px 14px;
+    font-size: 0.85em;
+    cursor: pointer;
+}
+.ftt-ai-toggle:hover { background: #6A3E8E; color: #fff; }
+.ftt-ai-body { padding: 0 18px 18px; }
+.ftt-ai-prompt-input {
+    width: 100%;
+    border: 1px solid #c9a8e8;
+    border-radius: 6px;
+    padding: 10px;
+    font-size: 0.95em;
+    resize: vertical;
+    box-sizing: border-box;
+    background: #fff;
+    margin-bottom: 10px;
+}
+.ftt-ai-prompt-input:focus {
+    outline: none;
+    border-color: #6A3E8E;
+    box-shadow: 0 0 0 2px rgba(106,62,142,0.15);
+}
+.ftt-ai-actions { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.ftt-ai-spinner { color: #6A3E8E; font-size: 0.9em; }
+.ftt-ai-clarifications {
+    background: #fff8e6;
+    border: 1px solid #f0c040;
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin-top: 10px;
+    font-size: 0.9em;
+}
+.ftt-ai-clarifications ul { margin: 6px 0 0 16px; padding: 0; }
+.ftt-ai-clarifications li { margin-bottom: 4px; }
+.ftt-ai-return-prompt,
+.ftt-ai-airport-suggest {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #eaf4ff;
+    border: 1px solid #9ac8f0;
+    border-radius: 6px;
+    padding: 8px 14px;
+    margin-top: 10px;
+    font-size: 0.9em;
+    flex-wrap: wrap;
+}
+.ftt-btn-link {
+    background: none;
+    border: none;
+    color: #666;
+    text-decoration: underline;
+    cursor: pointer;
+    font-size: 0.85em;
+    padding: 0;
+}
+.ftt-btn-sm { padding: 4px 12px; font-size: 0.85em; }
+.ftt-msg-warn {
+    background: #fff8e6;
+    border: 1px solid #f0c040;
+    color: #7a5c00;
+    padding: 8px 12px;
+    border-radius: 4px;
+    display: inline-block;
+    font-size: 0.9em;
 }

@@ -1564,7 +1564,105 @@
             const date = new Date(dateString);
             return date.toLocaleString();
         },
-        
+
+        /**
+         * Fill the event form from an AI parse-event response.
+         * Populates every field it can map, then surfaces clarifications.
+         *
+         * @param {Object} res  The parsed response from POST /ai/parse-event
+         */
+        fillFormFromAI: function(res) {
+            var self = this;
+            var TOD_TIMES = { morning: '09:00', midday: '12:00', afternoon: '15:00', night: '20:00' };
+
+            // ── Basic fields ──────────────────────────────────────────────
+            if (res.title)       $('#event_title').val(res.title);
+            if (res.notes)       $('#notes').val(res.notes);
+            if (res.destination) $('#location_name').val(res.destination);
+
+            // ── Dates ─────────────────────────────────────────────────────
+            // Form uses either date-only (all_day) or datetime-local inputs.
+            var allDay = $('#all_day').is(':checked');
+            if (res.start_date) {
+                $('#start_datetime').val(allDay ? res.start_date : res.start_date + 'T00:00');
+            }
+            if (res.end_date) {
+                $('#end_datetime').val(allDay ? res.end_date : res.end_date + 'T23:59');
+            }
+
+            // ── Event type ────────────────────────────────────────────────
+            if (res.event_type) {
+                var et      = res.event_type;
+                var etTypes = window.fttEventTypes || {};
+                $('#event_type').val(et);
+                $('#event_type_search').val(
+                    etTypes[et] || et.replace(/_/g, ' ').replace(/\b\w/g, function(l){ return l.toUpperCase(); })
+                );
+            }
+
+            // ── Member / traveler ─────────────────────────────────────────
+            if ($('#ftt-member-checkboxes').length) {
+                $('#ftt-family-event').prop('checked', false);
+                $('.ftt-child-checkbox').prop('checked', false).prop('disabled', false);
+                if (res.member_id) {
+                    var $cb = $('.ftt-child-checkbox[value="' + res.member_id + '"]');
+                    if ($cb.length) {
+                        $cb.prop('checked', true);
+                    }
+                }
+            } else if ($('#member_id').length && res.member_id) {
+                $('#member_id').val(res.member_id);
+            }
+
+            // ── Travel legs ───────────────────────────────────────────────
+            if (res.travel_legs && res.travel_legs.length > 0) {
+                // Clear any existing legs first.
+                $('#ftt-travel-legs-container').empty();
+                res.travel_legs.forEach(function(leg) {
+                    // Map depart_time_of_day to an actual time for the leg.
+                    var legData = $.extend({}, leg);
+                    // The leg form uses depart_time_of_day directly as a select value.
+                    self.addTravelLeg(legData);
+                });
+                setTimeout(function(){ self.checkFlightSuggestions(); }, 300);
+            }
+
+            // ── Show/hide the AI assistant panel ──────────────────────────
+            // Keep it open so the user can see clarifications.
+
+            // ── Clarifications ────────────────────────────────────────────
+            var clarifications = res.clarifications_needed || [];
+            if (clarifications.length > 0) {
+                var $list = $('#ftt-ai-clarification-list').empty();
+                clarifications.forEach(function(c) {
+                    $list.append('<li>' + $('<span>').text(c).html() + '</li>');
+                });
+                $('#ftt-ai-clarifications').slideDown(200);
+            }
+
+            // ── Return flight prompt ──────────────────────────────────────
+            if (res.needs_return_clarification) {
+                $('#ftt-ai-return-prompt').slideDown(200);
+            }
+
+            // ── Airport save suggestion ───────────────────────────────────
+            if (res.suggest_save_home_airport) {
+                var confirmMsg = res.save_home_airport_confirmation ||
+                    ('Save ' + res.suggest_save_home_airport + ' as your home airport?');
+                $('#ftt-ai-airport-suggest-msg').text(confirmMsg);
+                $('#ftt-ai-airport-suggest').slideDown(200);
+            }
+
+            // ── Success notice ────────────────────────────────────────────
+            var confidence = res.confidence || 'medium';
+            var noticeClass = confidence === 'high' ? 'ftt-msg-ok' : 'ftt-msg-warn';
+            var noticeText  = confidence === 'high'
+                ? '✓ Form filled. Review and save when ready.'
+                : '⚠ Form partially filled — please check highlighted items above.';
+            $('#ftt-ai-msg').removeClass('ftt-msg-ok ftt-msg-error ftt-msg-warn')
+                            .addClass(noticeClass).text(noticeText).show();
+        },
+
         /**
          * Get pretty event type name
          */
@@ -2886,6 +2984,91 @@
             if (codeText && codeText !== '---') {
                 FTT.copyToClipboard(codeText);
             }
+        });
+
+        // ── AI Event Assistant ────────────────────────────────────────────
+        var fttAiParsed = null; // holds last AI response
+
+        $('#ftt-ai-toggle').on('click', function() {
+            var $body = $('#ftt-ai-body');
+            var open  = $body.is(':visible');
+            $body.slideToggle(200);
+            $(this).attr('aria-expanded', !open)
+                   .text( open ? 'Describe your trip ▾' : 'Hide ▴' );
+        });
+
+        $('#ftt-ai-parse-btn').on('click', function() {
+            var prompt = $.trim($('#ftt-ai-prompt').val());
+            if (!prompt) return;
+
+            var $btn = $(this);
+            $btn.prop('disabled', true);
+            $('#ftt-ai-spinner').show();
+            $('#ftt-ai-msg').hide();
+            $('#ftt-ai-clarifications').hide();
+            $('#ftt-ai-return-prompt').hide();
+            $('#ftt-ai-airport-suggest').hide();
+
+            $.ajax({
+                url:         fttData.restUrl + 'ai/parse-event',
+                method:      'POST',
+                beforeSend:  function(xhr) { xhr.setRequestHeader('X-WP-Nonce', fttData.nonce); },
+                contentType: 'application/json',
+                data:        JSON.stringify({ prompt: prompt }),
+                success: function(res) {
+                    fttAiParsed = res;
+                    FTT.fillFormFromAI(res);
+                },
+                error: function(xhr) {
+                    var msg = (xhr.responseJSON && xhr.responseJSON.message)
+                              ? xhr.responseJSON.message
+                              : 'AI could not parse that. Try adding more detail.';
+                    $('#ftt-ai-msg').removeClass('ftt-msg-ok').addClass('ftt-msg-error').text(msg).show();
+                },
+                complete: function() {
+                    $btn.prop('disabled', false);
+                    $('#ftt-ai-spinner').hide();
+                }
+            });
+        });
+
+        // Add return flight from AI suggestion.
+        $(document).on('click', '#ftt-ai-add-return', function() {
+            if (!fttAiParsed) return;
+            var outbound = (fttAiParsed.travel_legs || [])[0] || {};
+            FTT.addTravelLeg({
+                leg_name:            'Return',
+                mode:                'fly',
+                depart_airport:      outbound.arrive_airport || '',
+                arrive_airport:      outbound.depart_airport || '',
+                depart_date:         fttAiParsed.end_date   || '',
+                depart_time_of_day:  '',
+                arrive_date:         fttAiParsed.end_date   || '',
+                booked:              false,
+            });
+            $('#ftt-ai-return-prompt').slideUp(150);
+        });
+
+        $(document).on('click', '#ftt-ai-skip-return', function() {
+            $('#ftt-ai-return-prompt').slideUp(150);
+        });
+
+        // Airport save suggestion.
+        $(document).on('click', '#ftt-ai-airport-yes', function() {
+            var code = fttAiParsed && fttAiParsed.suggest_save_home_airport;
+            if (!code) return;
+            $.ajax({
+                url:         fttData.restUrl + 'user-preferences',
+                method:      'PUT',
+                beforeSend:  function(xhr) { xhr.setRequestHeader('X-WP-Nonce', fttData.nonce); },
+                contentType: 'application/json',
+                data:        JSON.stringify({ home_airport: code }),
+                complete:    function() { $('#ftt-ai-airport-suggest').slideUp(150); }
+            });
+        });
+
+        $(document).on('click', '#ftt-ai-airport-no', function() {
+            $('#ftt-ai-airport-suggest').slideUp(150);
         });
 
         // Calendar subscribe modal
