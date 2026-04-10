@@ -2989,12 +2989,30 @@
         }
 
         // Toggle the chat panel open/closed.
+        // Collapsing the form while chatting keeps focus on the conversation.
+        function fttFormCollapse() {
+            $('#ftt-form-fields').slideUp(250);
+            $('#ftt-form-expand-bar').show().attr('aria-expanded', 'false');
+        }
+        function fttFormExpand() {
+            $('#ftt-form-fields').slideDown(300);
+            $('#ftt-form-expand-bar').hide().attr('aria-expanded', 'true');
+        }
+
         $('#ftt-ai-toggle').on('click', function() {
             var $body = $('#ftt-ai-body');
             var open  = $body.is(':visible');
             $body.slideToggle(200);
             $(this).attr('aria-expanded', String(!open))
                    .text( open ? 'Chat ▾' : 'Hide ▴' );
+            // Collapse the form when chat opens; restore when chat closes.
+            if (!open) { fttFormCollapse(); } else { fttFormExpand(); }
+        });
+
+        // Manual expand/collapse of the form section.
+        $('#ftt-form-expand-bar').on('click', function() {
+            var expanded = $('#ftt-form-fields').is(':visible');
+            if (expanded) { fttFormCollapse(); } else { fttFormExpand(); }
         });
 
         // Send the current textarea content to the AI.
@@ -3090,11 +3108,20 @@
                             );
                         }
 
-                        // Lock input, show restart.
+                        // Lock input, show restart. Expand the form so the user can review.
                         fttAiDone = true;
                         $btn.text('Done').prop('disabled', true);
                         $('#ftt-ai-prompt').prop('disabled', true);
                         $('#ftt-ai-restart').show();
+
+                        // Expand the form and scroll it into view.
+                        fttFormExpand();
+                        setTimeout(function() {
+                            var $form = $('#ftt-form-wrap');
+                            if ($form.length) {
+                                $('html, body').animate({ scrollTop: $form.offset().top - 80 }, 400);
+                            }
+                        }, 350);
                     }
                 },
                 error: function(xhr) {
@@ -3132,6 +3159,8 @@
             $('#ftt-ai-prompt').val('').prop('disabled', false).focus();
             $('#ftt-ai-parse-btn').text('Send').prop('disabled', false);
             $(this).hide();
+            // Re-collapse the form for the next chat session.
+            fttFormCollapse();
         });
 
         // Calendar subscribe modal

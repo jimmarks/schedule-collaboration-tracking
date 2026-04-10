@@ -74,7 +74,15 @@ $default_airport = get_user_meta($current_user->ID, 'ftt_home_airport', true);
         </div>
     </div>
     <?php endif; ?>
-    
+
+    <!-- Form is collapsed while the AI chat is active, expanded after fill -->
+    <div id="ftt-form-wrap" class="ftt-form-wrap">
+        <button type="button" id="ftt-form-expand-bar" class="ftt-form-expand-bar" style="display:none;" aria-expanded="false">
+            <span class="ftt-form-expand-label"><?php esc_html_e( 'Event Details', 'schedule-collaboration-tracking' ); ?></span>
+            <span class="ftt-form-expand-hint"><?php esc_html_e( 'Chat to fill — or click to edit manually', 'schedule-collaboration-tracking' ); ?></span>
+            <span class="ftt-form-expand-arrow">▾</span>
+        </button>
+        <div id="ftt-form-fields">
     <form id="ftt-event-form">
         <!-- Basic Information -->
         <div class="ftt-form-section">
@@ -264,4 +272,6 @@ $default_airport = get_user_meta($current_user->ID, 'ftt_home_airport', true);
             </button>
         </div>
     </form>
-</div>
+        </div><!-- /#ftt-form-fields -->
+    </div><!-- /#ftt-form-wrap -->
+</div><!-- /.ftt-container -->

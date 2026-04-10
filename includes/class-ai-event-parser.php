@@ -307,22 +307,29 @@ class FTT_AI_Event_Parser {
             'name' => $current_user->display_name,
         ] : null;
 
-        // Get group members so the AI can resolve names to IDs.
-        $members  = [];
-        $group_id = (int) get_user_meta( $user_id, 'ftt_primary_group', true );
-
-        if ( $group_id && class_exists( 'FTT_Family_Groups' ) ) {
-            $group_members = FTT_Family_Groups::get_group_members( $group_id );
-            if ( is_array( $group_members ) ) {
-                foreach ( $group_members as $m ) {
-                    $wp_user = get_userdata( $m->user_id );
+        // Get members using the same logic as the event form (FTT_Roles).
+        $members = [];
+        if ( class_exists( 'FTT_Roles' ) ) {
+            if ( user_can( $user_id, 'manage_options' ) ) {
+                // Admin sees all registered members.
+                $all_members = FTT_Roles::get_all_members();
+                foreach ( $all_members as $wp_user ) {
+                    $members[] = [
+                        'id'      => (int) $wp_user->ID,
+                        'name'    => $wp_user->display_name,
+                        'is_self' => ( (int) $wp_user->ID === $user_id ),
+                    ];
+                }
+            } else {
+                // Parent sees only their linked children.
+                $child_ids = FTT_Roles::get_children( $user_id );
+                foreach ( $child_ids as $child_id ) {
+                    $wp_user = get_userdata( (int) $child_id );
                     if ( $wp_user ) {
                         $members[] = [
-                            'id'           => (int) $m->user_id,
-                            'name'         => $wp_user->display_name,
-                            'role'         => $m->role,
-                            'relationship' => $m->relationship ?? '',
-                            'is_self'      => ( (int) $m->user_id === $user_id ),
+                            'id'      => (int) $wp_user->ID,
+                            'name'    => $wp_user->display_name,
+                            'is_self' => false,
                         ];
                     }
                 }

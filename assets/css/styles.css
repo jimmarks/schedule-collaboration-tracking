@@ -5904,3 +5904,27 @@ body.ftt-survey-open {
     display: inline-block;
     font-size: 0.9em;
 }
+
+/* ── Form collapse wrapper when AI chat is active ────────────────────── */
+.ftt-form-wrap { position: relative; }
+.ftt-form-expand-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    background: #f4eeff;
+    border: 1px dashed #b89ad8;
+    border-radius: 8px;
+    padding: 12px 18px;
+    cursor: pointer;
+    text-align: left;
+    font-size: 0.95em;
+    color: #6A3E8E;
+    box-sizing: border-box;
+    margin-bottom: 12px;
+}
+.ftt-form-expand-bar:hover { background: #ede4f9; }
+.ftt-form-expand-label { font-weight: 600; }
+.ftt-form-expand-hint { flex: 1; color: #8c6db0; font-size: 0.88em; }
+.ftt-form-expand-arrow { font-size: 1.1em; }
+.ftt-form-expand-bar[aria-expanded="true"] .ftt-form-expand-arrow { transform: rotate(180deg); }
