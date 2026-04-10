@@ -252,7 +252,7 @@ $default_airport = get_user_meta($current_user->ID, 'ftt_home_airport', true);
 
             <!-- Flight Link Suggestions -->
             <div id="ftt-flight-suggestions" class="ftt-flight-suggestions" style="display: none;">
-                <h5><?php esc_html_e('💡 Link Flights for Better Pricing', 'schedule-collaboration-tracking'); ?></h5>
+                <h5><?php esc_html_e('✓ Round-Trip Detected', 'schedule-collaboration-tracking'); ?></h5>
                 <div id="ftt-suggestions-list"></div>
             </div>
 

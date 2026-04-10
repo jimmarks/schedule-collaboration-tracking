@@ -797,13 +797,6 @@
                                 <option value="other" ${data && data.mode === 'other' ? 'selected' : ''}>Other</option>
                             </select>
                         </div>
-                        <div class="ftt-form-field ftt-flight-only">
-                            <label>
-                                <input type="checkbox" name="travel_legs[${index}][is_round_trip]" class="ftt-round-trip-toggle" value="1" ${data && data.is_round_trip ? 'checked' : ''}>
-                                Round-Trip Flight
-                            </label>
-                            <small class="description">Check if departing and returning same route - system will search combined pricing</small>
-                        </div>
                     </div>
                     
                     <div class="ftt-form-row">
@@ -854,25 +847,6 @@
                             </div>
                         </div>
                         
-                        <div class="ftt-date-group ftt-return-group ftt-round-trip-return" style="display: none;">
-                            <h5 class="ftt-date-group-label">🔄 Return</h5>
-                            <div class="ftt-form-row">
-                                <div class="ftt-form-field">
-                                    <label>Return Date *</label>
-                                    <input type="date" name="travel_legs[${index}][return_date]" value="${data && data.return_date ? data.return_date : ''}">
-                                </div>
-                                <div class="ftt-form-field">
-                                    <label>Return Time of Day</label>
-                                    <select name="travel_legs[${index}][return_time_of_day]">
-                                        <option value="">Any Time</option>
-                                        <option value="morning" ${data && data.return_time_of_day === 'morning' ? 'selected' : ''}>Morning</option>
-                                        <option value="midday" ${data && data.return_time_of_day === 'midday' ? 'selected' : ''}>Mid-Day</option>
-                                        <option value="afternoon" ${data && data.return_time_of_day === 'afternoon' ? 'selected' : ''}>Afternoon</option>
-                                        <option value="night" ${data && data.return_time_of_day === 'night' ? 'selected' : ''}>Night</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
                     </div>
                     
                     <div class="ftt-booking-section ftt-flight-only">
@@ -970,26 +944,7 @@
                 $newLeg.find('.ftt-booking-details').toggle(this.checked);
             });
             
-            // Toggle round-trip return date fields
-            $newLeg.find('.ftt-round-trip-toggle').on('change', function() {
-                const isRoundTrip = this.checked;
-                const $returnGroup = $newLeg.find('.ftt-return-group');
-                $returnGroup.toggle(isRoundTrip);
-                
-                // Show helper text
-                if (isRoundTrip) {
-                    if (!$newLeg.find('.ftt-round-trip-help').length) {
-                        $returnGroup.before(
-                            '<div class="ftt-round-trip-help" style="margin: 15px 0 0 0; padding: 12px 15px; background: #e7f3ff; border-left: 4px solid #2271b1; font-size: 14px; border-radius: 4px;">' +
-                            '<strong>💡 Round-Trip Pricing:</strong> Enter your return date below. The system will search for combined round-trip fares which are often cheaper than two one-way tickets.' +
-                            '</div>'
-                        );
-                    }
-                } else {
-                    $newLeg.find('.ftt-round-trip-help').remove();
-                }
-            }).trigger('change');
-            
+
 
         },
         
@@ -1080,7 +1035,7 @@
                             suggestions.push({
                                 outbound: legs[i],
                                 return: legs[j],
-                                message: `💡 Legs ${legs[i].index + 1} and ${legs[j].index + 1} look like a round-trip (${legs[i].from}↔${legs[j].from}). Consider using the Round-Trip checkbox on Leg ${legs[i].index + 1} for better pricing.`
+                                message: `✓ Legs ${legs[i].index + 1} and ${legs[j].index + 1} form a round-trip (${legs[i].from}↔${legs[j].from}). Round-trip pricing will be searched automatically.`
                             });
                         }
                     }
@@ -1095,7 +1050,7 @@
                 $suggestionsList.empty();
                 suggestions.forEach(function(suggestion) {
                     $suggestionsList.append(`
-                        <div class=\"ftt-suggestion\" style=\"padding: 10px; margin: 5px 0; background: #fff3cd; border-left: 3px solid #ffc107; border-radius: 3px;\">
+                        <div class="ftt-suggestion" style="padding: 10px; margin: 5px 0; background: #edf7ed; border-left: 3px solid #4caf50; border-radius: 3px;">
                             ${suggestion.message}
                         </div>
                     `);
@@ -1153,9 +1108,6 @@
                     arrive_time_of_day: $(`[name="travel_legs[${index}][arrive_time_of_day]"]`).val(),
                     depart_datetime: $(`[name="travel_legs[${index}][depart_datetime]"]`).val(),
                     arrive_datetime: $(`[name="travel_legs[${index}][arrive_datetime]"]`).val(),
-                    is_round_trip: $(`[name="travel_legs[${index}][is_round_trip]"]`).is(':checked'),
-                    return_date: $(`[name="travel_legs[${index}][return_date]"]`).val(),
-                    return_time_of_day: $(`[name="travel_legs[${index}][return_time_of_day]"]`).val(),
                     airline: $(`[name="travel_legs[${index}][airline]"]`).val(),
                     flight_number: $(`[name="travel_legs[${index}][flight_number]"]`).val(),
                     booked: $(`[name="travel_legs[${index}][booked]"]`).is(':checked'),
