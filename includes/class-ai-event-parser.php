@@ -386,29 +386,53 @@ Always respond with valid JSON in exactly one of these two formats. No prose, no
 CHAT mode (when gathering info or confirming something):
 {"mode": "chat", "message": "Your friendly, short question here"}
 
-FILL mode (when you have traveler + destination + start date):
-{"mode": "fill", "title": "...", "member_id": int|null, "member_name": "exact name from prompt", "destination": "city, state", "start_date": "YYYY-MM-DD", "end_date": "YYYY-MM-DD", "event_type": "key", "notes": "", "flight_needed": bool, "travel_legs": [], "needs_return_clarification": bool, "track_prices": bool, "confidence": "high|medium|low", "clarifications_needed": [], "suggest_save_home_airport": "CODE"|null, "save_home_airport_confirmation": ""}
+FILL mode (only when the complete checklist below is satisfied):
+{"mode": "fill", "title": "...", "member_id": int|null, "member_name": "exact name from prompt", "destination": "city, state", "start_date": "YYYY-MM-DD", "end_date": "YYYY-MM-DD", "event_type": "key", "notes": "", "flight_needed": bool, "travel_legs": [{"leg_name": "Outbound", "mode": "fly", "depart_airport": "XXX", "arrive_airport": "XXX", "depart_date": "YYYY-MM-DD", "depart_time_of_day": "morning|midday|afternoon|night|", "arrive_date": "YYYY-MM-DD", "arrive_time_of_day": "", "baggage": ["carry_on","checked","instrument","color_guard_equipment","oversize"], "booked": false}], "needs_return_clarification": false, "track_prices": bool, "confidence": "high|medium|low", "clarifications_needed": [], "suggest_save_home_airport": "CODE"|null, "save_home_airport_confirmation": ""}
 
-== GATHERING INFO ==
-Ask ONE short, friendly question at a time for anything that is missing or unclear.
-Required before you can use FILL mode: traveler name, destination, start date.
-Nice to have: end/return date, flight airports.
+== PRE-FILL CHECKLIST — ask for EVERY missing item before switching to FILL mode ==
+You MUST have clear answers to ALL of these before you generate a fill response.
+Ask ONE friendly question per turn until all are known.
+
+1. TRAVELER — who is going? (must match a group member or be resolved)
+2. DESTINATION — what city and state? (if ambiguous, see MULTI-AIRPORT CITIES below)
+3. OUTBOUND DATE — exact date of departure
+4. END DATE / RETURN DATE — when does the trip end or when do they return? Ask if not stated.
+5. FLIGHT TIME — what time of day works best for the outbound flight? (morning / afternoon / evening / no preference)
+6. RETURN FLIGHT — will they need a return flight? If yes: what time of day works best for the return?
+7. BAGGAGE — carry-on only, or will they check a bag? Any instruments or equipment to bring?
+
+For trips with NO flights (drives, buses, etc.) you can skip items 5, 6, and 7.
+Once you have all answers, do a SINGLE brief confirmation ("Just to confirm — [summary]. Ready to fill the form?"), then on the next "yes" switch to FILL mode.
+
+== MULTI-AIRPORT CITIES — ask which airport when the user names these cities ==
+- "New York" / "NYC" → JFK (Kennedy), LGA (LaGuardia), EWR (Newark)
+- "Washington DC" / "DC" / "Northern Virginia" → DCA (Reagan National), IAD (Dulles), BWI (Baltimore-Washington)
+- "Los Angeles" / "LA" / "Southern California" → LAX, BUR (Burbank), LGB (Long Beach), SNA (Orange County)
+- "Chicago" → ORD (O'Hare), MDW (Midway)
+- "San Francisco" / "Bay Area" → SFO, OAK (Oakland), SJC (San Jose)
+- "Dallas" / "Fort Worth" → DFW, DAL (Love Field)
+- "Houston" → IAH (George Bush), HOU (Hobby)
+- "Miami" / "South Florida" → MIA, FLL (Fort Lauderdale)
+- "Philadelphia area" → PHL, EWR
+- "Maryland" near DC → BWI, DCA, IAD (ask which is most convenient)
+Ask: "[City] has a few airports — [list with short names]. Which one?"
 
 == MEMBER MATCHING — CRITICAL RULES ==
 - Set "member_name" to EXACTLY what the user typed — NEVER substitute a different name from the group list.
 - Try to find the traveler in the group list. If they clearly match, set "member_id" to that member's id.
-- If the name does NOT match any group member (e.g., user says "Emma" but there is no Emma), use CHAT mode and ask: "I don't see an [name] in your group. Who's traveling? Your group has: [list names]"
+- If the name does NOT match any group member, use CHAT mode and ask: "I don't see [name] in your group. Who's traveling? Your group has: [list names]"
 - If user says "I / me / my / myself", use "{$self_name}" and that member's id.
 - NEVER invent or guess a member_name from the group list.
 
 == FILL MODE RULES ==
+- "baggage" array per leg: include values from ["carry_on","checked","instrument","color_guard_equipment","oversize"] based on what the user said. Leave empty [] if carry-on only (carry_on is assumed). Add "carry_on" when confirmed.
 - confidence "high": member_id non-null AND start_date known. NEVER "high" when member_id is null.
 - confidence "medium": member_id resolved but other info is vague.
 - confidence "low": member_id null OR start_date unknown.
-- needs_return_clarification: true when flight_needed=true, no return leg, and end_date ≠ start_date.
-- Include a return leg ONLY when user explicitly says "fly back", "return flight", "flight home", etc.
+- Include a return leg ONLY when the user confirms they need one.
+- needs_return_clarification: false (you already asked — no need to ask again in the form).
 - suggest_save_home_airport: set ONLY if home airport is "not set" AND user's own consistent departure airport is clear from context. Null if home airport is already set.
-- "Logan" or "Boston" = BOS. "Bradley" or "Hartford" = BDL. Resolve common airport names to IATA codes.
+- "Logan" or "Boston" = BOS. "Bradley" or "Hartford" = BDL. Resolve all airport names to IATA codes.
 - For relative dates like "the 25th": use current month if not past, else next month.
 PROMPT;
     }
@@ -426,7 +450,7 @@ PROMPT;
             'messages'        => $messages,
             'response_format' => [ 'type' => 'json_object' ],
             'temperature'     => 0.2,
-            'max_tokens'      => 1000,
+            'max_tokens'      => 1500,
         ] );
 
         $response = wp_remote_post( self::OPENAI_API_URL, [

@@ -1619,10 +1619,16 @@
                 // Clear any existing legs first.
                 $('#ftt-travel-legs-container').empty();
                 res.travel_legs.forEach(function(leg) {
-                    // Map depart_time_of_day to an actual time for the leg.
                     var legData = $.extend({}, leg);
-                    // The leg form uses depart_time_of_day directly as a select value.
                     self.addTravelLeg(legData);
+
+                    // After the leg DOM is built, tick baggage checkboxes.
+                    if (leg.baggage && leg.baggage.length > 0) {
+                        var $leg = $('#ftt-travel-legs-container .ftt-travel-leg').last();
+                        leg.baggage.forEach(function(b) {
+                            $leg.find('input[type="checkbox"][value="' + b + '"]').prop('checked', true);
+                        });
+                    }
                 });
                 setTimeout(function(){ self.checkFlightSuggestions(); }, 300);
             }
