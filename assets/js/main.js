@@ -1576,9 +1576,11 @@
             var TOD_TIMES = { morning: '09:00', midday: '12:00', afternoon: '15:00', night: '20:00' };
 
             // ── Basic fields ──────────────────────────────────────────────
-            if (res.title)       $('#event_title').val(res.title);
-            if (res.notes)       $('#notes').val(res.notes);
-            if (res.destination) $('#location_name').val(res.destination);
+            if (res.title)            $('#event_title').val(res.title);
+            if (res.notes)            $('#notes').val(res.notes);
+            if (res.destination)      $('#location_name').val(res.destination);
+            if (res.location_name)    $('#location_name').val(res.location_name);
+            if (res.location_address) $('#location_address').val(res.location_address);
 
             // ── Dates ─────────────────────────────────────────────────────
             // Form uses either date-only (all_day) or datetime-local inputs.
@@ -1631,6 +1633,14 @@
                     }
                 });
                 setTimeout(function(){ self.checkFlightSuggestions(); }, 300);
+            }
+
+            // ── Time blocks ───────────────────────────────────────────────
+            if (res.time_blocks && res.time_blocks.length > 0) {
+                $('#ftt-time-blocks-container').empty();
+                res.time_blocks.forEach(function(block) {
+                    self.addTimeBlock(block);
+                });
             }
 
             // ── Show/hide the AI assistant panel ──────────────────────────
