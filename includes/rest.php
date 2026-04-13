@@ -1939,7 +1939,7 @@ class FTT_REST {
             } 
             // Fall back to the parent's primary group
             else {
-                $primary_group_id = get_user_meta($user_id, 'ftt_primary_group', true);
+                $primary_group_id = get_user_meta($user_id, 'ftt_primary_group_id', true);
                 if ($primary_group_id) {
                     $group_id_to_use = (int) $primary_group_id;
                 }
@@ -1951,8 +1951,8 @@ class FTT_REST {
                 if (!empty($parent_groups)) {
                     $group_id_to_use = $parent_groups[0]->id;
                     // Set this as primary group if not set
-                    if (!get_user_meta($user_id, 'ftt_primary_group', true)) {
-                        update_user_meta($user_id, 'ftt_primary_group', $group_id_to_use);
+                    if (!get_user_meta($user_id, 'ftt_primary_group_id', true)) {
+                        update_user_meta($user_id, 'ftt_primary_group_id', $group_id_to_use);
                     }
                 }
             }
