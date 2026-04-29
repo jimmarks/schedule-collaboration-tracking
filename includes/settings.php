@@ -89,8 +89,8 @@ class FTT_Settings {
 
         $groups = $wpdb->get_results( "SELECT subscription_status, subscription_interval FROM {$groups_table} WHERE is_archived = 0" );
 
-        $base_monthly = 9.99;
-        $addon_monthly = 5.00;
+        $base_monthly = 5.99;
+        $addon_monthly = 2.00;
         $base_annual  = 99.00;
         $addon_annual  = 50.00;
 

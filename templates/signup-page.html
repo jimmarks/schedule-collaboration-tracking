@@ -320,8 +320,8 @@
                 const interval = $('input[name="interval"]:checked').val();
                 const addonQty = parseInt($('#addon_quantity').val());
                 
-                let basePrice = interval === 'month' ? 9.99 : 89.99;
-                let addonPrice = interval === 'month' ? 5.00 : 50.00;
+                let basePrice = interval === 'month' ? 5.99 : 59.90;
+                let addonPrice = interval === 'month' ? 2.00 : 20.00;
                 let total = basePrice + (addonQty * addonPrice);
                 let period = interval === 'month' ? '/month' : '/year';
                 

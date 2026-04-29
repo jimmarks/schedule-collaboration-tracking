@@ -17,6 +17,20 @@ class FTT_Admin_Billing_Dashboard {
      */
     public static function init() {
         add_action('admin_enqueue_scripts', [__CLASS__, 'enqueue_scripts']);
+        add_action('admin_menu', [__CLASS__, 'add_menu_page']);
+        add_action('wp_login', [__CLASS__, 'record_login'], 10, 2);
+    }
+
+    /**
+     * Record last login timestamp and cumulative login count for a user.
+     *
+     * @param string  $user_login  Username.
+     * @param WP_User $user        User object.
+     */
+    public static function record_login( $user_login, $user ) {
+        update_user_meta( $user->ID, 'ftt_last_login', current_time( 'timestamp' ) );
+        $count = (int) get_user_meta( $user->ID, 'ftt_login_count', true );
+        update_user_meta( $user->ID, 'ftt_login_count', $count + 1 );
     }
     
     /**
@@ -84,8 +98,8 @@ class FTT_Admin_Billing_Dashboard {
         
         // Calculate MRR (Monthly Recurring Revenue)
         $stripe_settings = get_option('ftt_stripe_settings', []);
-        $base_monthly = 9.99;
-        $addon_monthly = 5.00;
+        $base_monthly = 5.99;
+        $addon_monthly = 2.00;
         $base_annual = 99.00;
         $addon_annual = 50.00;
         
@@ -162,14 +176,16 @@ class FTT_Admin_Billing_Dashboard {
             <table class="wp-list-table widefat fixed striped">
                 <thead>
                     <tr>
-                        <th width="20%">Group Name</th>
+                        <th width="18%">Group Name</th>
                         <th width="15%">Billing Owner</th>
                         <th width="10%">Status</th>
-                        <th width="10%">Interval</th>
-                        <th width="15%">Next Billing / Trial End</th>
-                        <th width="10%">Children</th>
-                        <th width="10%">MRR</th>
-                        <th width="10%">Actions</th>
+                        <th width="8%">Interval</th>
+                        <th width="12%">Next Billing / Trial End</th>
+                        <th width="10%">Last Login</th>
+                        <th width="7%">Logins</th>
+                        <th width="8%">Children</th>
+                        <th width="7%">MRR</th>
+                        <th width="5%">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -208,6 +224,12 @@ class FTT_Admin_Billing_Dashboard {
                             $next_date = date('M j, Y', strtotime($group->next_billing_date));
                         }
                     ?>
+                    <?php
+                        $owner_last_login = $billing_owner ? (int) get_user_meta( $billing_owner->ID, 'ftt_last_login', true ) : 0;
+                        $owner_login_count = $billing_owner ? (int) get_user_meta( $billing_owner->ID, 'ftt_login_count', true ) : 0;
+                        $owner_last_login_str = $owner_last_login ? human_time_diff( $owner_last_login, current_time('timestamp') ) . ' ago' : 'Never';
+                        $owner_last_login_full = $owner_last_login ? date( 'M j, Y g:i a', $owner_last_login ) : '';
+                    ?>
                     <tr data-status="<?php echo esc_attr($status); ?>">
                         <td><strong><?php echo esc_html($group->name); ?></strong></td>
                         <td><?php echo esc_html($billing_owner_name); ?>
@@ -218,6 +240,8 @@ class FTT_Admin_Billing_Dashboard {
                         <td><span class="ftt-status-badge <?php echo $status_class; ?>"><?php echo $status_text; ?></span></td>
                         <td><?php echo ucfirst($group->subscription_interval ?: '-'); ?></td>
                         <td><?php echo $next_date ?: '-'; ?></td>
+                        <td title="<?php echo esc_attr($owner_last_login_full); ?>"><?php echo esc_html($owner_last_login_str); ?></td>
+                        <td><?php echo $owner_login_count ?: '—'; ?></td>
                         <td><?php echo $child_count; ?></td>
                         <td>$<?php echo number_format($group_mrr, 2); ?></td>
                         <td>
@@ -246,7 +270,7 @@ class FTT_Admin_Billing_Dashboard {
                 <h3>Notes</h3>
                 <ul>
                     <li><strong>MRR</strong> = Monthly Recurring Revenue (annual subscriptions are divided by 12)</li>
-                    <li><strong>Pricing</strong> = $9.99/month base ($99/year) + $5/month per additional child ($50/year)</li>
+                    <li><strong>Pricing</strong> = $5.99/month base ($59.90/year) + $2/month per additional child ($20/year)</li>
                     <li><strong>Trial Period</strong> = 14 days free with payment method required</li>
                     <li><strong>Grace Period</strong> = 7 days after payment failure before access is restricted</li>
                 </ul>
@@ -328,6 +352,85 @@ class FTT_Admin_Billing_Dashboard {
                 </ul>
             </div>
             <?php endif; // FTT_API_Tracker ?>
+
+            <?php
+            // ---- User Activity -------------------------------------------------------
+            $ftt_users = get_users( array(
+                'meta_key'     => 'ftt_user_role',
+                'meta_compare' => 'EXISTS',
+                'orderby'      => 'meta_value_num',
+                'meta_key'     => 'ftt_last_login',
+                'order'        => 'DESC',
+                'number'       => 200,
+            ) );
+            // Also grab any WP users with the ftt_parent / ftt_admin role even if missing meta
+            if ( empty( $ftt_users ) ) {
+                $ftt_users = get_users( array(
+                    'role__in' => array( 'ftt_parent', 'ftt_admin', 'administrator' ),
+                    'orderby'  => 'display_name',
+                    'order'    => 'ASC',
+                    'number'   => 200,
+                ) );
+            }
+            $never_logged_in = array_filter( $ftt_users, function( $u ) {
+                return ! get_user_meta( $u->ID, 'ftt_last_login', true );
+            } );
+            $has_logged_in = array_filter( $ftt_users, function( $u ) {
+                return (bool) get_user_meta( $u->ID, 'ftt_last_login', true );
+            } );
+            usort( $has_logged_in, function( $a, $b ) {
+                return (int) get_user_meta( $b->ID, 'ftt_last_login', true )
+                     - (int) get_user_meta( $a->ID, 'ftt_last_login', true );
+            } );
+            $all_activity_users = array_merge( $has_logged_in, $never_logged_in );
+            ?>
+
+            <h2 style="margin-top:36px;">User Activity</h2>
+            <p style="color:#646970;margin-bottom:16px;">
+                Login tracking started when this version of the plugin was activated.
+                "Never" means the user has not logged in since tracking began.
+            </p>
+
+            <table class="wp-list-table widefat fixed striped" id="ftt-user-activity-table">
+                <thead>
+                    <tr>
+                        <th width="20%">Name</th>
+                        <th width="22%">Email</th>
+                        <th width="10%">Role</th>
+                        <th width="18%">Last Login</th>
+                        <th width="10%">Login Count</th>
+                        <th width="20%">Registered</th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php foreach ( $all_activity_users as $u ) :
+                    $last_login_ts    = (int) get_user_meta( $u->ID, 'ftt_last_login', true );
+                    $login_count      = (int) get_user_meta( $u->ID, 'ftt_login_count', true );
+                    $last_login_rel   = $last_login_ts ? human_time_diff( $last_login_ts, current_time('timestamp') ) . ' ago' : '<span style="color:#999;">Never</span>';
+                    $last_login_full  = $last_login_ts ? date( 'M j, Y g:i a', $last_login_ts ) : '';
+                    $registered_ts    = strtotime( $u->user_registered );
+                    $registered_str   = date( 'M j, Y', $registered_ts );
+                    $registered_rel   = human_time_diff( $registered_ts, current_time('timestamp') ) . ' ago';
+                    $role_display     = implode( ', ', array_map( 'ucfirst', $u->roles ) );
+                    $never            = ! $last_login_ts;
+                ?>
+                <tr<?php echo $never ? ' style="opacity:0.65;"' : ''; ?>>
+                    <td>
+                        <strong><?php echo esc_html( $u->display_name ); ?></strong>
+                        <br><small style="color:#999;">#<?php echo (int) $u->ID; ?></small>
+                    </td>
+                    <td><?php echo esc_html( $u->user_email ); ?></td>
+                    <td><?php echo esc_html( $role_display ); ?></td>
+                    <td title="<?php echo esc_attr( $last_login_full ); ?>"><?php echo $last_login_rel; ?></td>
+                    <td><?php echo $login_count ?: ( $never ? '—' : $login_count ); ?></td>
+                    <td title="<?php echo esc_attr( $registered_str ); ?>"><?php echo esc_html( $registered_rel ); ?></td>
+                </tr>
+                <?php endforeach; ?>
+                <?php if ( empty( $all_activity_users ) ) : ?>
+                <tr><td colspan="6" style="text-align:center;padding:40px;">No users found.</td></tr>
+                <?php endif; ?>
+                </tbody>
+            </table>
 
         </div>
         

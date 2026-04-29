@@ -222,7 +222,7 @@ class FTT_Billing_Manager {
         $interval = get_user_meta($user_id, 'ftt_subscription_interval', true);
         $current_price = get_user_meta($user_id, 'ftt_subscription_price', true);
         
-        $addon_price = $interval === 'year' ? 50.00 : 5.00;
+        $addon_price = $interval === 'year' ? 20.00 : 2.00;
         $new_price = $current_price + $addon_price;
         
         $period = $interval === 'year' ? 'year' : 'month';
@@ -527,8 +527,8 @@ class FTT_Billing_Manager {
         $interval = $group->subscription_interval ?: 'month';
         $period = $interval === 'year' ? 'year' : 'month';
         
-        $base_price = $interval === 'year' ? 99.00 : 9.99;
-        $addon_price = $interval === 'year' ? 50.00 : 5.00;
+        $base_price = $interval === 'year' ? 59.90 : 5.99;
+        $addon_price = $interval === 'year' ? 20.00 : 2.00;
         $total_price = $base_price + ($addon_quantity * $addon_price);
         
         $in_trial = ($group->subscription_status === 'trialing');

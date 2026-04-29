@@ -292,8 +292,8 @@ composer require stripe/stripe-php</pre>
                 <li><?php esc_html_e('Go to Stripe Dashboard → Products', 'schedule-collaboration-tracking'); ?></li>
                 <li><?php esc_html_e('Create these products:', 'schedule-collaboration-tracking'); ?>
                     <ul>
-                        <li><strong><?php esc_html_e('Base Subscription', 'schedule-collaboration-tracking'); ?></strong>: <?php esc_html_e('$9.99/month and $99/year', 'schedule-collaboration-tracking'); ?></li>
-                        <li><strong><?php esc_html_e('Additional Child', 'schedule-collaboration-tracking'); ?></strong>: <?php esc_html_e('$5.00/month and $50/year', 'schedule-collaboration-tracking'); ?></li>
+                        <li><strong><?php esc_html_e('Base Subscription', 'schedule-collaboration-tracking'); ?></strong>: <?php esc_html_e('$5.99/month and $59.90/year (includes 1 child)', 'schedule-collaboration-tracking'); ?></li>
+                        <li><strong><?php esc_html_e('Additional Child', 'schedule-collaboration-tracking'); ?></strong>: <?php esc_html_e('$2.00/month and $20/year', 'schedule-collaboration-tracking'); ?></li>
                     </ul>
                 </li>
                 <li><?php esc_html_e('Click on each price to see the Price ID (starts with "price_")', 'schedule-collaboration-tracking'); ?></li>
@@ -316,7 +316,7 @@ composer require stripe/stripe-php</pre>
             </tr>
             <tr>
                 <th scope="row">
-                    <label for="ftt_price_base_monthly"><?php esc_html_e('Monthly ($9.99/mo)', 'schedule-collaboration-tracking'); ?></label>
+                    <label for="ftt_price_base_monthly"><?php esc_html_e('Monthly ($5.99/mo)', 'schedule-collaboration-tracking'); ?></label>
                 </th>
                 <td>
                     <input type="text" name="ftt_stripe_settings[price_base_monthly]" id="ftt_price_base_monthly" value="<?php echo esc_attr($price_base_monthly); ?>" class="regular-text code" placeholder="price_...">
@@ -324,7 +324,7 @@ composer require stripe/stripe-php</pre>
             </tr>
             <tr>
                 <th scope="row">
-                    <label for="ftt_price_base_yearly"><?php esc_html_e('Yearly ($99/yr)', 'schedule-collaboration-tracking'); ?></label>
+                    <label for="ftt_price_base_yearly"><?php esc_html_e('Yearly ($59.90/yr)', 'schedule-collaboration-tracking'); ?></label>
                 </th>
                 <td>
                     <input type="text" name="ftt_stripe_settings[price_base_yearly]" id="ftt_price_base_yearly" value="<?php echo esc_attr($price_base_yearly); ?>" class="regular-text code" placeholder="price_...">
@@ -336,7 +336,7 @@ composer require stripe/stripe-php</pre>
             </tr>
             <tr>
                 <th scope="row">
-                    <label for="ftt_price_addon_monthly"><?php esc_html_e('Monthly ($5/mo)', 'schedule-collaboration-tracking'); ?></label>
+                    <label for="ftt_price_addon_monthly"><?php esc_html_e('Monthly ($2/mo)', 'schedule-collaboration-tracking'); ?></label>
                 </th>
                 <td>
                     <input type="text" name="ftt_stripe_settings[price_addon_monthly]" id="ftt_price_addon_monthly" value="<?php echo esc_attr($price_addon_monthly); ?>" class="regular-text code" placeholder="price_...">
@@ -344,7 +344,7 @@ composer require stripe/stripe-php</pre>
             </tr>
             <tr>
                 <th scope="row">
-                    <label for="ftt_price_addon_yearly"><?php esc_html_e('Yearly ($50/yr)', 'schedule-collaboration-tracking'); ?></label>
+                    <label for="ftt_price_addon_yearly"><?php esc_html_e('Yearly ($20/yr)', 'schedule-collaboration-tracking'); ?></label>
                 </th>
                 <td>
                     <input type="text" name="ftt_stripe_settings[price_addon_yearly]" id="ftt_price_addon_yearly" value="<?php echo esc_attr($price_addon_yearly); ?>" class="regular-text code" placeholder="price_...">
@@ -614,16 +614,16 @@ composer require stripe/stripe-php</pre>
                 $interval = $price->recurring->interval ?? 'one_time';
                 
                 // Match base subscription
-                if ($amount == 9.99 && $interval === 'month') {
+                if ($amount == 5.99 && $interval === 'month') {
                     $found_prices['price_base_monthly'] = $price->id;
-                } elseif ($amount == 99.00 && $interval === 'year') {
+                } elseif ($amount == 59.90 && $interval === 'year') {
                     $found_prices['price_base_yearly'] = $price->id;
                 }
                 
                 // Match add-ons
-                elseif ($amount == 5.00 && $interval === 'month') {
+                elseif ($amount == 2.00 && $interval === 'month') {
                     $found_prices['price_addon_monthly'] = $price->id;
-                } elseif ($amount == 50.00 && $interval === 'year') {
+                } elseif ($amount == 20.00 && $interval === 'year') {
                     $found_prices['price_addon_yearly'] = $price->id;
                 }
             }
