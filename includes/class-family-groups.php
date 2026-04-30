@@ -925,18 +925,18 @@ class FTT_Family_Groups {
      */
     public static function add_event_to_group($post_id, $group_id) {
         global $wpdb;
-        
-        $table = $wpdb->prefix . self::TABLE_EVENT_GROUPS;
-        
-        $data = [
-            'post_id' => absint($post_id),
-            'group_id' => absint($group_id),
-            'created_at' => current_time('mysql'),
-        ];
-        
-        $inserted = $wpdb->insert($table, $data);
-        
-        return $inserted !== false;
+
+        $post_id  = absint($post_id);
+        $group_id = absint($group_id);
+        $table    = $wpdb->prefix . self::TABLE_EVENT_GROUPS;
+
+        // Use INSERT IGNORE so repeated calls (e.g. on event edit) are safe.
+        $result = $wpdb->query($wpdb->prepare(
+            "INSERT IGNORE INTO {$table} (post_id, group_id, created_at) VALUES (%d, %d, %s)",
+            $post_id, $group_id, current_time('mysql')
+        ));
+
+        return $result !== false;
     }
     
     /**
@@ -1671,7 +1671,7 @@ class FTT_Family_Groups {
         
         $interval = $group->subscription_interval ?: 'month';
         $base_price = $interval === 'year' ? 99.00 : 9.99;
-        $addon_price = $interval === 'year' ? 50.00 : 5.00;
+        $addon_price = $interval === 'year' ? 20.00 : 2.00;
         $total_price = $base_price + ($addon_quantity * $addon_price);
         
         return [

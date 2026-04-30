@@ -17,18 +17,72 @@ $default_airport = get_user_meta($current_user->ID, 'ftt_home_airport', true);
 ?>
 
 <div class="ftt-container">
+    <?php
+    $ftt_page_title  = __('Manage Events', 'schedule-collaboration-tracking');
+    $ftt_active_slug = 'event_form';
+    include FTT_PLUGIN_DIR . 'templates/partials/nav.php';
+    ?>
     <div class="ftt-form-header">
         <?php
         $calendar_url = FTT_Pages::get_page_url('calendar');
         if ($calendar_url) :
         ?>
-        <p class="ftt-back-link">
+        <p class="ftt-breadcrumb">
             <a href="<?php echo esc_url($calendar_url); ?>">← <?php esc_html_e('Back to Calendar', 'schedule-collaboration-tracking'); ?></a>
         </p>
         <?php endif; ?>
         <h2><?php esc_html_e('Add/Edit Event', 'schedule-collaboration-tracking'); ?></h2>
     </div>
-    
+
+    <?php
+    $ftt_settings   = get_option('ftt_settings', []);
+    $has_openai_key = ! empty( $ftt_settings['openai_api_key'] );
+    if ( $has_openai_key ) :
+    ?>
+    <!-- ── AI Event Assistant (conversational chat) ── -->
+    <div class="ftt-ai-assistant" id="ftt-ai-assistant">
+        <div class="ftt-ai-header">
+            <span class="ftt-ai-icon">✨</span>
+            <span class="ftt-ai-label"><?php esc_html_e( 'AI Event Assistant', 'schedule-collaboration-tracking' ); ?></span>
+            <button type="button" class="ftt-ai-toggle" id="ftt-ai-toggle" aria-expanded="false">
+                <?php esc_html_e( 'Chat', 'schedule-collaboration-tracking' ); ?> ▾
+            </button>
+        </div>
+        <div class="ftt-ai-body" id="ftt-ai-body" style="display:none;">
+            <div class="ftt-ai-chat" id="ftt-ai-chat" role="log" aria-live="polite">
+                <div class="ftt-ai-bubble ftt-ai-bubble-ai">
+                    <?php esc_html_e( 'Tell me about the trip — who\'s going, where to, and when?', 'schedule-collaboration-tracking' ); ?>
+                </div>
+            </div>
+            <div class="ftt-ai-chat-footer">
+                <textarea id="ftt-ai-prompt"
+                          class="ftt-ai-chat-input"
+                          rows="2"
+                          placeholder="<?php esc_attr_e( 'Type your reply…', 'schedule-collaboration-tracking' ); ?>"></textarea>
+                <div class="ftt-ai-chat-meta">
+                    <button type="button" class="ftt-btn ftt-btn-primary ftt-ai-send-btn" id="ftt-ai-parse-btn">
+                        <?php esc_html_e( 'Send', 'schedule-collaboration-tracking' ); ?>
+                    </button>
+                    <span class="ftt-ai-spinner" id="ftt-ai-spinner" style="display:none;">
+                        ✨ <?php esc_html_e( 'Thinking…', 'schedule-collaboration-tracking' ); ?>
+                    </span>
+                    <button type="button" class="ftt-btn-link ftt-ai-restart" id="ftt-ai-restart" style="display:none;">
+                        <?php esc_html_e( 'Start over', 'schedule-collaboration-tracking' ); ?>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+
+    <!-- Form is collapsed while the AI chat is active, expanded after fill -->
+    <div id="ftt-form-wrap" class="ftt-form-wrap">
+        <button type="button" id="ftt-form-expand-bar" class="ftt-form-expand-bar" style="display:none;" aria-expanded="false">
+            <span class="ftt-form-expand-label"><?php esc_html_e( 'Event Details', 'schedule-collaboration-tracking' ); ?></span>
+            <span class="ftt-form-expand-hint"><?php esc_html_e( 'Chat to fill — or click to edit manually', 'schedule-collaboration-tracking' ); ?></span>
+            <span class="ftt-form-expand-arrow">▾</span>
+        </button>
+        <div id="ftt-form-fields">
     <form id="ftt-event-form">
         <!-- Basic Information -->
         <div class="ftt-form-section">
@@ -198,7 +252,7 @@ $default_airport = get_user_meta($current_user->ID, 'ftt_home_airport', true);
 
             <!-- Flight Link Suggestions -->
             <div id="ftt-flight-suggestions" class="ftt-flight-suggestions" style="display: none;">
-                <h5><?php esc_html_e('💡 Link Flights for Better Pricing', 'schedule-collaboration-tracking'); ?></h5>
+                <h5><?php esc_html_e('✓ Round-Trip Detected', 'schedule-collaboration-tracking'); ?></h5>
                 <div id="ftt-suggestions-list"></div>
             </div>
 
@@ -218,4 +272,6 @@ $default_airport = get_user_meta($current_user->ID, 'ftt_home_airport', true);
             </button>
         </div>
     </form>
-</div>
+        </div><!-- /#ftt-form-fields -->
+    </div><!-- /#ftt-form-wrap -->
+</div><!-- /.ftt-container -->

@@ -236,7 +236,7 @@ class FTT_REST {
         ));
         
         register_rest_route('ftt/v1', '/user-preferences', array(
-            'methods'             => 'POST',
+            'methods'             => 'POST, PUT',
             'callback'            => array(__CLASS__, 'update_user_preferences'),
             'permission_callback' => 'is_user_logged_in',
         ));
@@ -320,6 +320,15 @@ class FTT_REST {
             'methods'             => 'POST',
             'callback'            => array(__CLASS__, 'remove_child'),
             'permission_callback' => 'is_user_logged_in',
+        ));
+        
+        // Sync orphaned children to groups (admin utility)
+        register_rest_route('ftt/v1', '/sync-children-to-groups', array(
+            'methods'             => 'POST',
+            'callback'            => array(__CLASS__, 'sync_children_to_groups'),
+            'permission_callback' => function() {
+                return current_user_can('manage_options');
+            },
         ));
 
         register_rest_route('ftt/v1', '/invite-adult', array(
@@ -739,11 +748,54 @@ class FTT_REST {
                 ));
             }
 
-            $group_event_ids = $wpdb->get_col($wpdb->prepare(
+            // Events explicitly associated with the group (family events, etc.)
+            $from_group_table = $wpdb->get_col($wpdb->prepare(
                 "SELECT post_id FROM {$wpdb->prefix}ftt_event_groups WHERE group_id = %d",
                 $group_id
             ));
-            error_log('Group mode: found ' . count($group_event_ids) . ' events in group ' . $group_id);
+
+            // Also collect events via member_id of every group parent's children
+            // (covers events that predate or missed the ftt_event_groups insert).
+            $from_member_ids = array();
+            $group_parents = FTT_Family_Groups::get_group_members($group_id, 'parent');
+            foreach ($group_parents as $parent_member) {
+                $parent_child_ids = get_user_meta((int) $parent_member->user_id, 'ftt_parent_of', true);
+                if (is_array($parent_child_ids)) {
+                    foreach ($parent_child_ids as $cid) {
+                        $cid = (int) $cid;
+                        if ($cid && !in_array($cid, $from_member_ids, true)) {
+                            $from_member_ids[] = $cid;
+                        }
+                    }
+                }
+            }
+            // Also include children formally in group_members
+            $group_children = FTT_Family_Groups::get_group_members($group_id, 'child');
+            foreach ($group_children as $cm) {
+                $cid = (int) $cm->user_id;
+                if (!in_array($cid, $from_member_ids, true)) {
+                    $from_member_ids[] = $cid;
+                }
+            }
+
+            // Fetch event IDs for those member_ids
+            $member_based_ids = array();
+            if (!empty($from_member_ids)) {
+                $placeholders     = implode(',', array_fill(0, count($from_member_ids), '%d'));
+                $member_based_ids = $wpdb->get_col(
+                    $wpdb->prepare(
+                        "SELECT DISTINCT post_id FROM {$wpdb->postmeta}
+                         WHERE meta_key = 'member_id' AND meta_value IN ($placeholders)",
+                        $from_member_ids
+                    )
+                );
+            }
+
+            $group_event_ids = array_unique(array_merge(
+                array_map('intval', $from_group_table),
+                array_map('intval', $member_based_ids)
+            ));
+            error_log('Group mode: found ' . count($group_event_ids) . ' events (table:' . count($from_group_table) . ' + member_id:' . count($member_based_ids) . ')');
 
             if (empty($group_event_ids)) {
                 error_log('No events in group - returning empty data');
@@ -1008,26 +1060,34 @@ class FTT_REST {
         if ($request->has_param('group_id')) {
             $group_id = absint($request->get_param('group_id'));
             if ($group_id > 0) {
-                // Add event to group if not already associated
                 FTT_Family_Groups::add_event_to_group($post_id, $group_id);
             }
-        } elseif (!get_post_meta($post_id, 'group_id', true)) {
-            // Auto-assign to user's primary group if no group specified
-            $current_user_id = get_current_user_id();
-            $primary_group = get_user_meta($current_user_id, 'ftt_primary_group', true);
-            if ($primary_group) {
-                // Guard: verify the group still exists before inserting (avoids FK constraint error)
-                $group_exists = $wpdb->get_var( $wpdb->prepare(
-                    "SELECT id FROM {$wpdb->prefix}ftt_family_groups WHERE id = %d",
-                    $primary_group
-                ) );
-                if ($group_exists) {
-                    update_post_meta($post_id, 'group_id', $primary_group);
-                    FTT_Family_Groups::add_event_to_group($post_id, $primary_group);
+        } else {
+            // Use existing group_id meta if present, otherwise fall back to primary group.
+            $existing_group = absint(get_post_meta($post_id, 'group_id', true));
+            if (!$existing_group) {
+                $current_user_id = get_current_user_id();
+                $primary_group   = get_user_meta($current_user_id, 'ftt_primary_group', true);
+                if ($primary_group) {
+                    $group_exists = $wpdb->get_var($wpdb->prepare(
+                        "SELECT id FROM {$wpdb->prefix}ftt_family_groups WHERE id = %d",
+                        $primary_group
+                    ));
+                    if ($group_exists) {
+                        $existing_group = (int) $primary_group;
+                        update_post_meta($post_id, 'group_id', $existing_group);
+                    }
                 }
+            }
+            // Ensure the ftt_event_groups row exists for this event (idempotent).
+            if ($existing_group) {
+                FTT_Family_Groups::add_event_to_group($post_id, $existing_group);
             }
         }
         
+        // Fire action so other classes (e.g. AI parser) can react after all meta is written.
+        do_action( 'ftt_event_meta_saved', $post_id, $request );
+
         // Check for newly booked flights and delete associated price alerts
         if ($request->has_param('travel_legs')) {
             $raw_legs = $request->get_param('travel_legs');
@@ -1496,6 +1556,20 @@ class FTT_REST {
         if ($timezone !== null) {
             update_user_meta($user_id, 'ftt_timezone', sanitize_text_field($timezone));
         }
+
+        // Handle airport reminder dismissed flag.
+        if ( ! empty( $params['airport_reminder_dismissed'] ) ) {
+            update_user_meta( $user_id, 'ftt_airport_reminder_dismissed', 1 );
+        }
+
+        // Handle AI-suggested home airport save (explicit user preference stated in prompt).
+        $save_home_airport = isset( $params['save_home_airport'] ) ? $params['save_home_airport'] : null;
+        if ( $save_home_airport !== null ) {
+            $clean = strtoupper( preg_replace( '/[^A-Za-z]/', '', $save_home_airport ) );
+            if ( strlen( $clean ) === 3 ) {
+                update_user_meta( $user_id, 'ftt_home_airport', $clean );
+            }
+        }
         
         return rest_ensure_response(array('success' => true, 'message' => 'Preferences updated'));
     }
@@ -1850,21 +1924,48 @@ class FTT_REST {
             FTT_Child_Colors::update_color($child_id, $color);
         }
         
-        // Link to parent
+        // Link to parent (legacy system - maintained for backward compatibility)
         FTT_Roles::add_parent_child($user_id, $child_id);
 
         // Add child to the correct group (group-based billing system)
+        // This is REQUIRED - all children must belong to a group
         if (class_exists('FTT_Family_Groups')) {
+            $group_id_to_use = null;
+            
             // Prefer the group explicitly specified by the caller (e.g. ?group=X page).
-            // Fall back to the parent's primary group for legacy / non-group-mode calls.
             $requested_group_id = absint($params['group_id'] ?? 0);
             if ($requested_group_id && FTT_Family_Groups::can_manage_group($requested_group_id, $user_id)) {
-                FTT_Family_Groups::add_member($requested_group_id, $child_id, 'child');
-            } else {
-                $primary_group_id = get_user_meta($user_id, 'ftt_primary_group', true);
+                $group_id_to_use = $requested_group_id;
+            } 
+            // Fall back to the parent's primary group
+            else {
+                $primary_group_id = get_user_meta($user_id, 'ftt_primary_group_id', true);
                 if ($primary_group_id) {
-                    FTT_Family_Groups::add_member((int) $primary_group_id, $child_id, 'child');
+                    $group_id_to_use = (int) $primary_group_id;
                 }
+            }
+            
+            // If still no group, try to find any group the parent belongs to
+            if (!$group_id_to_use) {
+                $parent_groups = FTT_Family_Groups::get_user_groups($user_id);
+                if (!empty($parent_groups)) {
+                    $group_id_to_use = $parent_groups[0]->id;
+                    // Set this as primary group if not set
+                    if (!get_user_meta($user_id, 'ftt_primary_group_id', true)) {
+                        update_user_meta($user_id, 'ftt_primary_group_id', $group_id_to_use);
+                    }
+                }
+            }
+            
+            // Add to group if we found one
+            if ($group_id_to_use) {
+                // Check if child is already in this group to avoid duplicates
+                if (!FTT_Family_Groups::is_member($group_id_to_use, $child_id)) {
+                    FTT_Family_Groups::add_member($group_id_to_use, $child_id, 'child');
+                    error_log("FTT REST: Added child $child_id to group $group_id_to_use");
+                }
+            } else {
+                error_log("FTT REST: WARNING - Child $child_id was added to parent $user_id but no group found. Child may not appear in Family Groups.");
             }
         }
         
@@ -2353,6 +2454,101 @@ class FTT_REST {
             'children' => $children,
             'adults' => $adults,
         ]);
+    }
+    
+    /**
+     * Sync orphaned children to groups
+     * 
+     * Finds children that exist in the old parent-child relationship system
+     * but are NOT in any Family Group, then adds them to their parent's primary group.
+     * 
+     * @return WP_REST_Response
+     */
+    public static function sync_children_to_groups($request) {
+        if (!class_exists('FTT_Family_Groups')) {
+            return new WP_Error('groups_disabled', 'Family Groups feature not available', ['status' => 400]);
+        }
+        
+        global $wpdb;
+        $report = [
+            ' synced' => 0,
+            'skipped' => 0,
+            'errors' => [],
+            'details' => [],
+        ];
+        
+        // Get all users who have children in the old system
+        $parents_with_children = $wpdb->get_results(
+            "SELECT user_id, meta_value 
+             FROM {$wpdb->usermeta} 
+             WHERE meta_key = 'ftt_parent_of'"
+        );
+        
+        foreach ($parents_with_children as $row) {
+            $parent_id = $row->user_id;
+            $children_ids = maybe_unserialize($row->meta_value);
+            
+            if (!is_array($children_ids) || empty($children_ids)) {
+                continue;
+            }
+            
+            // Get parent's primary group
+            $primary_group_id = get_user_meta($parent_id, 'ftt_primary_group', true);
+            
+            // If no primary group, try to find any group they belong to
+            if (!$primary_group_id) {
+                $parent_groups = FTT_Family_Groups::get_user_groups($parent_id);
+                if (!empty($parent_groups)) {
+                    $primary_group_id = $parent_groups[0]->id;
+                    update_user_meta($parent_id, 'ftt_primary_group', $primary_group_id);
+                }
+            }
+            
+            if (!$primary_group_id) {
+                $report['errors'][] = "Parent $parent_id has children but no group";
+                $report['skipped'] += count($children_ids);
+                continue;
+            }
+            
+            foreach ($children_ids as $child_id) {
+                // Check if child user exists
+                $child_user = get_userdata($child_id);
+                if (!$child_user) {
+                    $report['errors'][] = "Child user $child_id does not exist";
+                    $report['skipped']++;
+                    continue;
+                }
+                
+                // Check if child is already in this group
+                if (FTT_Family_Groups::is_member($primary_group_id, $child_id)) {
+                    $report['skipped']++;
+                    continue;
+                }
+                
+                // Add child to group
+                try {
+                    FTT_Family_Groups::add_member($primary_group_id, $child_id, 'child');
+                    $report['synced']++;
+                    $report['details'][] = sprintf(
+                        'Added %s to group %d (parent: %s)',
+                        $child_user->display_name,
+                        $primary_group_id,
+                        get_userdata($parent_id)->display_name
+                    );
+                } catch (Exception $e) {
+                    $report['errors'][] = sprintf(
+                        'Failed to add child %d to group %d: %s',
+                        $child_id,
+                        $primary_group_id,
+                        $e->getMessage()
+                    );
+                }
+            }
+        }
+        
+        error_log('FTT: Sync children to groups completed - ' . wp_json_encode($report));
+        
+        return rest_ensure_response($report);
     }
 }
 

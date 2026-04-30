@@ -4,6 +4,7 @@
  *
  * Step 1 – Calendar Setup: app calendar is ready; optionally connect an external iCal feed.
  * Step 2 – Billing Offer: show pricing; user can set up Stripe or skip to use card-free trial.
+ * Step 3 – Your Profile: set home airport and timezone for AI event parsing.
  *
  * @package Family_Travel_Tracker
  */
@@ -15,7 +16,7 @@ if ( ! is_user_logged_in() ) {
 
 $current_user     = wp_get_current_user();
 $user_id          = get_current_user_id();
-$step             = max( 1, min( 2, intval( $_GET['step'] ?? 1 ) ) );
+$step             = max( 1, min( 3, intval( $_GET['step'] ?? 1 ) ) );
 $stripe_settings  = get_option( 'ftt_stripe_settings', [] );
 $trial_days       = max( 1, intval( $stripe_settings['trial_days'] ?? 14 ) );
 $primary_group_id = get_user_meta( $user_id, 'ftt_primary_group', true );
@@ -37,7 +38,19 @@ $trial_end_label = $trial_ends_at
     : date_i18n( get_option( 'date_format' ), strtotime( "+{$trial_days} days" ) );
 
 $step2_url  = esc_url( add_query_arg( 'step', 2, home_url( '/ftt-onboarding/' ) ) );
+$step3_url  = esc_url( add_query_arg( 'step', 3, home_url( '/ftt-onboarding/' ) ) );
 $finish_url = esc_url( home_url( '/ftt-groups/?welcome=1' ) );
+
+// Pre-load existing profile values so Step 3 reflects what's already saved.
+$saved_home_airport = get_user_meta( $user_id, 'ftt_home_airport', true );
+// Also check the ftt_home_airports array (primary = index 0).
+if ( empty( $saved_home_airport ) ) {
+    $airports_raw       = get_user_meta( $user_id, 'ftt_home_airports', true );
+    $airports_arr       = is_array( $airports_raw ) ? $airports_raw : ( $airports_raw ? json_decode( $airports_raw, true ) : [] );
+    $saved_home_airport = ! empty( $airports_arr[0] ) ? $airports_arr[0] : '';
+}
+$site_tz        = get_option( 'ftt_settings', [] )['default_timezone'] ?? wp_timezone_string();
+$saved_timezone = get_user_meta( $user_id, 'ftt_timezone', true ) ?: $site_tz;
 
 // Build this user's personal calendar subscribe URLs for the Step 1 modal.
 $cal_webcal_url = '';
@@ -69,9 +82,14 @@ if ( $ical_enabled ) {
             <span class="ftt-step-label"><?php esc_html_e( 'Calendar Setup', 'schedule-collaboration-tracking' ); ?></span>
         </div>
         <div class="ftt-progress-divider"></div>
-        <div class="ftt-progress-step <?php echo $step >= 2 ? 'active' : ''; ?>">
-            <span class="ftt-step-num">2</span>
+        <div class="ftt-progress-step <?php echo $step >= 2 ? 'active' : ''; ?> <?php echo $step > 2 ? 'done' : ''; ?>">
+            <span class="ftt-step-num"><?php echo $step > 2 ? '✓' : '2'; ?></span>
             <span class="ftt-step-label"><?php esc_html_e( 'Billing', 'schedule-collaboration-tracking' ); ?></span>
+        </div>
+        <div class="ftt-progress-divider"></div>
+        <div class="ftt-progress-step <?php echo $step >= 3 ? 'active' : ''; ?>">
+            <span class="ftt-step-num">3</span>
+            <span class="ftt-step-label"><?php esc_html_e( 'Your Profile', 'schedule-collaboration-tracking' ); ?></span>
         </div>
     </div>
 
@@ -266,7 +284,7 @@ if ( $ical_enabled ) {
             <p class="ftt-onboard-reassurance">
                 <?php esc_html_e( 'No charge during your trial. You can cancel any time.', 'schedule-collaboration-tracking' ); ?>
             </p>
-            <a href="<?php echo $finish_url; ?>" class="ftt-onboard-skip-billing-link">
+            <a href="<?php echo $step3_url; ?>" class="ftt-onboard-skip-billing-link">
                 <?php printf(
                     /* translators: %s: trial end date */
                     esc_html__( 'Remind me later — I\'ll decide before my trial ends on %s', 'schedule-collaboration-tracking' ),
@@ -276,6 +294,60 @@ if ( $ical_enabled ) {
         </div>
 
     </div><!-- /step-2 -->
+
+    <?php elseif ( $step === 3 ) : ?>
+    <!-- ══════════════ STEP 3 – YOUR PROFILE ══════════════ -->
+    <div class="ftt-onboarding-step" id="ftt-onboard-step-3">
+
+        <div class="ftt-onboarding-icon">✈️</div>
+        <h2><?php esc_html_e( 'Almost done — one quick thing', 'schedule-collaboration-tracking' ); ?></h2>
+        <p class="ftt-onboarding-subtitle">
+            <?php esc_html_e( 'Your home airport lets the AI suggest the right flights when you describe a trip. You can update these any time in your profile.', 'schedule-collaboration-tracking' ); ?>
+        </p>
+
+        <div class="ftt-onboarding-card">
+
+            <div class="ftt-onboard-profile-row">
+                <label for="ftt-onboard-airport" class="ftt-onboard-profile-label">
+                    <?php esc_html_e( 'Home Airport (IATA code)', 'schedule-collaboration-tracking' ); ?>
+                </label>
+                <input type="text"
+                       id="ftt-onboard-airport"
+                       class="ftt-onboard-airport-input"
+                       placeholder="e.g. BDL"
+                       maxlength="3"
+                       value="<?php echo esc_attr( $saved_home_airport ); ?>"
+                       autocomplete="off" />
+                <p class="description">
+                    <?php esc_html_e( '3-letter code for your nearest airport — e.g. BOS, JFK, LAX.', 'schedule-collaboration-tracking' ); ?>
+                </p>
+            </div>
+
+            <div class="ftt-onboard-profile-row">
+                <label for="ftt-onboard-timezone" class="ftt-onboard-profile-label">
+                    <?php esc_html_e( 'Your Timezone', 'schedule-collaboration-tracking' ); ?>
+                </label>
+                <select id="ftt-onboard-timezone" class="ftt-onboard-timezone-select">
+                    <?php echo wp_timezone_choice( $saved_timezone, get_user_locale() ); ?>
+                </select>
+            </div>
+
+            <div class="ftt-onboarding-actions">
+                <button type="button" class="ftt-btn ftt-btn-primary ftt-btn-lg" id="ftt-onboard-save-profile">
+                    <?php esc_html_e( 'Save &amp; go to dashboard →', 'schedule-collaboration-tracking' ); ?>
+                </button>
+            </div>
+            <div id="ftt-onboard-profile-msg" class="ftt-onboard-msg" style="display:none;"></div>
+
+        </div><!-- /card -->
+
+        <div class="ftt-onboard-skip-billing" style="margin-top:16px;">
+            <a href="<?php echo $finish_url; ?>" class="ftt-onboard-skip-billing-link">
+                <?php esc_html_e( "I'll set this up later", 'schedule-collaboration-tracking' ); ?>
+            </a>
+        </div>
+
+    </div><!-- /step-3 -->
     <?php endif; ?>
 
 </div><!-- /.ftt-onboarding-wrapper -->
@@ -396,6 +468,39 @@ if ( $ical_enabled ) {
                 $('.ftt-onboard-start-billing').prop('disabled', false);
             }
         });
+    });
+
+    /* ── Step 3: save home airport + timezone ── */
+    $('#ftt-onboard-save-profile').on('click', function () {
+        var $btn      = $(this);
+        var $msg      = $('#ftt-onboard-profile-msg');
+        var airport   = $('#ftt-onboard-airport').val().replace(/[^A-Za-z]/g, '').toUpperCase();
+        var timezone  = $('#ftt-onboard-timezone').val();
+        var finishUrl = <?php echo wp_json_encode( home_url( '/ftt-groups/?welcome=1' ) ); ?>;
+
+        $btn.prop('disabled', true).text(<?php echo wp_json_encode( __( 'Saving…', 'schedule-collaboration-tracking' ) ); ?>);
+
+        $.ajax({
+            url:         restUrl + 'user-preferences',
+            method:      'PUT',
+            beforeSend:  function (xhr) { xhr.setRequestHeader('X-WP-Nonce', nonce); },
+            contentType: 'application/json',
+            data:        JSON.stringify({ home_airport: airport, timezone: timezone }),
+            success: function () {
+                window.location.href = finishUrl;
+            },
+            error: function () {
+                showMsg($msg, 'error', <?php echo wp_json_encode( __( 'Could not save your profile. Please try again.', 'schedule-collaboration-tracking' ) ); ?>);
+                $btn.prop('disabled', false).text(<?php echo wp_json_encode( __( 'Save & go to dashboard →', 'schedule-collaboration-tracking' ) ); ?>);
+            }
+        });
+    });
+
+    /* ── Auto-uppercase the airport input ── */
+    $('#ftt-onboard-airport').on('input', function () {
+        var pos = this.selectionStart;
+        this.value = this.value.replace(/[^A-Za-z]/g, '').toUpperCase();
+        this.setSelectionRange(pos, pos);
     });
 
     function showMsg($el, type, text) {

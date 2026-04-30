@@ -267,18 +267,62 @@ class FTT_Cron_Setup {
                             <tr>
                                 <th>Timestamp</th>
                                 <th>Type</th>
+                                <th>Status</th>
+                                <th>Results</th>
+                                <th>Duration</th>
                                 <th>User</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php foreach ($log as $entry): ?>
+                                <?php
+                                $status = isset($entry['status']) ? $entry['status'] : 'unknown';
+                                $flights_checked = isset($entry['flights_checked']) ? intval($entry['flights_checked']) : '—';
+                                $prices_recorded = isset($entry['prices_recorded']) ? intval($entry['prices_recorded']) : '—';
+                                $duration = isset($entry['duration']) ? floatval($entry['duration']) : '—';
+                                $error = isset($entry['error']) ? $entry['error'] : '';
+                                ?>
                                 <tr>
                                     <td><?php echo esc_html($entry['timestamp']); ?></td>
                                     <td>
                                         <?php if ($entry['type'] === 'manual'): ?>
                                             <span style="color: #0073aa;">👤 Manual</span>
+                                        <?php elseif ($entry['type'] === 'digest'): ?>
+                                            <span style="color: #9b59b6;">📧 Digest</span>
                                         <?php else: ?>
                                             <span style="color: #46b450;">⏰ Scheduled</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <?php if ($status === 'success'): ?>
+                                            <span style="color: #46b450; font-weight: bold;">✓ Success</span>
+                                        <?php elseif ($status === 'failed'): ?>
+                                            <span style="color: #dc3232; font-weight: bold;">✗ Failed</span>
+                                            <?php if ($error): ?>
+                                                <br><small style="color: #666;"><?php echo esc_html($error); ?></small>
+                                            <?php endif; ?>
+                                        <?php else: ?>
+                                            <span style="color: #999;">⚠ Unknown</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <?php if ($status === 'success'): ?>
+                                            <?php if ($entry['type'] === 'digest'): ?>
+                                                👥 <?php echo $flights_checked; ?> users<br>
+                                                📧 <?php echo $prices_recorded; ?> emails sent
+                                            <?php else: ?>
+                                                ✈️ <?php echo $flights_checked; ?> checked<br>
+                                                💾 <?php echo $prices_recorded; ?> recorded
+                                            <?php endif; ?>
+                                        <?php else: ?>
+                                            <span style="color: #999;">—</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <?php if (is_numeric($duration)): ?>
+                                            <?php echo number_format($duration, 2); ?>s
+                                        <?php else: ?>
+                                            <span style="color: #999;">—</span>
                                         <?php endif; ?>
                                     </td>
                                     <td><?php echo isset($entry['user']) ? esc_html($entry['user']) : '<span style="color: #999;">—</span>'; ?></td>

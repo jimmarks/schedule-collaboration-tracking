@@ -30,8 +30,19 @@ $group_created = isset($_GET['created']) && $_GET['created'] === '1';
 $billing_error = isset($_GET['billing_error']) && $_GET['billing_error'] === '1';
 ?>
 
-<div class="ftt-groups-container">
-    
+<div class="ftt-container">
+    <?php
+    $ftt_page_title  = __('Family Groups', 'schedule-collaboration-tracking');
+    $ftt_active_slug = 'groups';
+    include FTT_PLUGIN_DIR . 'templates/partials/nav.php';
+    ?>
+
+    <!-- Page heading -->
+    <div class="ftt-groups-header">
+        <h1><?php esc_html_e('Family Groups', 'schedule-collaboration-tracking'); ?></h1>
+        <p><?php esc_html_e('Manage your family groups, members, and billing. Click "View Calendar" to see events and schedules.', 'schedule-collaboration-tracking'); ?></p>
+    </div>
+
     <?php if ($checkout_success): ?>
     <!-- Checkout Success Message -->
     <div class="ftt-success-banner">
@@ -82,18 +93,6 @@ $billing_error = isset($_GET['billing_error']) && $_GET['billing_error'] === '1'
     </div>
     <?php endif; ?>
     
-    <!-- Page Header -->
-    <div class="ftt-groups-header">
-        <div class="ftt-groups-nav">
-            <a href="<?php echo esc_url(home_url('/ftt-dashboard/')); ?>" class="ftt-back-btn">
-                <span class="dashicons dashicons-arrow-left-alt"></span>
-                Back to Dashboard
-            </a>
-        </div>
-        <h1>Family Groups</h1>
-        <p>Manage your family groups, members, and billing. Click "View Calendar" to see events and schedules.</p>
-    </div>
-
     <!-- Groups List -->
     <div class="ftt-groups-list">
         <?php if (empty($groups)): ?>
@@ -448,12 +447,6 @@ $billing_error = isset($_GET['billing_error']) && $_GET['billing_error'] === '1'
 </div>
 
 <style>
-.ftt-groups-container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 20px;
-}
-
 .ftt-welcome-banner {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
@@ -1231,10 +1224,6 @@ $billing_error = isset($_GET['billing_error']) && $_GET['billing_error'] === '1'
 
 /* Mobile Responsive */
 @media (max-width: 768px) {
-    .ftt-groups-container {
-        padding: 10px;
-    }
-    
     .ftt-success-banner,
     .ftt-warning-banner,
     .ftt-error-banner,
@@ -1345,10 +1334,6 @@ $billing_error = isset($_GET['billing_error']) && $_GET['billing_error'] === '1'
 }
 
 @media (max-width: 480px) {
-    .ftt-groups-container {
-        padding: 5px;
-    }
-    
     .ftt-groups-header h1 {
         font-size: 20px;
     }

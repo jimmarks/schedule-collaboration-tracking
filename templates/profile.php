@@ -20,15 +20,11 @@ $dashboard_url = FTT_Pages::get_page_url( 'dashboard' );
 ?>
 
 <div class="ftt-profile-page" id="ftt-profile-page">
-
-	<!-- ── Back link ─────────────────────────────────────────────────── -->
-	<?php if ( $dashboard_url ) : ?>
-	<p class="ftt-profile-back">
-		<a href="<?php echo esc_url( $dashboard_url ); ?>" class="ftt-back-link">
-			← <?php esc_html_e( 'Back to Dashboard', 'schedule-collaboration-tracking' ); ?>
-		</a>
-	</p>
-	<?php endif; ?>
+    <?php
+    $ftt_page_title  = __('My Settings', 'schedule-collaboration-tracking');
+    $ftt_active_slug = 'profile';
+    include FTT_PLUGIN_DIR . 'templates/partials/nav.php';
+    ?>
 
 	<h1 class="ftt-profile-heading">
 		<?php esc_html_e( 'My Settings', 'schedule-collaboration-tracking' ); ?>

@@ -71,9 +71,27 @@ class FTT_Price_Tracking {
         add_action('ftt_daily_digest', array(__CLASS__, 'process_daily_digests'));
         add_filter('cron_schedules', array(__CLASS__, 'add_custom_cron_schedule'));
         
-        // Schedule cron job if not already scheduled
-        if (!wp_next_scheduled('ftt_check_flight_prices')) {
-            wp_schedule_event(time(), 'fourtimesdaily', 'ftt_check_flight_prices');
+        // Reschedule price check if it's still using the old 6-hour interval.
+        $existing = wp_next_scheduled('ftt_check_flight_prices');
+        if ($existing) {
+            $events = _get_cron_array();
+            $using_old = false;
+            foreach ($events as $time => $hooks) {
+                if (isset($hooks['ftt_check_flight_prices'])) {
+                    foreach ($hooks['ftt_check_flight_prices'] as $hook) {
+                        if (isset($hook['schedule']) && $hook['schedule'] === 'fourtimesdaily') {
+                            $using_old = true;
+                        }
+                    }
+                }
+            }
+            if ($using_old) {
+                wp_clear_scheduled_hook('ftt_check_flight_prices');
+                $existing = false;
+            }
+        }
+        if (!$existing) {
+            wp_schedule_event(time(), 'sixtimesdaily', 'ftt_check_flight_prices');
         }
         
         // Schedule daily digest at 2am
@@ -164,9 +182,9 @@ class FTT_Price_Tracking {
      * Add custom cron schedule for four times daily
      */
     public static function add_custom_cron_schedule($schedules) {
-        $schedules['fourtimesdaily'] = array(
-            'interval' => 21600, // 6 hours in seconds (24 hours / 4)
-            'display'  => __('Four Times Daily (Every 6 Hours)', 'schedule-collaboration-tracking')
+        $schedules['sixtimesdaily'] = array(
+            'interval' => 14400, // 4 hours in seconds (24 hours / 6)
+            'display'  => __('Six Times Daily (Every 4 Hours)', 'schedule-collaboration-tracking')
         );
         $schedules['daily_2am'] = array(
             'interval' => 86400, // 24 hours in seconds
@@ -443,18 +461,45 @@ class FTT_Price_Tracking {
         $start_time = microtime(true);
         $flights_checked = 0;
         $prices_recorded = 0;
+        $had_error = false;
+        $error_message = '';
         
-        // Get API credentials
-        $settings = get_option('ftt_settings', array());
-        $api_key = $settings['serpapi_api_key'] ?? '';
-        
-        if (empty($api_key)) {
-            error_log('SRT Price Tracking: SerpAPI key not configured');
-            return;
-        }
-        
-        $type_label = $source === 'manual' ? 'manual' : 'scheduled';
-        error_log("SRT: Starting $type_label price check...");
+        try {
+            // Get API credentials
+            $settings = get_option('ftt_settings', array());
+            $api_key = $settings['serpapi_api_key'] ?? '';
+            
+            if (empty($api_key)) {
+                error_log('SRT Price Tracking: SerpAPI key not configured');
+                
+                // Log the failure
+                $log = get_option('ftt_cron_log', array());
+                $log_entry = array(
+                    'timestamp' => current_time('mysql'),
+                    'type' => $source,
+                    'status' => 'failed',
+                    'error' => 'SerpAPI key not configured',
+                    'flights_checked' => 0,
+                    'prices_recorded' => 0,
+                    'duration' => 0,
+                );
+                
+                if ($source === 'manual') {
+                    $log_entry['user'] = wp_get_current_user()->user_login;
+                }
+                
+                $log[] = $log_entry;
+                if (count($log) > 20) {
+                    $log = array_slice($log, -20);
+                }
+                update_option('ftt_cron_log', $log);
+                update_option('ftt_cron_last_run', current_time('mysql'));
+                
+                return;
+            }
+            
+            $type_label = $source === 'manual' ? 'manual' : 'scheduled';
+            error_log("SRT: Starting $type_label price check...");
         
         // Base query arguments - get all future flight events
         $args = array(
@@ -607,6 +652,10 @@ class FTT_Price_Tracking {
         $log_entry = array(
             'timestamp' => current_time('mysql'),
             'type' => $source,
+            'status' => 'success',
+            'flights_checked' => $flights_checked,
+            'prices_recorded' => $prices_recorded,
+            'duration' => $duration,
         );
         
         if ($source === 'manual') {
@@ -630,6 +679,35 @@ class FTT_Price_Tracking {
             'prices_recorded' => $prices_recorded,
             'duration' => $duration,
         ));
+        
+        } catch (Exception $e) {
+            // Log the exception
+            $duration = round(microtime(true) - $start_time, 2);
+            $error_message = $e->getMessage();
+            error_log("SRT Price Tracking Error: " . $error_message);
+            
+            $log = get_option('ftt_cron_log', array());
+            $log_entry = array(
+                'timestamp' => current_time('mysql'),
+                'type' => $source,
+                'status' => 'failed',
+                'error' => $error_message,
+                'flights_checked' => $flights_checked,
+                'prices_recorded' => $prices_recorded,
+                'duration' => $duration,
+            );
+            
+            if ($source === 'manual') {
+                $log_entry['user'] = wp_get_current_user()->user_login;
+            }
+            
+            $log[] = $log_entry;
+            if (count($log) > 20) {
+                $log = array_slice($log, -20);
+            }
+            update_option('ftt_cron_log', $log);
+            update_option('ftt_cron_last_run', current_time('mysql'));
+        }
     }
     
     /**
@@ -1263,22 +1341,73 @@ class FTT_Price_Tracking {
      */
     public static function process_daily_digests() {
         global $wpdb;
-        $alerts_table = $wpdb->prefix . 'ftt_price_alerts';
+        $start_time = microtime(true);
+        $emails_sent = 0;
         
-        // FIRST: Run price check to ensure we have fresh data with Google insights
-        error_log('[SRT Daily Digest] Running price check before sending emails...');
-        self::check_all_prices('digest');
-        error_log('[SRT Daily Digest] Price check complete, now sending emails');
-        
-        // Get all users with active daily digest alerts
-        $users = $wpdb->get_results(
-            "SELECT DISTINCT user_id FROM $alerts_table WHERE alert_type = 'daily_digest' AND is_active = 1"
-        );
-        
-        error_log(sprintf('[SRT Daily Digest] Processing %d users', count($users)));
-        
-        foreach ($users as $user) {
-            self::send_daily_digest($user->user_id);
+        try {
+            $alerts_table = $wpdb->prefix . 'ftt_price_alerts';
+            
+            // FIRST: Run price check to ensure we have fresh data with Google insights
+            error_log('[SRT Daily Digest] Running price check before sending emails...');
+            self::check_all_prices('digest');
+            error_log('[SRT Daily Digest] Price check complete, now sending emails');
+            
+            // Get all users with active daily digest alerts
+            $users = $wpdb->get_results(
+                "SELECT DISTINCT user_id FROM $alerts_table WHERE alert_type = 'daily_digest' AND is_active = 1"
+            );
+            
+            error_log(sprintf('[SRT Daily Digest] Processing %d users', count($users)));
+            
+            foreach ($users as $user) {
+                $sent = self::send_daily_digest($user->user_id);
+                if ($sent) {
+                    $emails_sent++;
+                }
+            }
+            
+            // Log success
+            $duration = round(microtime(true) - $start_time, 2);
+            error_log("[SRT Daily Digest] Complete - {$emails_sent} emails sent, Duration: {$duration}s");
+            
+            $log = get_option('ftt_cron_log', array());
+            $log_entry = array(
+                'timestamp' => current_time('mysql'),
+                'type' => 'digest',
+                'status' => 'success',
+                'flights_checked' => count($users),
+                'prices_recorded' => $emails_sent,
+                'duration' => $duration,
+            );
+            
+            $log[] = $log_entry;
+            if (count($log) > 20) {
+                $log = array_slice($log, -20);
+            }
+            update_option('ftt_cron_log', $log);
+            
+        } catch (Exception $e) {
+            // Log the exception
+            $duration = round(microtime(true) - $start_time, 2);
+            $error_message = $e->getMessage();
+            error_log("[SRT Daily Digest] Error: " . $error_message);
+            
+            $log = get_option('ftt_cron_log', array());
+            $log_entry = array(
+                'timestamp' => current_time('mysql'),
+                'type' => 'digest',
+                'status' => 'failed',
+                'error' => $error_message,
+                'flights_checked' => 0,
+                'prices_recorded' => 0,
+                'duration' => $duration,
+            );
+            
+            $log[] = $log_entry;
+            if (count($log) > 20) {
+                $log = array_slice($log, -20);
+            }
+            update_option('ftt_cron_log', $log);
         }
     }
     
@@ -1439,10 +1568,14 @@ class FTT_Price_Tracking {
                 'flight_count' => $total_flights,
             ]);
             
-            wp_mail($user->user_email, $subject, $email_body, $headers);
+            $sent = wp_mail($user->user_email, $subject, $email_body, $headers);
             
             error_log(sprintf('[SRT Daily Digest] Sent to %s (%d flights)', $user->user_email, $total_flights));
+            
+            return $sent;
         }
+        
+        return false;
     }
     
     /**

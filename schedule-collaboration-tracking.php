@@ -3,7 +3,7 @@
  * Plugin Name: Family Travel Tracker
  * Plugin URI: https://github.com/jimmarks/schedule-collaboration-tracking
  * Description: Multi-child schedule coordination with travel planning, flight tracking, and shared calendars for families. Perfect for busy parents, co-parenting families, and children's activities.
- * Version: 2.6.37
+ * Version: 3.0.13
  * Author: Jim Marks
  * Author URI: https://github.com/jimmarks
  * License: GPL v2 or later
@@ -19,7 +19,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('FTT_VERSION', '2.6.37');
+define('FTT_VERSION', '3.0.13');
 define('FTT_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('FTT_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('FTT_PLUGIN_BASENAME', plugin_basename(__FILE__));
@@ -103,6 +103,8 @@ class Family_Travel_Tracker {
         require_once FTT_PLUGIN_DIR . 'includes/class-cookie-scanner.php';
         require_once FTT_PLUGIN_DIR . 'includes/class-user-profile.php';
         require_once FTT_PLUGIN_DIR . 'includes/class-external-calendars.php';
+        require_once FTT_PLUGIN_DIR . 'includes/class-newsletter-sync.php';
+        require_once FTT_PLUGIN_DIR . 'includes/class-ai-event-parser.php';
         // Domain routing removed - single domain setup (www.familytraveltracker.app only)
         // require_once FTT_PLUGIN_DIR . 'includes/domain-routing.php';
         
@@ -128,6 +130,8 @@ class Family_Travel_Tracker {
         add_action('plugins_loaded', array($this, 'load_textdomain'));
         add_action('plugins_loaded', array($this, 'check_pages'));
         add_action('wp_enqueue_scripts', array($this, 'enqueue_scripts'));
+        add_action('wp_footer', array($this, 'render_airport_reminder_modal'));
+        add_action('wp_login', array($this, 'track_login_count'), 10, 2);
         add_action('admin_notices', array('FTT_Pages', 'get_missing_pages_notice'));
         add_action('admin_init', array('FTT_Pages', 'handle_recreate_pages'));
         add_action('admin_init', array($this, 'run_migrations'));
@@ -157,6 +161,8 @@ class Family_Travel_Tracker {
         FTT_Cookie_Scanner::init();
         FTT_User_Profile::init();
         FTT_External_Calendars::init();
+        FTT_Newsletter_Sync::init();
+        FTT_AI_Event_Parser::init();
         // FTT_Domain_Routing::init(); // Disabled - single domain setup
         
         // Load test/debug tools (only if file exists)
@@ -232,6 +238,121 @@ class Family_Travel_Tracker {
                 $wpdb->query( "ALTER TABLE `{$table}` ADD COLUMN `group_token` VARCHAR(16) NULL UNIQUE AFTER `color`, ADD INDEX `idx_token` (`group_token`)" );
             }
             update_option('ftt_migration_version', '4');
+        }
+
+        // Migration 5: Backfill ftt_event_groups for events that were never associated
+        // with a group (created before groups existed or before auto-assign was working).
+        if (version_compare($migration_version, '5', '<')) {
+            global $wpdb;
+            $eg_table      = $wpdb->prefix . 'ftt_event_groups';
+            $members_table = $wpdb->prefix . 'ftt_group_members';
+
+            // Find all published ftt_event posts not yet in ftt_event_groups.
+            $unassociated = $wpdb->get_results(
+                "SELECT p.ID,
+                        MAX(CASE WHEN pm.meta_key = 'member_id' THEN pm.meta_value END) AS member_id,
+                        MAX(CASE WHEN pm.meta_key = 'group_id'  THEN pm.meta_value END) AS group_id_meta
+                 FROM {$wpdb->posts} p
+                 LEFT JOIN {$wpdb->postmeta} pm
+                        ON p.ID = pm.post_id AND pm.meta_key IN ('member_id','group_id')
+                 LEFT JOIN {$eg_table} eg ON p.ID = eg.post_id
+                 WHERE p.post_type   = 'ftt_event'
+                   AND p.post_status = 'publish'
+                   AND eg.post_id IS NULL
+                 GROUP BY p.ID"
+            );
+
+            foreach ($unassociated as $ev) {
+                $target_group = null;
+
+                // 1. Prefer explicit group_id post meta.
+                if (!empty($ev->group_id_meta)) {
+                    $target_group = (int) $ev->group_id_meta;
+                }
+
+                // 2. Derive from the assigned member's group membership.
+                if (!$target_group && !empty($ev->member_id)) {
+                    $target_group = (int) $wpdb->get_var($wpdb->prepare(
+                        "SELECT group_id FROM {$members_table} WHERE user_id = %d ORDER BY added_at ASC LIMIT 1",
+                        (int) $ev->member_id
+                    ));
+                }
+
+                if ($target_group) {
+                    // Insert (ignore duplicate — table has UNIQUE KEY).
+                    $wpdb->query($wpdb->prepare(
+                        "INSERT IGNORE INTO {$eg_table} (post_id, group_id, created_at) VALUES (%d, %d, %s)",
+                        $ev->ID, $target_group, current_time('mysql')
+                    ));
+                    // Ensure post meta is also consistent.
+                    if (empty($ev->group_id_meta)) {
+                        update_post_meta($ev->ID, 'group_id', $target_group);
+                    }
+                }
+            }
+
+            update_option('ftt_migration_version', '5');
+        }
+
+        // Migration 6: Re-run event backfill with post_author fallback for events
+        // whose child (member_id) was never added to wp_ftt_group_members.
+        if (version_compare($migration_version, '6', '<')) {
+            global $wpdb;
+            $eg_table      = $wpdb->prefix . 'ftt_event_groups';
+            $members_table = $wpdb->prefix . 'ftt_group_members';
+
+            // Find all published ftt_event posts still not in ftt_event_groups.
+            $unassociated = $wpdb->get_results(
+                "SELECT p.ID, p.post_author,
+                        MAX(CASE WHEN pm.meta_key = 'member_id' THEN pm.meta_value END) AS member_id,
+                        MAX(CASE WHEN pm.meta_key = 'group_id'  THEN pm.meta_value END) AS group_id_meta
+                 FROM {$wpdb->posts} p
+                 LEFT JOIN {$wpdb->postmeta} pm
+                        ON p.ID = pm.post_id AND pm.meta_key IN ('member_id','group_id')
+                 LEFT JOIN {$eg_table} eg ON p.ID = eg.post_id
+                 WHERE p.post_type   = 'ftt_event'
+                   AND p.post_status = 'publish'
+                   AND eg.post_id IS NULL
+                 GROUP BY p.ID"
+            );
+
+            foreach ($unassociated as $ev) {
+                $target_group = null;
+
+                // 1. Explicit group_id post meta.
+                if (!empty($ev->group_id_meta)) {
+                    $target_group = (int) $ev->group_id_meta;
+                }
+
+                // 2. Child (member_id) is directly in ftt_group_members.
+                if (!$target_group && !empty($ev->member_id)) {
+                    $target_group = (int) $wpdb->get_var($wpdb->prepare(
+                        "SELECT group_id FROM {$members_table} WHERE user_id = %d ORDER BY added_at ASC LIMIT 1",
+                        (int) $ev->member_id
+                    ));
+                }
+
+                // 3. Fall back to the post author's group membership.
+                //    The author is the parent who created the event, and they ARE in the group.
+                if (!$target_group && !empty($ev->post_author)) {
+                    $target_group = (int) $wpdb->get_var($wpdb->prepare(
+                        "SELECT group_id FROM {$members_table} WHERE user_id = %d ORDER BY added_at ASC LIMIT 1",
+                        (int) $ev->post_author
+                    ));
+                }
+
+                if ($target_group) {
+                    $wpdb->query($wpdb->prepare(
+                        "INSERT IGNORE INTO {$eg_table} (post_id, group_id, created_at) VALUES (%d, %d, %s)",
+                        $ev->ID, $target_group, current_time('mysql')
+                    ));
+                    if (empty($ev->group_id_meta)) {
+                        update_post_meta($ev->ID, 'group_id', $target_group);
+                    }
+                }
+            }
+
+            update_option('ftt_migration_version', '6');
         }
     }
     
@@ -489,6 +610,7 @@ class Family_Travel_Tracker {
             'geocodingProvider' => $settings['geocoding_provider'] ?? 'none',
             'mapboxApiKey' => $settings['mapbox_api_key'] ?? '',
             'googlePlacesApiKey' => $settings['google_places_api_key'] ?? '',
+            'showAirportReminder' => $this->should_show_airport_reminder($current_uid),
             'externalCalendars' => $current_uid ? array_values(
                 array_map(
                     function( $f ) { return array( 'label' => $f['label'], 'color' => $f['color'] ); },
@@ -496,6 +618,109 @@ class Family_Travel_Tracker {
                 )
             ) : array(),
         ));
+    }
+
+    /**
+     * Increment login count on every successful login.
+     * Hooked into wp_login.
+     *
+     * @param string  $user_login
+     * @param WP_User $user
+     */
+    public function track_login_count( $user_login, $user ) {
+        $count = (int) get_user_meta( $user->ID, 'ftt_login_count', true );
+        update_user_meta( $user->ID, 'ftt_login_count', $count + 1 );
+    }
+
+    /**
+     * Decide whether to show the home-airport reminder modal on this page load.
+     * Conditions: logged in, airport not set, login count 2–4, not dismissed, not on onboarding.
+     *
+     * @param int $user_id
+     * @return bool
+     */
+    private function should_show_airport_reminder( $user_id ) {
+        if ( ! $user_id ) {
+            return false;
+        }
+        // Already dismissed permanently.
+        if ( get_user_meta( $user_id, 'ftt_airport_reminder_dismissed', true ) ) {
+            return false;
+        }
+        // Airport already set — nothing to remind.
+        $airport = get_user_meta( $user_id, 'ftt_home_airport', true );
+        if ( empty( $airport ) ) {
+            $airports_raw = get_user_meta( $user_id, 'ftt_home_airports', true );
+            $airports_arr = is_array( $airports_raw ) ? $airports_raw
+                          : ( $airports_raw ? json_decode( $airports_raw, true ) : [] );
+            $airport = ! empty( $airports_arr[0] ) ? $airports_arr[0] : '';
+        }
+        if ( ! empty( $airport ) ) {
+            return false;
+        }
+        // Only remind on logins 2, 3, 4 (skip login 1 = just came from onboarding).
+        $login_count = (int) get_user_meta( $user_id, 'ftt_login_count', true );
+        if ( $login_count < 2 || $login_count > 4 ) {
+            return false;
+        }
+        // Don't show on onboarding pages.
+        if ( is_page() ) {
+            $onboarding_url = home_url( '/ftt-onboarding/' );
+            $current_url    = home_url( add_query_arg( [] ) );
+            if ( strpos( $current_url, $onboarding_url ) !== false ) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Output the home-airport reminder modal in wp_footer when needed.
+     * The modal is invisible until JS shows it.
+     */
+    public function render_airport_reminder_modal() {
+        if ( ! $this->should_show_airport_reminder( get_current_user_id() ) ) {
+            return;
+        }
+        $site_tz        = get_option( 'ftt_settings', [] )['default_timezone'] ?? wp_timezone_string();
+        $saved_timezone = get_user_meta( get_current_user_id(), 'ftt_timezone', true ) ?: $site_tz;
+        ?>
+        <div id="ftt-airport-reminder-modal" class="ftt-modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="ftt-airport-reminder-title">
+            <div class="ftt-modal-content">
+                <span class="ftt-modal-close" id="ftt-airport-reminder-close" role="button" tabindex="0" aria-label="<?php esc_attr_e( 'Close', 'schedule-collaboration-tracking' ); ?>">&times;</span>
+                <div class="ftt-onboarding-icon">✈️</div>
+                <h2 id="ftt-airport-reminder-title"><?php esc_html_e( 'One quick tip', 'schedule-collaboration-tracking' ); ?></h2>
+                <p><?php esc_html_e( "Set your home airport and the AI will automatically suggest the right flights when you plan a trip — no need to type it every time.", 'schedule-collaboration-tracking' ); ?></p>
+
+                <div class="ftt-onboard-profile-row">
+                    <label for="ftt-reminder-airport" class="ftt-onboard-profile-label"><?php esc_html_e( 'Home Airport (IATA code)', 'schedule-collaboration-tracking' ); ?></label>
+                    <input type="text"
+                           id="ftt-reminder-airport"
+                           class="ftt-onboard-airport-input"
+                           placeholder="e.g. BDL"
+                           maxlength="3"
+                           autocomplete="off" />
+                    <p class="description"><?php esc_html_e( '3-letter code — e.g. BOS, JFK, LAX.', 'schedule-collaboration-tracking' ); ?></p>
+                </div>
+
+                <div class="ftt-onboard-profile-row">
+                    <label for="ftt-reminder-timezone" class="ftt-onboard-profile-label"><?php esc_html_e( 'Your Timezone', 'schedule-collaboration-tracking' ); ?></label>
+                    <select id="ftt-reminder-timezone">
+                        <?php echo wp_timezone_choice( $saved_timezone, get_user_locale() ); ?>
+                    </select>
+                </div>
+
+                <div class="ftt-onboarding-actions" style="margin-top:16px;">
+                    <button type="button" class="ftt-btn ftt-btn-primary" id="ftt-reminder-save"><?php esc_html_e( 'Save', 'schedule-collaboration-tracking' ); ?></button>
+                </div>
+                <div id="ftt-reminder-msg" class="ftt-onboard-msg" style="display:none;"></div>
+
+                <div style="text-align:center;margin-top:12px;">
+                    <a href="#" id="ftt-reminder-dismiss" style="font-size:0.85em;color:#888;"><?php esc_html_e( "Don't ask again", 'schedule-collaboration-tracking' ); ?></a>
+                </div>
+            </div>
+        </div>
+        <?php
     }
 }
 

@@ -858,10 +858,10 @@ document.addEventListener('DOMContentLoaded', function() {
         var isYearly = yearlyRadio && yearlyRadio.checked;
         
         // Pricing structure
-        var baseMonthly = 9.99;
-        var addonMonthly = 5.00;
-        var baseYearly = 99.00;
-        var addonYearly = 50.00;
+        var baseMonthly = 5.99;
+        var addonMonthly = 2.00;
+        var baseYearly = 59.90;
+        var addonYearly = 20.00;
         
         var base = isYearly ? baseYearly : baseMonthly;
         var addonPerChild = isYearly ? addonYearly : addonMonthly;

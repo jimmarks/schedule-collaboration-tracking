@@ -37,6 +37,11 @@ jQuery(document).ready(function($) {
             color: $('#child-color').val()
         };
         
+        // Add group_id if available (from family-management.php template)
+        if (typeof fttGroupContext !== 'undefined' &&  fttGroupContext.groupId) {
+            formData.group_id = fttGroupContext.groupId;
+        }
+        
         console.log('Submitting to:', endpoint, formData);
         
         $.ajax({

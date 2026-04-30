@@ -71,7 +71,7 @@ class FTT_CPT {
         $args = array(
             'labels'             => $labels,
             'public'             => true,
-            'publicly_queryable' => true,
+            'publicly_queryable' => false, // Disable public URLs - use custom views instead
             'show_ui'            => true,
             'show_in_menu'       => true,
             'query_var'          => true,
@@ -625,6 +625,7 @@ class FTT_CPT {
     public static function modify_row_actions($actions, $post) {
         if ($post->post_type === 'ftt_event') {
             $event_form_url = FTT_Pages::get_page_url('event_form');
+            $event_view_url = FTT_Pages::get_page_url('event_view');
             
             if ($event_form_url) {
                 // Replace Edit link
@@ -637,6 +638,20 @@ class FTT_CPT {
                     );
                 }
             }
+            
+            // Add View Details link (ID-based, read-only)
+            if ($event_view_url) {
+                $view_url = add_query_arg('event_id', $post->ID, $event_view_url);
+                $actions['view_details'] = sprintf(
+                    '<a href="%s">%s</a>',
+                    esc_url($view_url),
+                    __('View Details', 'schedule-collaboration-tracking')
+                );
+            }
+            
+            // Remove the default "View" action since we've disabled public URLs
+            // and replaced it with "View Details" that uses event IDs
+            unset($actions['view']);
         }
         
         return $actions;

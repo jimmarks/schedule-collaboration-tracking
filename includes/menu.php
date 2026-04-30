@@ -29,30 +29,60 @@ class FTT_Menu {
     }
 
     /**
-     * Register the members-only nav menu location.
+     * Register the members-only nav menu locations.
+     *
+     * primary_member      – desktop logged-in nav (swaps the 'primary' location)
+     * mobile_member       – mobile logged-in nav (swaps whatever Astra uses for mobile)
      */
     public static function register_member_menu_location() {
-        register_nav_menu('primary_member', __('Primary (Members)', 'schedule-collaboration-tracking'));
+        register_nav_menus( array(
+            'primary_member' => __('Primary Navigation (Members)', 'schedule-collaboration-tracking'),
+            'mobile_member'  => __('Mobile Navigation (Members)', 'schedule-collaboration-tracking'),
+        ) );
     }
 
     /**
-     * Swap the primary nav location to use the members menu when logged in,
-     * but only if a menu has been assigned to the primary_member location.
+     * Swap nav menu locations to member-specific menus when logged in.
+     *
+     * Desktop: 'primary'                   → 'primary_member'
+     * Mobile:  [configured mobile slug]    → 'mobile_member'
+     *          Falls back to 'primary_member' if no mobile_member menu assigned.
      */
-    public static function swap_menu_for_members($args) {
-        if (!is_user_logged_in()) {
+    public static function swap_menu_for_members( $args ) {
+        if ( ! is_user_logged_in() ) {
             return $args;
         }
 
-        // Only act on the primary location
-        if (!isset($args['theme_location']) || $args['theme_location'] !== 'primary') {
+        if ( ! isset( $args['theme_location'] ) ) {
             return $args;
         }
 
-        // Only swap if a menu is actually assigned to primary_member
-        $member_menu = get_nav_menu_locations()['primary_member'] ?? 0;
-        if ($member_menu) {
-            $args['theme_location'] = 'primary_member';
+        $locations   = get_nav_menu_locations();
+        $location    = $args['theme_location'];
+
+        // ── Desktop swap: primary → primary_member ──────────────────────
+        if ( $location === 'primary' ) {
+            if ( ! empty( $locations['primary_member'] ) ) {
+                $args['theme_location'] = 'primary_member';
+            }
+            return $args;
+        }
+
+        // ── Mobile swap: [configured slug] → mobile_member ──────────────
+        $settings     = get_option( 'ftt_settings', array() );
+        $mobile_slugs = array_filter( array_map(
+            'trim',
+            explode( ',', $settings['mobile_menu_location'] ?? '' )
+        ) );
+
+        if ( ! empty( $mobile_slugs ) && in_array( $location, $mobile_slugs, true ) ) {
+            if ( ! empty( $locations['mobile_member'] ) ) {
+                // Use dedicated mobile logged-in menu
+                $args['theme_location'] = 'mobile_member';
+            } elseif ( ! empty( $locations['primary_member'] ) ) {
+                // No mobile menu assigned; fall back to desktop member menu
+                $args['theme_location'] = 'primary_member';
+            }
         }
 
         return $args;

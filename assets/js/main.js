@@ -72,17 +72,21 @@
             }
             
             const calendar = new FullCalendar.Calendar(calendarEl, {
-                initialView: (function() {
-                    var viewMap = { month: 'dayGridMonth', week: 'timeGridWeek', agenda: 'listWeek' };
-                    return viewMap[(fttData.userCalendarView || 'month')] || 'dayGridMonth';
-                })(),
+                initialView: 'listWeek',
                 timeZone: fttData.userTimezone || 'local',
                 height: 'auto',
                 contentHeight: 'auto',
+                views: {
+                    listWeek: {
+                        titleFormat: window.innerWidth <= 768
+                            ? { month: 'short', day: 'numeric' }
+                            : undefined
+                    }
+                },
                 headerToolbar: {
                     left: 'prev,next today',
                     center: 'title',
-                    right: 'dayGridMonth,timeGridWeek'
+                    right: ''
                 },
                 events: function(info, successCallback, failureCallback) {
                     FTT.fetchEvents(info.startStr, info.endStr)
@@ -793,13 +797,6 @@
                                 <option value="other" ${data && data.mode === 'other' ? 'selected' : ''}>Other</option>
                             </select>
                         </div>
-                        <div class="ftt-form-field ftt-flight-only">
-                            <label>
-                                <input type="checkbox" name="travel_legs[${index}][is_round_trip]" class="ftt-round-trip-toggle" value="1" ${data && data.is_round_trip ? 'checked' : ''}>
-                                Round-Trip Flight
-                            </label>
-                            <small class="description">Check if departing and returning same route - system will search combined pricing</small>
-                        </div>
                     </div>
                     
                     <div class="ftt-form-row">
@@ -850,25 +847,6 @@
                             </div>
                         </div>
                         
-                        <div class="ftt-date-group ftt-return-group ftt-round-trip-return" style="display: none;">
-                            <h5 class="ftt-date-group-label">🔄 Return</h5>
-                            <div class="ftt-form-row">
-                                <div class="ftt-form-field">
-                                    <label>Return Date *</label>
-                                    <input type="date" name="travel_legs[${index}][return_date]" value="${data && data.return_date ? data.return_date : ''}">
-                                </div>
-                                <div class="ftt-form-field">
-                                    <label>Return Time of Day</label>
-                                    <select name="travel_legs[${index}][return_time_of_day]">
-                                        <option value="">Any Time</option>
-                                        <option value="morning" ${data && data.return_time_of_day === 'morning' ? 'selected' : ''}>Morning</option>
-                                        <option value="midday" ${data && data.return_time_of_day === 'midday' ? 'selected' : ''}>Mid-Day</option>
-                                        <option value="afternoon" ${data && data.return_time_of_day === 'afternoon' ? 'selected' : ''}>Afternoon</option>
-                                        <option value="night" ${data && data.return_time_of_day === 'night' ? 'selected' : ''}>Night</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
                     </div>
                     
                     <div class="ftt-booking-section ftt-flight-only">
@@ -966,26 +944,7 @@
                 $newLeg.find('.ftt-booking-details').toggle(this.checked);
             });
             
-            // Toggle round-trip return date fields
-            $newLeg.find('.ftt-round-trip-toggle').on('change', function() {
-                const isRoundTrip = this.checked;
-                const $returnGroup = $newLeg.find('.ftt-return-group');
-                $returnGroup.toggle(isRoundTrip);
-                
-                // Show helper text
-                if (isRoundTrip) {
-                    if (!$newLeg.find('.ftt-round-trip-help').length) {
-                        $returnGroup.before(
-                            '<div class="ftt-round-trip-help" style="margin: 15px 0 0 0; padding: 12px 15px; background: #e7f3ff; border-left: 4px solid #2271b1; font-size: 14px; border-radius: 4px;">' +
-                            '<strong>💡 Round-Trip Pricing:</strong> Enter your return date below. The system will search for combined round-trip fares which are often cheaper than two one-way tickets.' +
-                            '</div>'
-                        );
-                    }
-                } else {
-                    $newLeg.find('.ftt-round-trip-help').remove();
-                }
-            }).trigger('change');
-            
+
 
         },
         
@@ -1031,6 +990,18 @@
             });
 
             $textInput.on('blur', function() {
+                // If the user typed a bare 3-letter IATA code and nothing was
+                // selected from the dropdown, accept the raw value so it is
+                // never silently dropped.  A mousedown selection has already
+                // written the code to $hiddenInput, so that case is safe too.
+                const raw = $(this).val().trim().toUpperCase();
+                if (/^[A-Z]{3}$/.test(raw)) {
+                    $hiddenInput.val(raw);
+                    const city = self.airportData[raw] || '';
+                    $textInput.val(city ? city + ' (' + raw + ')' : raw);
+                } else if (raw === '') {
+                    $hiddenInput.val('');
+                }
                 setTimeout(function() { $list.hide(); }, 150);
             });
         },
@@ -1064,7 +1035,7 @@
                             suggestions.push({
                                 outbound: legs[i],
                                 return: legs[j],
-                                message: `💡 Legs ${legs[i].index + 1} and ${legs[j].index + 1} look like a round-trip (${legs[i].from}↔${legs[j].from}). Consider using the Round-Trip checkbox on Leg ${legs[i].index + 1} for better pricing.`
+                                message: `✓ Legs ${legs[i].index + 1} and ${legs[j].index + 1} form a round-trip (${legs[i].from}↔${legs[j].from}). Round-trip pricing will be searched automatically.`
                             });
                         }
                     }
@@ -1079,7 +1050,7 @@
                 $suggestionsList.empty();
                 suggestions.forEach(function(suggestion) {
                     $suggestionsList.append(`
-                        <div class=\"ftt-suggestion\" style=\"padding: 10px; margin: 5px 0; background: #fff3cd; border-left: 3px solid #ffc107; border-radius: 3px;\">
+                        <div class="ftt-suggestion" style="padding: 10px; margin: 5px 0; background: #edf7ed; border-left: 3px solid #4caf50; border-radius: 3px;">
                             ${suggestion.message}
                         </div>
                     `);
@@ -1137,9 +1108,6 @@
                     arrive_time_of_day: $(`[name="travel_legs[${index}][arrive_time_of_day]"]`).val(),
                     depart_datetime: $(`[name="travel_legs[${index}][depart_datetime]"]`).val(),
                     arrive_datetime: $(`[name="travel_legs[${index}][arrive_datetime]"]`).val(),
-                    is_round_trip: $(`[name="travel_legs[${index}][is_round_trip]"]`).is(':checked'),
-                    return_date: $(`[name="travel_legs[${index}][return_date]"]`).val(),
-                    return_time_of_day: $(`[name="travel_legs[${index}][return_time_of_day]"]`).val(),
                     airline: $(`[name="travel_legs[${index}][airline]"]`).val(),
                     flight_number: $(`[name="travel_legs[${index}][flight_number]"]`).val(),
                     booked: $(`[name="travel_legs[${index}][booked]"]`).is(':checked'),
@@ -1311,7 +1279,7 @@
                             'price_drop': 'Drop Below $' + (alert.threshold_price || '?'),
                             'percent_drop': 'Drop By ' + (alert.threshold_percent || '?') + '%',
                             'good_deal': 'Good Deal (15% below avg)',
-                            'daily_digest': '📧 Daily Digest (2am)'
+                            'daily_digest': '📧 Daily Digest'
                         }[alert.alert_type] || alert.alert_type;
                         
                         const statusIcon = alert.is_active ? '✓ Active' : '✗ Inactive';
@@ -1548,7 +1516,90 @@
             const date = new Date(dateString);
             return date.toLocaleString();
         },
-        
+
+        /**
+         * Fill the event form from an AI parse-event response.
+         * Populates every field it can map, then surfaces clarifications.
+         *
+         * @param {Object} res  The parsed response from POST /ai/parse-event
+         */
+        fillFormFromAI: function(res) {
+            var self = this;
+            var TOD_TIMES = { morning: '09:00', midday: '12:00', afternoon: '15:00', night: '20:00' };
+
+            // ── Basic fields ──────────────────────────────────────────────
+            if (res.title)            $('#event_title').val(res.title);
+            if (res.notes)            $('#notes').val(res.notes);
+            if (res.destination)      $('#location_name').val(res.destination);
+            if (res.location_name)    $('#location_name').val(res.location_name);
+            if (res.location_address) $('#location_address').val(res.location_address);
+
+            // ── Dates ─────────────────────────────────────────────────────
+            // Form uses either date-only (all_day) or datetime-local inputs.
+            var allDay = $('#all_day').is(':checked');
+            if (res.start_date) {
+                $('#start_datetime').val(allDay ? res.start_date : res.start_date + 'T00:00');
+            }
+            if (res.end_date) {
+                $('#end_datetime').val(allDay ? res.end_date : res.end_date + 'T23:59');
+            }
+
+            // ── Event type ────────────────────────────────────────────────
+            if (res.event_type) {
+                var et      = res.event_type;
+                var etTypes = window.fttEventTypes || {};
+                $('#event_type').val(et);
+                $('#event_type_search').val(
+                    etTypes[et] || et.replace(/_/g, ' ').replace(/\b\w/g, function(l){ return l.toUpperCase(); })
+                );
+            }
+
+            // ── Member / traveler ─────────────────────────────────────────
+            if ($('#ftt-member-checkboxes').length) {
+                $('#ftt-family-event').prop('checked', false);
+                $('.ftt-child-checkbox').prop('checked', false).prop('disabled', false);
+                if (res.member_id) {
+                    var $cb = $('.ftt-child-checkbox[value="' + res.member_id + '"]');
+                    if ($cb.length) {
+                        $cb.prop('checked', true);
+                    }
+                }
+            } else if ($('#member_id').length && res.member_id) {
+                $('#member_id').val(res.member_id);
+            }
+
+            // ── Travel legs ───────────────────────────────────────────────
+            if (res.travel_legs && res.travel_legs.length > 0) {
+                // Clear any existing legs first.
+                $('#ftt-travel-legs-container').empty();
+                res.travel_legs.forEach(function(leg) {
+                    var legData = $.extend({}, leg);
+                    self.addTravelLeg(legData);
+
+                    // After the leg DOM is built, tick baggage checkboxes.
+                    if (leg.baggage && leg.baggage.length > 0) {
+                        var $leg = $('#ftt-travel-legs-container .ftt-travel-leg').last();
+                        leg.baggage.forEach(function(b) {
+                            $leg.find('input[type="checkbox"][value="' + b + '"]').prop('checked', true);
+                        });
+                    }
+                });
+                setTimeout(function(){ self.checkFlightSuggestions(); }, 300);
+            }
+
+            // ── Time blocks ───────────────────────────────────────────────
+            if (res.time_blocks && res.time_blocks.length > 0) {
+                $('#ftt-time-blocks-container').empty();
+                res.time_blocks.forEach(function(block) {
+                    self.addTimeBlock(block);
+                });
+            }
+
+            // ── Show/hide the AI assistant panel ──────────────────────────
+            // Keep it open so the user can see clarifications.
+
+        },
+
         /**
          * Get pretty event type name
          */
@@ -1590,7 +1641,7 @@
                             <option value="price_drop">Drop Below Price</option>
                             <option value="percent_drop">Drop By Percentage</option>
                             <option value="good_deal">Good Deal Alert (15% below average)</option>
-                            <option value="daily_digest">📧 Daily Price Digest (2am email)</option>
+                            <option value="daily_digest">📧 Daily Price Digest</option>
                         </select>
                     </div>
                     
@@ -2024,7 +2075,7 @@
                             💰 Check Price Now
                         </button>
                         <button class="button button-small button-secondary ftt-track-price" data-event-id="${event.id}" data-leg-index="${legIndex}" data-origin="${origin}" data-destination="${destination}" data-date="${date || ''}">
-                            <span class="dashicons dashicons-bell" style="font-size: 14px; margin-top: 2px;"></span> Track Price
+                            <span class="dashicons dashicons-bell" style="font-size: 14px;"></span> Track Price
                         </button>
                     </div>
                     <div class="ftt-price-info" id="ftt-price-info-${legIndex}"></div>
@@ -2091,8 +2142,7 @@
                     }
                     
                     const price = parseFloat(response.price);
-                    const checked = new Date(response.checked_at).toLocaleString();
-                    
+
                     if (!price || isNaN(price)) {
                         $container.html('<p style="color: red;">✗ Unable to parse price data</p>');
                         return;
@@ -2100,50 +2150,17 @@
                     
                     console.log('🔗 Google Flights URL:', response.google_flights_url);
                     console.log('🎫 Trip Type:', response.trip_type);
-                    
-                    let html = '';
-                    
-                    // Show Google Price Insights if available
-                    if (response.google_insights) {
-                        const insights = response.google_insights;
-                        html += '<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 4px; padding: 10px; margin: 10px 0;">';
-                        html += '<div style="font-size: 0.85em; font-weight: 600; margin-bottom: 6px;">✈️ Google Flights Insights</div>';
-                        
-                        if (insights.price_level) {
-                            let priceLevel = insights.price_level.toLowerCase();
-                            let levelIcon = priceLevel === 'low' ? '💚' : (priceLevel === 'high' ? '🔴' : '🟡');
-                            html += `<div style="font-size: 1.05em; margin-bottom: 4px;">${levelIcon} Price is <strong>${priceLevel}</strong></div>`;
-                        }
-                        
-                        if (insights.typical_price_range) {
-                            let range = insights.typical_price_range;
-                            html += `<div style="font-size: 0.85em; opacity: 0.95;">Typical: $${range[0]}–${range[1]}</div>`;
-                        }
-                        
-                        if (insights.lowest_price) {
-                            html += `<div style="font-size: 0.85em; opacity: 0.9;">Lowest: $${insights.lowest_price}</div>`;
-                        }
-                        
-                        html += '</div>';
-                    }
-                    
-                    // Current price box
-                    html += '<div style="background: #f0f9ff; border: 1px solid #0891b2; padding: 10px; margin: 10px 0; border-radius: 4px;">';
-                    html += '<strong style="color: #0891b2; font-size: 1.2em;">$' + price.toFixed(2) + '</strong> ';
-                    html += '<span style="color: #666; font-size: 0.9em;">as of ' + checked + '</span>';
-                    
-                    if (response.trip_type) {
-                        html += '<span style="background: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 3px; font-size: 0.8em; margin-left: 10px;">' + response.trip_type + '</span>';
-                    }
-                    
-                    if (response.google_flights_url) {
-                        html += '<div style="margin-top: 8px;"><a href="' + response.google_flights_url + '" target="_blank" style="color: #0891b2; font-size: 0.9em; text-decoration: underline;">🔍 Verify on Google Flights →</a></div>';
-                    }
-                    
-                    html += '</div>';
-                    $container.html(html);
-                    
-                    // Reload price history
+
+                    // Stash trip_type and Google Flights URL on the container so
+                    // renderPriceHistory can include them without a second render.
+                    $container
+                        .data('ftt-trip-type', response.trip_type || '')
+                        .data('ftt-flights-url', response.google_flights_url || '');
+
+                    // Show a brief loading state, then let renderPriceHistory do
+                    // the single authoritative render (avoids duplicating the
+                    // Insights + price cards that renderPriceHistory also draws).
+                    $container.html('<div style="padding: 16px; text-align: center; color: #666;">🔄 Loading updated price…</div>');
                     FTT.loadPriceHistory(eventId, legIndex, modal);
                 },
                 error: function(xhr) {
@@ -2296,10 +2313,20 @@
                 html += '</div>';
             }
             
-            // Show current price box (latest from history)
+            // Pick up trip_type / verify URL stashed by the "Check Price Now" handler.
+            const fttTripType    = $container.data('ftt-trip-type')  || '';
+            const fttFlightsUrl  = $container.data('ftt-flights-url') || '';
+
+            // Current price box (latest from history)
             html += '<div style="background: #f0f9ff; border: 1px solid #0891b2; padding: 10px; margin: 10px 0; border-radius: 4px;">';
             html += '<strong style="color: #0891b2; font-size: 1.2em;">$' + current.toFixed(2) + '</strong> ';
             html += '<span style="color: #666; font-size: 0.9em;">as of ' + checked + '</span>';
+            if (fttTripType) {
+                html += '<span style="background: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 3px; font-size: 0.8em; margin-left: 10px;">' + fttTripType + '</span>';
+            }
+            if (fttFlightsUrl) {
+                html += '<div style="margin-top: 8px;"><a href="' + fttFlightsUrl + '" target="_blank" style="color: #0891b2; font-size: 0.9em; text-decoration: underline;">🔍 Verify on Google Flights →</a></div>';
+            }
             html += '</div>';
             
             // Our tracked price history
@@ -2334,15 +2361,9 @@
             
             html += '</div>';
             
-            // Check if there's already a price history section
-            const existingHistory = $container.find('.ftt-price-history');
-            if (existingHistory.length) {
-                // Replace existing price history only
-                existingHistory.replaceWith('<div class="ftt-price-history">' + html + '</div>');
-            } else {
-                // Append new price history (after current price info if it exists)
-                $container.append('<div class="ftt-price-history">' + html + '</div>');
-            }
+            // Always replace the container's entire content so we never
+            // accumulate duplicate insight/price blocks from successive renders.
+            $container.html('<div class="ftt-price-history">' + html + '</div>');
         },
         
         /**
@@ -2900,6 +2921,288 @@
             if (codeText && codeText !== '---') {
                 FTT.copyToClipboard(codeText);
             }
+        });
+
+        // ── AI Event Assistant (conversational chat) ─────────────────────
+        var fttAiHistory = [];   // [{role:'user',content:'...'}, {role:'assistant',content:'...'}]
+        var fttAiParsed  = null; // last fill-mode response
+        var fttAiDone    = false; // true after form has been filled
+
+        function fttAiScrollChat() {
+            var el = document.getElementById('ftt-ai-chat');
+            if (el) el.scrollTop = el.scrollHeight;
+        }
+
+        // Append a plain text bubble to the chat window.
+        function fttAiAppendBubble(role, text) {
+            var cls = (role === 'user') ? 'ftt-ai-bubble-user' : 'ftt-ai-bubble-ai';
+            var $b = $('<div>').addClass('ftt-ai-bubble ' + cls).text(text);
+            $('#ftt-ai-chat').append($b);
+            fttAiScrollChat();
+            return $b;
+        }
+
+        // Append an AI bubble with Yes / No action buttons.
+        function fttAiAppendActionBubble(text, yesLabel, noLabel, onYes, onNo) {
+            var $b = $('<div>').addClass('ftt-ai-bubble ftt-ai-bubble-ai ftt-ai-bubble-action');
+            $b.append($('<p>').text(text));
+            var $yes = $('<button type="button">').addClass('ftt-btn ftt-btn-secondary ftt-btn-sm').text(yesLabel);
+            var $no  = $('<button type="button">').addClass('ftt-btn-link').text(noLabel);
+            function resolve() { $b.addClass('ftt-ai-bubble-resolved'); $yes.prop('disabled', true); $no.prop('disabled', true); }
+            $yes.on('click', function() { resolve(); onYes(); });
+            $no.on('click',  function() { resolve(); onNo();  });
+            $b.append($yes).append(' ').append($no);
+            $('#ftt-ai-chat').append($b);
+            fttAiScrollChat();
+        }
+
+        // Toggle the chat panel open/closed.
+        // Collapsing the form while chatting keeps focus on the conversation.
+        function fttFormCollapse() {
+            $('#ftt-form-fields').slideUp(250);
+            $('#ftt-form-expand-bar').show().attr('aria-expanded', 'false');
+        }
+        function fttFormExpand() {
+            $('#ftt-form-fields').slideDown(300);
+            $('#ftt-form-expand-bar').hide().attr('aria-expanded', 'true');
+        }
+
+        $('#ftt-ai-toggle').on('click', function() {
+            var $body = $('#ftt-ai-body');
+            var open  = $body.is(':visible');
+            $body.slideToggle(200);
+            $(this).attr('aria-expanded', String(!open))
+                   .text( open ? 'Chat ▾' : 'Hide ▴' );
+            // Collapse the form when chat opens; restore when chat closes.
+            if (!open) { fttFormCollapse(); } else { fttFormExpand(); }
+        });
+
+        // Manual expand/collapse of the form section.
+        $('#ftt-form-expand-bar').on('click', function() {
+            var expanded = $('#ftt-form-fields').is(':visible');
+            if (expanded) { fttFormCollapse(); } else { fttFormExpand(); }
+        });
+
+        // Send the current textarea content to the AI.
+        function fttAiSend() {
+            if (fttAiDone) return;
+            var prompt = $.trim($('#ftt-ai-prompt').val());
+            if (!prompt) return;
+
+            var $btn = $('#ftt-ai-parse-btn');
+            $btn.prop('disabled', true);
+            $('#ftt-ai-spinner').show();
+
+            fttAiAppendBubble('user', prompt);
+            $('#ftt-ai-prompt').val('');
+
+            $.ajax({
+                url:         fttData.restUrl + 'ai/parse-event',
+                method:      'POST',
+                beforeSend:  function(xhr) { xhr.setRequestHeader('X-WP-Nonce', fttData.nonce); },
+                contentType: 'application/json',
+                data:        JSON.stringify({ prompt: prompt, history: fttAiHistory }),
+                success: function(res) {
+                    // Record both sides of this turn for next request.
+                    fttAiHistory.push({ role: 'user',      content: prompt });
+                    fttAiHistory.push({ role: 'assistant', content: JSON.stringify(res) });
+
+                    if (res.mode === 'chat') {
+                        // AI has a follow-up question — show it and keep input active.
+                        fttAiAppendBubble('ai', res.message);
+                        $('#ftt-ai-prompt').focus();
+
+                    } else {
+                        // Fill mode: populate the form.
+                        fttAiParsed = res;
+                        FTT.fillFormFromAI(res);
+
+                        // Confirmation bubble.
+                        var confidence = res.confidence || 'medium';
+                        var doneMsg = (confidence === 'high')
+                            ? '✓ Done! I\'ve filled in the form for "' + (res.title || 'this event') + '". Give it a look and save when you\'re ready.'
+                            : '⚠ I\'ve partially filled the form for "' + (res.title || 'this event') + '". A few items below need your attention.';
+                        fttAiAppendBubble('ai', doneMsg);
+
+                        // Clarifications as a follow-up bubble.
+                        var clarifications = res.clarifications_needed || [];
+                        if (clarifications.length > 0) {
+                            fttAiAppendBubble('ai', 'A few things to double-check:\n• ' + clarifications.join('\n• '));
+                        }
+
+                        // Return flight question (inline buttons).
+                        if (res.needs_return_clarification) {
+                            var returnDate = res.end_date ? ' for ' + res.end_date : '';
+                            fttAiAppendActionBubble(
+                                'No return flight was included — should I add one' + returnDate + '?',
+                                'Yes, add return flight',
+                                'No return needed',
+                                function() {
+                                    var outbound = (fttAiParsed.travel_legs || [])[0] || {};
+                                    FTT.addTravelLeg({
+                                        leg_name:           'Return',
+                                        mode:               'fly',
+                                        depart_airport:     outbound.arrive_airport || '',
+                                        arrive_airport:     outbound.depart_airport || '',
+                                        depart_date:        fttAiParsed.end_date   || '',
+                                        depart_time_of_day: '',
+                                        arrive_date:        fttAiParsed.end_date   || '',
+                                        booked:             false,
+                                    });
+                                    fttAiAppendBubble('ai', 'Return leg added!');
+                                },
+                                function() {}
+                            );
+                        }
+
+                        // Airport save suggestion (inline buttons).
+                        if (res.suggest_save_home_airport) {
+                            var airportMsg = res.save_home_airport_confirmation ||
+                                ('Save ' + res.suggest_save_home_airport + ' as your home airport?');
+                            fttAiAppendActionBubble(
+                                airportMsg,
+                                'Yes, save it',
+                                'No thanks',
+                                function() {
+                                    $.ajax({
+                                        url:         fttData.restUrl + 'user-preferences',
+                                        method:      'PUT',
+                                        beforeSend:  function(xhr) { xhr.setRequestHeader('X-WP-Nonce', fttData.nonce); },
+                                        contentType: 'application/json',
+                                        data:        JSON.stringify({ home_airport: res.suggest_save_home_airport }),
+                                    });
+                                },
+                                function() {}
+                            );
+                        }
+
+                        // Lock input, show restart. Expand the form so the user can review.
+                        fttAiDone = true;
+                        $btn.text('Done').prop('disabled', true);
+                        $('#ftt-ai-prompt').prop('disabled', true);
+                        $('#ftt-ai-restart').show();
+
+                        // Expand the form and scroll it into view.
+                        fttFormExpand();
+                        setTimeout(function() {
+                            var $form = $('#ftt-form-wrap');
+                            if ($form.length) {
+                                $('html, body').animate({ scrollTop: $form.offset().top - 80 }, 400);
+                            }
+                        }, 350);
+                    }
+                },
+                error: function(xhr) {
+                    var msg = (xhr.responseJSON && xhr.responseJSON.message)
+                              ? xhr.responseJSON.message
+                              : 'Something went wrong — try rephrasing.';
+                    fttAiAppendBubble('ai', '⚠ ' + msg);
+                },
+                complete: function() {
+                    if (!fttAiDone) { $btn.prop('disabled', false); }
+                    $('#ftt-ai-spinner').hide();
+                },
+            });
+        }
+
+        $('#ftt-ai-parse-btn').on('click', fttAiSend);
+
+        // Send on Enter (Shift+Enter = new line).
+        $('#ftt-ai-prompt').on('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                fttAiSend();
+            }
+        });
+
+        // Reset the whole conversation.
+        $('#ftt-ai-restart').on('click', function() {
+            fttAiHistory = [];
+            fttAiParsed  = null;
+            fttAiDone    = false;
+            $('#ftt-ai-chat').html(
+                '<div class="ftt-ai-bubble ftt-ai-bubble-ai">' +
+                'Tell me about the trip — who\'s going, where to, and when?</div>'
+            );
+            $('#ftt-ai-prompt').val('').prop('disabled', false).focus();
+            $('#ftt-ai-parse-btn').text('Send').prop('disabled', false);
+            $(this).hide();
+            // Re-collapse the form for the next chat session.
+            fttFormCollapse();
+        });
+
+        // Calendar subscribe modal
+        $(document).on('click', '#ftt-open-subscribe-modal', function() {
+            $('#ftt-subscribe-modal').fadeIn(200);
+        });
+        $(document).on('click', '#ftt-close-subscribe-modal', function() {
+            $('#ftt-subscribe-modal').fadeOut(200);
+        });
+        $(document).on('click', '#ftt-subscribe-modal', function(e) {
+            if ($(e.target).is('#ftt-subscribe-modal')) {
+                $('#ftt-subscribe-modal').fadeOut(200);
+            }
+        });
+
+        // ── Home-airport reminder modal ──────────────────────────────────
+        if (fttData.showAirportReminder) {
+            // Small delay so it doesn't fire the instant the page loads.
+            setTimeout(function() {
+                $('#ftt-airport-reminder-modal').fadeIn(250);
+            }, 1500);
+        }
+
+        // Auto-uppercase airport input.
+        $(document).on('input', '#ftt-reminder-airport', function() {
+            var pos = this.selectionStart;
+            this.value = this.value.replace(/[^A-Za-z]/g, '').toUpperCase();
+            this.setSelectionRange(pos, pos);
+        });
+
+        // Close on backdrop click or × button (just hides, does not dismiss permanently).
+        $(document).on('click', '#ftt-airport-reminder-close, #ftt-airport-reminder-modal', function(e) {
+            if ($(e.target).is('#ftt-airport-reminder-modal') || $(e.target).is('#ftt-airport-reminder-close')) {
+                $('#ftt-airport-reminder-modal').fadeOut(200);
+            }
+        });
+
+        // Save airport + timezone.
+        $(document).on('click', '#ftt-reminder-save', function() {
+            var $btn     = $(this);
+            var $msg     = $('#ftt-reminder-msg');
+            var airport  = $('#ftt-reminder-airport').val().replace(/[^A-Za-z]/g, '').toUpperCase();
+            var timezone = $('#ftt-reminder-timezone').val();
+
+            $btn.prop('disabled', true).text('Saving…');
+
+            $.ajax({
+                url:         fttData.restUrl + 'user-preferences',
+                method:      'PUT',
+                beforeSend:  function(xhr) { xhr.setRequestHeader('X-WP-Nonce', fttData.nonce); },
+                contentType: 'application/json',
+                data:        JSON.stringify({ home_airport: airport, timezone: timezone }),
+                success: function() {
+                    $('#ftt-airport-reminder-modal').fadeOut(300);
+                },
+                error: function() {
+                    $msg.removeClass('ftt-msg-ok').addClass('ftt-msg-error')
+                        .text('Could not save. Please try again.').show();
+                    $btn.prop('disabled', false).text('Save');
+                }
+            });
+        });
+
+        // "Don't ask again" — sets a dismissed flag server-side via user-preferences.
+        $(document).on('click', '#ftt-reminder-dismiss', function(e) {
+            e.preventDefault();
+            $('#ftt-airport-reminder-modal').fadeOut(200);
+            $.ajax({
+                url:         fttData.restUrl + 'user-preferences',
+                method:      'PUT',
+                beforeSend:  function(xhr) { xhr.setRequestHeader('X-WP-Nonce', fttData.nonce); },
+                contentType: 'application/json',
+                data:        JSON.stringify({ airport_reminder_dismissed: true })
+            });
         });
     });
     

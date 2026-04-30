@@ -12,22 +12,12 @@ if (!defined('ABSPATH')) {
 ?>
 
 <div class="ftt-container">
+    <?php
+    $ftt_page_title  = __('Upcoming Events', 'schedule-collaboration-tracking');
+    $ftt_active_slug = 'event_list';
+    include FTT_PLUGIN_DIR . 'templates/partials/nav.php';
+    ?>
     <div class="ftt-event-list">
-        <div class="ftt-page-header">
-            <h2><?php esc_html_e('Upcoming Events', 'schedule-collaboration-tracking'); ?></h2>
-            <div class="ftt-page-nav">
-                <?php
-                $dashboard_url = FTT_Pages::get_page_url('dashboard');
-                $calendar_url = FTT_Pages::get_page_url('calendar');
-                if ($dashboard_url) : ?>
-                    <a href="<?php echo esc_url($dashboard_url); ?>" class="button"><?php esc_html_e('Dashboard', 'schedule-collaboration-tracking'); ?></a>
-                <?php endif; ?>
-                <?php if ($calendar_url) : ?>
-                    <a href="<?php echo esc_url($calendar_url); ?>" class="button button-primary"><?php esc_html_e('Calendar', 'schedule-collaboration-tracking'); ?></a>
-                <?php endif; ?>
-            </div>
-        </div>
-        
         <?php if ($query->have_posts()) : ?>
             <?php while ($query->have_posts()) : $query->the_post(); ?>
                 <?php
