@@ -18,6 +18,7 @@ class FTT_Shortcodes {
     public static function init() {
         add_shortcode('ftt_calendar', array(__CLASS__, 'render_calendar'));
         add_shortcode('ftt_event_form', array(__CLASS__, 'render_event_form'));
+        add_shortcode('ftt_event_view', array(__CLASS__, 'render_event_view'));
         add_shortcode('ftt_dashboard', array(__CLASS__, 'render_dashboard'));
         add_shortcode('ftt_event_list', array(__CLASS__, 'render_event_list'));
         add_shortcode('ftt_calendar_subscribe', array(__CLASS__, 'render_calendar_subscribe'));
@@ -99,6 +100,20 @@ class FTT_Shortcodes {
         
         ob_start();
         include FTT_PLUGIN_DIR . 'templates/event-form.php';
+        return ob_get_clean();
+    }
+    
+    /**
+     * Render event view shortcode (read-only)
+     */
+    public static function render_event_view($atts) {
+        // Check if user is logged in
+        if (!is_user_logged_in()) {
+            return '<p>' . esc_html__('Please log in to view event details.', 'schedule-collaboration-tracking') . '</p>';
+        }
+        
+        ob_start();
+        include FTT_PLUGIN_DIR . 'templates/event-view.php';
         return ob_get_clean();
     }
     

@@ -64,12 +64,12 @@ $adults  = FTT_Roles::get_all_adults();
                             $member_since = get_user_meta($member->ID, 'ftt_member_since', true);
                             ?>
                             <tr>
-                                <td><strong><?php echo esc_html($member->display_name); ?></strong></td>
-                                <td><?php echo esc_html($member->user_email); ?></td>
-                                <td><?php echo esc_html(implode(', ', $member->roles)); ?></td>
-                                <td><?php echo $parent_names ? esc_html(implode(', ', $parent_names)) : '—'; ?></td>
-                                <td><?php echo $member_since ? esc_html(date('M j, Y', strtotime($member_since))) : '—'; ?></td>
-                                <td>
+                                <td data-label="Name"><strong><?php echo esc_html($member->display_name); ?></strong></td>
+                                <td data-label="Email"><?php echo esc_html($member->user_email); ?></td>
+                                <td data-label="Role"><?php echo esc_html(implode(', ', $member->roles)); ?></td>
+                                <td data-label="Parents"><?php echo $parent_names ? esc_html(implode(', ', $parent_names)) : '—'; ?></td>
+                                <td data-label="Member Since"><?php echo $member_since ? esc_html(date('M j, Y', strtotime($member_since))) : '—'; ?></td>
+                                <td data-label="Actions">
                                     <a href="<?php echo esc_url(get_edit_user_link($member->ID)); ?>" class="button button-small"><?php esc_html_e('Edit', 'schedule-collaboration-tracking'); ?></a>
                                     <form method="post" style="display: inline;">
                                         <?php wp_nonce_field('ftt_manage_users'); ?>
@@ -120,12 +120,12 @@ $adults  = FTT_Roles::get_all_adults();
                             $adult_since = get_user_meta($adult->ID, 'ftt_member_since', true);
                             ?>
                             <tr>
-                                <td><strong><?php echo esc_html($adult->display_name); ?></strong></td>
-                                <td><?php echo esc_html($adult->user_email); ?></td>
-                                <td><?php echo esc_html(implode(', ', $adult->roles)); ?></td>
-                                <td><?php echo $children_names ? esc_html(implode(', ', $children_names)) : '—'; ?></td>
-                                <td><?php echo $adult_since ? esc_html(date('M j, Y', strtotime($adult_since))) : '—'; ?></td>
-                                <td>
+                                <td data-label="Name"><strong><?php echo esc_html($adult->display_name); ?></strong></td>
+                                <td data-label="Email"><?php echo esc_html($adult->user_email); ?></td>
+                                <td data-label="WP Role"><?php echo esc_html(implode(', ', $adult->roles)); ?></td>
+                                <td data-label="Children"><?php echo $children_names ? esc_html(implode(', ', $children_names)) : '—'; ?></td>
+                                <td data-label="Since"><?php echo $adult_since ? esc_html(date('M j, Y', strtotime($adult_since))) : '—'; ?></td>
+                                <td data-label="Actions">
                                     <a href="<?php echo esc_url(get_edit_user_link($adult->ID)); ?>" class="button button-small"><?php esc_html_e('Edit', 'schedule-collaboration-tracking'); ?></a>
                                 </td>
                             </tr>
@@ -154,12 +154,12 @@ $adults  = FTT_Roles::get_all_adults();
                 <tbody>
                     <?php foreach ($all_users as $user) : ?>
                         <tr>
-                            <td><strong><?php echo esc_html($user->display_name); ?></strong></td>
-                            <td><?php echo esc_html($user->user_email); ?></td>
-                            <td><?php echo esc_html(implode(', ', $user->roles)); ?></td>
-                            <td><?php echo FTT_Roles::is_member($user->ID) ? '✓' : '—'; ?></td>
-                            <td><?php echo FTT_Roles::is_adult($user->ID) ? '✓' : '—'; ?></td>
-                            <td>
+                            <td data-label="Name"><strong><?php echo esc_html($user->display_name); ?></strong></td>
+                            <td data-label="Email"><?php echo esc_html($user->user_email); ?></td>
+                            <td data-label="Role"><?php echo esc_html(implode(', ', $user->roles)); ?></td>
+                            <td data-label="Child?"><?php echo FTT_Roles::is_member($user->ID) ? '✓' : '—'; ?></td>
+                            <td data-label="Adult?"><?php echo FTT_Roles::is_adult($user->ID) ? '✓' : '—'; ?></td>
+                            <td data-label="Actions">
                                 <a href="<?php echo esc_url(get_edit_user_link($user->ID)); ?>" class="button button-small"><?php esc_html_e('Edit', 'schedule-collaboration-tracking'); ?></a>
                                 <?php if (!FTT_Roles::is_member($user->ID)) : ?>
                                     <form method="post" style="display: inline;">

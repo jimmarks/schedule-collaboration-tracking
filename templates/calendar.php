@@ -12,20 +12,13 @@ if (!defined('ABSPATH')) {
 ?>
 
 <div class="ftt-container">
+    <?php
+    $ftt_page_title  = __('Calendar', 'schedule-collaboration-tracking');
+    $ftt_active_slug = 'calendar';
+    include FTT_PLUGIN_DIR . 'templates/partials/nav.php';
+    ?>
+
     <div class="ftt-calendar-header">
-        <?php
-        $dashboard_url = FTT_Pages::get_page_url('dashboard');
-        if ($dashboard_url) : ?>
-            <p style="margin-bottom: 20px;">
-                <a href="<?php echo esc_url($dashboard_url); ?>" class="button">
-                    <span class="dashicons dashicons-arrow-left-alt" style="margin-top: 3px;"></span>
-                    <?php esc_html_e('Back to Dashboard', 'schedule-collaboration-tracking'); ?>
-                </a>
-            </p>
-        <?php endif; ?>
-        
-        <h2><?php esc_html_e('Family Calendar', 'schedule-collaboration-tracking'); ?></h2>
-        
         <?php
         // Show member selector for parents
         $current_user_id = get_current_user_id();
@@ -108,18 +101,6 @@ if (!defined('ABSPATH')) {
             </div>
         </div>
         
-        <?php if (current_user_can('edit_posts')) : ?>
-            <?php
-            $event_form_url = FTT_Pages::get_page_url('event_form');
-            if ($event_form_url) :
-            ?>
-            <p>
-                <a href="<?php echo esc_url($event_form_url); ?>" class="button button-primary">
-                    <?php esc_html_e('Add New Event', 'schedule-collaboration-tracking'); ?>
-                </a>
-            </p>
-            <?php endif; ?>
-        <?php endif; ?>
     </div>
     
     <?php
@@ -153,86 +134,25 @@ if (!defined('ABSPATH')) {
         ));
         ?>
         
-        <div class="ftt-qr-code-section">
-            <button type="button" class="ftt-qr-toggle button">
+        <div class="ftt-cal-subscribe-bar">
+            <button type="button" id="ftt-open-subscribe-modal" class="button">
                 <span class="dashicons dashicons-smartphone"></span>
-                <?php esc_html_e('Subscribe on Mobile Device', 'schedule-collaboration-tracking'); ?>
+                <?php esc_html_e('Add this calendar to your device', 'schedule-collaboration-tracking'); ?>
             </button>
-            
-            <div class="ftt-qr-code-content" style="display: none;">
-                <div class="ftt-qr-code-inner">
-                    <h4><?php esc_html_e('Scan QR Code', 'schedule-collaboration-tracking'); ?></h4>
-                    <p><?php esc_html_e('Use your phone\'s camera to scan this QR code and add the calendar to your device:', 'schedule-collaboration-tracking'); ?></p>
-                    
-                    <div class="ftt-qr-code-image">
-                        <img src="<?php echo esc_url($qr_code_url); ?>" alt="<?php esc_attr_e('Calendar Subscription QR Code', 'schedule-collaboration-tracking'); ?>" width="200" height="200" />
-                    </div>
-                    
-                    <div class="ftt-qr-instructions">
-                        <p><strong><?php esc_html_e('iOS (iPhone/iPad):', 'schedule-collaboration-tracking'); ?></strong></p>
-                        <ol style="margin: 5px 0 10px 20px; font-size: 14px;">
-                            <li><?php esc_html_e('Make sure your phone is unlocked', 'schedule-collaboration-tracking'); ?></li>
-                            <li><?php esc_html_e('Scan QR code with Camera app', 'schedule-collaboration-tracking'); ?></li>
-                            <li><?php esc_html_e('Tap the notification banner', 'schedule-collaboration-tracking'); ?></li>
-                            <li><?php esc_html_e('Tap "Subscribe" to add the calendar', 'schedule-collaboration-tracking'); ?></li>
-                        </ol>
-                        <p><strong><?php esc_html_e('Android:', 'schedule-collaboration-tracking'); ?></strong></p>
-                        <ol style="margin: 5px 0 10px 20px; font-size: 14px;">
-                            <li><?php esc_html_e('Open Google Chrome or Camera app', 'schedule-collaboration-tracking'); ?></li>
-                            <li><?php esc_html_e('Scan the QR code', 'schedule-collaboration-tracking'); ?></li>
-                            <li><?php esc_html_e('Tap the webcal:// link that appears', 'schedule-collaboration-tracking'); ?></li>
-                            <li><?php esc_html_e('Choose "Google Calendar" to subscribe', 'schedule-collaboration-tracking'); ?></li>
-                        </ol>
-                        <p style="font-size: 13px; color: #666;"><em><?php esc_html_e('Note: If the QR code doesn\'t work, copy the Webcal URL below and paste it into your device\'s calendar settings.', 'schedule-collaboration-tracking'); ?></em></p>
-                    </div>
-                    
-                    <p class="ftt-qr-alternative">
-                        <strong><?php esc_html_e('Webcal URL:', 'schedule-collaboration-tracking'); ?></strong><br>
-                        <small><?php esc_html_e('(For manual subscription - use in Settings → Calendar → Add Subscribed Calendar)', 'schedule-collaboration-tracking'); ?></small><br>
-                        <input type="text" readonly value="<?php echo esc_attr($webcal_url); ?>" class="ftt-webcal-url" onclick="this.select();" />
-                        <button type="button" class="button ftt-copy-url" data-url="<?php echo esc_attr($webcal_url); ?>">
-                            <?php esc_html_e('Copy', 'schedule-collaboration-tracking'); ?>
-                        </button>
-                    </p>
-                    <p class="ftt-qr-alternative" style="padding-top: 10px; border-top: 0;">
-                        <strong><?php esc_html_e('HTTPS URL:', 'schedule-collaboration-tracking'); ?></strong><br>
-                        <small><?php esc_html_e('(Direct link - opens in browser)', 'schedule-collaboration-tracking'); ?></small><br>
-                        <input type="text" readonly value="<?php echo esc_attr($ical_url); ?>" class="ftt-webcal-url" onclick="this.select();" />
-                        <button type="button" class="button ftt-copy-webcal" data-url="<?php echo esc_attr($ical_url); ?>">
-                            <?php esc_html_e('Copy', 'schedule-collaboration-tracking'); ?>
-                        </button>
-                    </p>
+        </div>
+
+        <!-- Subscribe modal -->
+        <div id="ftt-subscribe-modal" class="ftt-modal" style="display:none;">
+            <div class="ftt-modal-content ftt-subscribe-modal-content">
+                <div class="ftt-modal-header">
+                    <h2><?php esc_html_e('Add to Your Calendar App', 'schedule-collaboration-tracking'); ?></h2>
+                    <button type="button" class="ftt-modal-close-x" id="ftt-close-subscribe-modal" aria-label="<?php esc_attr_e('Close', 'schedule-collaboration-tracking'); ?>">&#x2715;</button>
+                </div>
+                <div class="ftt-modal-body">
+                    <?php echo do_shortcode('[ftt_calendar_subscribe]'); ?>
                 </div>
             </div>
         </div>
-        
-        <script>
-        jQuery(document).ready(function($) {
-            $('.ftt-qr-toggle').on('click', function() {
-                var $content = $('.ftt-qr-code-content');
-                $content.slideToggle(300);
-                $(this).toggleClass('active');
-            });
-            
-            $('.ftt-copy-url, .ftt-copy-webcal').on('click', function() {
-                var url = $(this).data('url');
-                var $input = $(this).prev('.ftt-webcal-url');
-                $input.select();
-                
-                try {
-                    document.execCommand('copy');
-                    var $btn = $(this);
-                    var originalText = $btn.text();
-                    $btn.text('<?php esc_html_e('Copied!', 'schedule-collaboration-tracking'); ?>');
-                    setTimeout(function() {
-                        $btn.text(originalText);
-                    }, 2000);
-                } catch (err) {
-                    alert('<?php esc_html_e('Please manually copy the URL', 'schedule-collaboration-tracking'); ?>');
-                }
-            });
-        });
-        </script>
     <?php endif; ?>
     
     <?php
@@ -284,243 +204,6 @@ if (!defined('ABSPATH')) {
         </div>
     </div>
 </div>
-
-<style>
-.ftt-qr-code-section {
-    margin: 20px 0;
-    padding: 0;
-}
-
-.ftt-qr-toggle {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 20px;
-    font-size: 14px;
-    cursor: pointer;
-    background: #0073aa;
-    color: #fff;
-    border: none;
-    border-radius: 4px;
-    transition: background 0.2s;
-}
-
-.ftt-qr-toggle:hover {
-    background: #005177;
-}
-
-.ftt-qr-toggle.active {
-    background: #005177;
-}
-
-.ftt-qr-toggle .dashicons {
-    font-size: 18px;
-    width: 18px;
-    height: 18px;
-}
-
-.ftt-qr-code-content {
-    margin-top: 15px;
-    background: #fff;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    padding: 0;
-    overflow: hidden;
-}
-
-.ftt-qr-code-inner {
-    padding: 20px;
-}
-
-.ftt-qr-code-inner h4 {
-    margin: 0 0 10px 0;
-    font-size: 18px;
-    color: #23282d;
-}
-
-.ftt-qr-code-image {
-    text-align: center;
-    margin: 20px 0;
-    padding: 20px;
-    background: #f9f9f9;
-    border-radius: 4px;
-}
-
-.ftt-qr-code-image img {
-    display: inline-block;
-    border: 3px solid #fff;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    border-radius: 4px;
-}
-
-.ftt-qr-instructions {
-    background: #f0f6fc;
-    padding: 15px;
-    border-left: 4px solid #0073aa;
-    margin: 20px 0;
-    border-radius: 4px;
-}
-
-.ftt-qr-instructions p {
-    margin: 8px 0;
-    font-size: 14px;
-}
-
-.ftt-qr-alternative {
-    margin-top: 20px;
-    padding-top: 20px;
-    border-top: 1px solid #ddd;
-}
-
-.ftt-webcal-url {
-    width: 100%;
-    max-width: 500px;
-    padding: 8px;
-    font-family: monospace;
-    font-size: 12px;
-    border: 1px solid #ddd;
-    border-radius: 3px;
-    margin: 10px 0;
-}
-
-.ftt-copy-url {
-    margin-left: 10px;
-}
-
-.ftt-calendar-legend {
-    margin-top: 30px;
-    padding: 20px;
-    background: #fff;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-}
-
-.ftt-legend-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 10px;
-    margin-top: 15px;
-}
-
-.ftt-legend-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.ftt-legend-color {
-    width: 20px;
-    height: 20px;
-    border-radius: 3px;
-}
-
-.ftt-legend-label {
-    font-size: 14px;
-}
-
-/* Event Category Filters */
-.ftt-event-filters {
-    margin: 20px 0;
-    position: relative;
-}
-
-#ftt-filter-toggle {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 20px;
-    font-size: 14px;
-    cursor: pointer;
-    background: #6A3E8E;
-    color: #fff;
-    border: none;
-    border-radius: 4px;
-    transition: background 0.2s;
-}
-
-#ftt-filter-toggle:hover {
-    background: #5B347A;
-}
-
-#ftt-filter-toggle.active {
-    background: #5B347A;
-}
-
-#ftt-filter-toggle .dashicons {
-    font-size: 18px;
-    width: 18px;
-    height: 18px;
-}
-
-.ftt-filter-panel {
-    margin-top: 15px;
-    background: #fff;
-    border: 2px solid #6A3E8E;
-    border-radius: 8px;
-    padding: 20px;
-}
-
-.ftt-filter-panel h4 {
-    margin: 0 0 15px 0;
-    color: #6A3E8E;
-    font-size: 16px;
-}
-
-.ftt-filter-categories {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 12px;
-    margin-bottom: 20px;
-}
-
-.ftt-filter-category {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 15px;
-    border: 2px solid #e0e0e0;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.2s;
-    background: white;
-}
-
-.ftt-filter-category:hover {
-    border-color: #6A3E8E;
-    background: #f5f5f5;
-}
-
-.ftt-filter-category input[type="checkbox"] {
-    margin: 0;
-}
-
-.ftt-filter-category input[type="checkbox"]:checked + .ftt-category-icon {
-    transform: scale(1.2);
-}
-
-.ftt-filter-category .ftt-category-icon {
-    font-size: 20px;
-    transition: transform 0.2s;
-}
-
-.ftt-filter-category .ftt-category-label {
-    flex: 1;
-    font-weight: 500;
-    font-size: 14px;
-}
-
-.ftt-filter-actions {
-    display: flex;
-    gap: 10px;
-    justify-content: flex-end;
-    padding-top: 15px;
-    border-top: 1px solid #e0e0e0;
-}
-
-.ftt-filter-actions .button {
-    min-width: 100px;
-}
-</style>
 
 <script>
 jQuery(document).ready(function($) {
@@ -588,7 +271,33 @@ jQuery(document).ready(function($) {
         $('.ftt-category-filter').prop('checked', true);
         $('#ftt-filter-apply').click();
     });
-    
+
+    // ── Mobile: collapsible Event Types legend ────────────────────────
+    if ($(window).width() <= 768) {
+        var STORE_KEY = 'ftt_mob_collapse';
+        var state;
+        try { state = JSON.parse(localStorage.getItem(STORE_KEY) || '{}'); } catch(e) { state = {}; }
+        function saveLegendState() {
+            try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch(e) {}
+        }
+
+        var $h3   = $('.ftt-calendar-legend h3');
+        var $grid = $('.ftt-legend-grid');
+        var collapsed = ('legend' in state) ? state['legend'] : true; // default: collapsed
+
+        $h3.addClass('ftt-mob-toggle-hdr');
+        var $chev = $('<span class="ftt-mob-chevron" aria-hidden="true"></span>').appendTo($h3);
+        state['legend'] = collapsed;
+        if (collapsed) { $grid.hide(); $chev.text('›'); } else { $chev.text('˅'); }
+
+        $h3.on('click', function() {
+            state['legend'] = !state['legend'];
+            $grid.slideToggle(180);
+            $chev.text(state['legend'] ? '›' : '˅');
+            saveLegendState();
+        });
+    }
+
     console.log('FTT CALENDAR: Filter handlers attached');
 });
 </script>

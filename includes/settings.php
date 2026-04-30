@@ -1667,14 +1667,14 @@ class FTT_Settings {
         $settings = get_option('ftt_settings', array());
         $value    = $settings['openai_api_key'] ?? '';
         ?>
-        <input type="password"
+        <input type="text"
                name="ftt_settings[openai_api_key]"
                value="<?php echo esc_attr($value); ?>"
                class="regular-text"
                placeholder="sk-...">
         <p class="description">
             <?php _e('Used by the AI Event Parser to convert natural-language prompts into structured events. Get a key at <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com</a>.', 'schedule-collaboration-tracking'); ?><br>
-            <?php esc_html_e('Model: gpt-4o-mini (~$0.002 per 1,000 prompts).', 'schedule-collaboration-tracking'); ?>
+            <?php esc_html_e('Model: gpt-5.4-mini (~$0.002 per 1,000 prompts).', 'schedule-collaboration-tracking'); ?>
         </p>
         <?php
     }

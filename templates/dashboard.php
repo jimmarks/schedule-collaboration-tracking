@@ -299,78 +299,11 @@ console.log('============================');
     <?php endif; ?>
     
     <!-- Main Navigation -->
-    <div class="ftt-main-nav">
-        <div class="ftt-nav-logo">
-            <h1>✈️ <?php esc_html_e('Family Dashboard', 'schedule-collaboration-tracking'); ?></h1>
-        </div>
-        <nav class="ftt-nav-menu">
-            <?php if ($calendar_url): ?>
-                <a href="<?php echo esc_url($calendar_url); ?>" class="ftt-nav-link">
-                    <span class="dashicons dashicons-calendar-alt"></span>
-                    <?php esc_html_e('Calendar', 'schedule-collaboration-tracking'); ?>
-                </a>
-            <?php endif; ?>
-            
-            <?php if ($event_list_url): ?>
-                <a href="<?php echo esc_url($event_list_url); ?>" class="ftt-nav-link">
-                    <span class="dashicons dashicons-list-view"></span>
-                    <?php 
-                    // Change label based on user role
-                    if ($is_admin) {
-                        esc_html_e('All Events', 'schedule-collaboration-tracking');
-                    } else {
-                        esc_html_e('My Events', 'schedule-collaboration-tracking');
-                    }
-                    ?>
-                </a>
-            <?php endif; ?>
-            
-            <?php 
-            // Groups link for parents/adults
-            $groups_url = FTT_Pages::get_page_url('groups');
-            if ($groups_url && ($is_parent || $is_admin)): 
-            ?>
-                <a href="<?php echo esc_url($groups_url); ?>" class="ftt-nav-link">
-                    <span class="dashicons dashicons-groups"></span>
-                    <?php esc_html_e('Family Groups', 'schedule-collaboration-tracking'); ?>
-                </a>
-            <?php endif; ?>
-            
-            <?php if ($is_admin && $event_form_url): ?>
-                <a href="<?php echo esc_url($event_form_url); ?>" class="ftt-nav-link">
-                    <span class="dashicons dashicons-plus-alt"></span>
-                    <?php esc_html_e('Manage Events', 'schedule-collaboration-tracking'); ?>
-                </a>
-            <?php endif; ?>
-
-            <?php
-            $profile_url = FTT_Pages::get_page_url('profile');
-            if ($is_logged_in && $profile_url): ?>
-                <a href="<?php echo esc_url($profile_url); ?>" class="ftt-nav-link">
-                    <span class="dashicons dashicons-admin-users"></span>
-                    <?php esc_html_e('My Settings', 'schedule-collaboration-tracking'); ?>
-                </a>
-            <?php endif; ?>
-
-            <?php if ($is_logged_in): ?>
-                <a href="<?php echo wp_logout_url(home_url()); ?>" class="ftt-nav-link ftt-nav-logout">
-                    <span class="dashicons dashicons-exit"></span>
-                    <?php esc_html_e('Logout', 'schedule-collaboration-tracking'); ?>
-                </a>
-            <?php else: ?>
-                <?php
-                $login_url = FTT_Pages::get_page_url('login');
-                if (!$login_url || strpos($login_url, 'ftt-login') === false) {
-                    $login_url = home_url('/ftt-login/');
-                }
-                ?>
-                <a href="<?php echo esc_url($login_url); ?>" class="ftt-nav-link ftt-nav-login">
-                    <span class="dashicons dashicons-admin-users"></span>
-                    <?php esc_html_e('Login', 'schedule-collaboration-tracking'); ?>
-                </a>
-            <?php endif; ?>
-        </nav>
-    </div>
+    <?php
+    $ftt_page_title  = __('Family Dashboard', 'schedule-collaboration-tracking');
+    $ftt_active_slug = 'dashboard';
+    include FTT_PLUGIN_DIR . 'templates/partials/nav.php';
+    ?>
 
     <?php
     // Display invitation acceptance message
@@ -429,45 +362,31 @@ console.log('============================');
 
             <!-- Quick Action Cards -->
             <div class="ftt-quick-actions">
-                <div class="ftt-action-card ftt-action-add-event">
+                <?php $event_form_url = FTT_Pages::get_page_url('event_form') ?: home_url('/ftt-manage-events/'); ?>
+                <a href="<?php echo esc_url($event_form_url); ?>" class="ftt-action-card ftt-action-add-event">
                     <div class="ftt-action-icon">📅</div>
                     <h3><?php esc_html_e('Add Event', 'schedule-collaboration-tracking'); ?></h3>
                     <p><?php esc_html_e('Create a new event for your family', 'schedule-collaboration-tracking'); ?></p>
-                    <?php
-                    $event_form_url = FTT_Pages::get_page_url('event_form');
-                    if ($event_form_url) : ?>
-                        <a href="<?php echo esc_url($event_form_url); ?>" class="button button-primary"><?php esc_html_e('Add Event', 'schedule-collaboration-tracking'); ?></a>
-                    <?php else : ?>
-                        <a href="<?php echo esc_url(home_url('/ftt-event-form/')); ?>" class="button button-primary"><?php esc_html_e('Add Event', 'schedule-collaboration-tracking'); ?></a>
-                    <?php endif; ?>
-                </div>
-                
-                <div class="ftt-action-card ftt-action-manage-groups">
+                </a>
+
+                <?php $groups_url = FTT_Pages::get_page_url('groups') ?: home_url('/ftt-groups/'); ?>
+                <a href="<?php echo esc_url($groups_url); ?>" class="ftt-action-card ftt-action-manage-groups">
                     <div class="ftt-action-icon">📦</div>
                     <h3><?php esc_html_e('Family Groups', 'schedule-collaboration-tracking'); ?></h3>
                     <p><?php esc_html_e('Manage family groups and billing', 'schedule-collaboration-tracking'); ?></p>
-                    <?php
-                    $groups_url = FTT_Pages::get_page_url('groups');
-                    if ($groups_url) : ?>
-                        <a href="<?php echo esc_url($groups_url); ?>" class="button button-primary"><?php esc_html_e('Manage Groups', 'schedule-collaboration-tracking'); ?></a>
-                    <?php else : ?>
-                        <a href="<?php echo esc_url(home_url('/ftt-groups/')); ?>" class="button button-primary"><?php esc_html_e('Manage Groups', 'schedule-collaboration-tracking'); ?></a>
-                    <?php endif; ?>
-                </div>
-                
-                <div class="ftt-action-card ftt-action-add-child">
+                </a>
+
+                <a href="#" class="ftt-action-card ftt-action-add-child" id="ftt-quick-add-child">
                     <div class="ftt-action-icon">👦</div>
                     <h3><?php esc_html_e('Add Child', 'schedule-collaboration-tracking'); ?></h3>
                     <p><?php esc_html_e('Link or create a child profile', 'schedule-collaboration-tracking'); ?></p>
-                    <a href="#" class="button button-primary" id="ftt-quick-add-child"><?php esc_html_e('Add Child', 'schedule-collaboration-tracking'); ?></a>
-                </div>
-                
-                <div class="ftt-action-card ftt-action-invite-adult">
+                </a>
+
+                <a href="#" class="ftt-action-card ftt-action-invite-adult" id="ftt-quick-invite-adult">
                     <div class="ftt-action-icon">👥</div>
                     <h3><?php esc_html_e('Invite Co-Parent', 'schedule-collaboration-tracking'); ?></h3>
                     <p><?php esc_html_e('Share calendar access with another guardian', 'schedule-collaboration-tracking'); ?></p>
-                    <a href="#" class="button button-primary" id="ftt-quick-invite-adult"><?php esc_html_e('Invite Adult', 'schedule-collaboration-tracking'); ?></a>
-                </div>
+                </a>
             </div>
 
             <?php
@@ -840,62 +759,6 @@ console.log('============================');
     font-weight: 500;
 }
 
-/* Main Navigation */
-.ftt-main-nav {
-    background: linear-gradient(135deg, #6A3E8E 0%, #5B347A 100%);
-    color: white;
-    padding: 20px 30px;
-    margin: -20px -30px 30px -30px;
-    border-radius: 8px 8px 0 0;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-}
-.ftt-nav-logo h1 {
-    margin: 0 0 15px 0;
-    font-size: 28px;
-    color: white;
-}
-.ftt-nav-menu {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-}
-.ftt-nav-link {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 10px 16px;
-    background: rgba(255,255,255,0.15);
-    color: white !important;
-    text-decoration: none;
-    border-radius: 6px;
-    transition: all 0.3s;
-    font-size: 14px;
-    font-weight: 500;
-}
-.ftt-nav-link:hover {
-    background: rgba(255,255,255,0.25);
-    transform: translateY(-2px);
-}
-.ftt-nav-link .dashicons {
-    font-size: 18px;
-    width: 18px;
-    height: 18px;
-}
-.ftt-nav-logout {
-    margin-left: auto;
-    background: rgba(240,90,90,0.3);
-}
-.ftt-nav-logout:hover {
-    background: rgba(240,90,90,0.5);
-}
-.ftt-nav-login {
-    margin-left: auto;
-    background: rgba(34,197,94,0.3);
-}
-.ftt-nav-login:hover {
-    background: rgba(34,197,94,0.5);
-}
-
 /* Welcome Section (Public View) */
 .ftt-welcome-section {
     text-align: center;
@@ -1141,165 +1004,254 @@ console.log('============================');
     .ftt-container {
         padding: 10px;
     }
-    
-    .ftt-main-nav {
-        margin: -10px -10px 20px -10px;
-        padding: 15px 10px;
-    }
-    
-    .ftt-nav-logo h1 {
-        font-size: 22px;
-    }
-    
-    .ftt-nav-menu {
-        flex-wrap: wrap;
-        justify-content: center;
-        gap: 5px;
-    }
-    
-    .ftt-nav-link {
-        font-size: 12px;
-        padding: 6px 10px;
-    }
-    
-    .ftt-nav-link .dashicons {
-        font-size: 14px;
-        width: 14px;
-        height: 14px;
-    }
-    
+
     .ftt-welcome-section {
         padding: 20px 15px;
     }
-    
+
     .ftt-welcome-content h2 {
         font-size: 24px;
     }
-    
+
     .ftt-welcome-text {
         font-size: 14px;
     }
-    
+
     .ftt-welcome-actions {
         flex-direction: column;
         gap: 12px;
     }
-    
+
     .ftt-welcome-actions .button {
         width: 100%;
         padding: 12px;
     }
-    
+
     .ftt-group-selector {
         margin: 15px 0;
     }
-    
+
     .ftt-group-selector select {
         font-size: 14px;
         padding: 10px;
     }
-    
+
+    /* Group selector bar */
+    .ftt-group-selector-bar {
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 10px 12px;
+        margin-bottom: 12px;
+    }
+    .ftt-group-selector-dropdown {
+        min-width: 0;
+        flex: 1 1 150px;
+    }
+    .ftt-manage-groups-btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    /* Group summary */
     .ftt-group-summary {
         padding: 15px;
     }
-    
+
     .ftt-group-summary-card {
         overflow: visible;
+        margin-bottom: 12px;
     }
-    
+
     .ftt-group-summary-header {
-        padding: 15px;
+        padding: 12px 15px;
+        border-radius: 0;
     }
-    
-    .ftt-group-summary-header h3 {
+
+    /* Toggle header style */
+    .ftt-mob-toggle-hdr {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+    }
+    .ftt-mob-toggle-hdr h3 {
+        margin: 0;
+        flex: 1;
+    }
+    .ftt-mob-chevron {
         font-size: 20px;
+        line-height: 1;
+        color: #6A3E8E;
+        font-weight: 300;
+        flex-shrink: 0;
     }
-    
+
+    .ftt-group-summary-header h3 {
+        font-size: 18px;
+    }
+
     .ftt-group-summary-stats {
         display: grid;
         grid-template-columns: 1fr 1fr 1fr;
         flex-wrap: unset;
     }
-    
+
     .ftt-stat-box {
-        padding: 15px 10px;
+        padding: 12px 8px;
         border-right: 1px solid #e9ecef;
         border-top: none;
         min-width: unset;
     }
-    
+
     .ftt-stat-box:nth-child(3) {
         border-right: none;
     }
-    
+
     .ftt-stat-box .dashicons {
         font-size: 24px;
         width: 24px;
         height: 24px;
     }
-    
+
     .ftt-stat-box strong {
         font-size: 18px;
     }
-    
+
     .ftt-stat-box span {
         font-size: 11px;
     }
-    
+
     .ftt-group-stats {
         grid-template-columns: 1fr 1fr;
         gap: 10px;
     }
-    
+
     .ftt-stat-card {
         padding: 12px;
     }
-    
+
+    /* ── Parent dashboard: flex column so we can reorder ── */
+    .ftt-parent-dashboard {
+        display: flex;
+        flex-direction: column;
+    }
+    .ftt-quick-actions  { order: 1; }  /* pinned to top on mobile */
+    .ftt-user-header    { order: 2; }
+    #ftt-dashboard      { order: 3; }  /* data next */
+    .ftt-family-section { order: 4; }
+    /* Synthetic collapsible header no longer needed for quick actions */
+    .ftt-mob-synth-hdr  { order: 5; }
+
+    /* Synthetic header inserted by JS before Quick Actions */
+    .ftt-mob-synth-hdr {
+        padding: 12px 15px;
+        font-weight: 600;
+        font-size: 14px;
+        color: #6A3E8E;
+        background: #f8f5fb;
+        border: 1px solid #e0d5ed;
+        border-radius: 6px 6px 0 0;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 16px;
+    }
+    .ftt-mob-synth-hdr + .ftt-quick-actions {
+        border: 1px solid #e0d5ed;
+        border-top: none;
+        border-radius: 0 0 6px 6px;
+        padding: 12px;
+        margin-top: 0 !important;
+    }
+
+    /* Children list */
     .ftt-children-list {
         grid-template-columns: 1fr;
     }
-    
+
     .ftt-child-card {
         padding: 15px;
     }
-    
+
+    /* Quick actions: single scrolling pill row at top */
     .ftt-quick-actions {
-        grid-template-columns: 1fr;
-        gap: 12px;
+        display: flex;
+        flex-direction: row;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        gap: 8px;
+        padding: 8px 0 10px;
+        margin-bottom: 12px;
+        /* no synthetic collapsible header on mobile for this section */
     }
-    
     .ftt-action-card {
-        padding: 20px;
+        flex: 0 0 auto;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        padding: 10px 14px;
+        border-radius: 10px;
+        min-width: 70px;
+        text-decoration: none;
+        color: inherit;
+        border: 2px solid #e0d5ed;
+        background: #fff;
     }
-    
+    .ftt-action-card:hover, .ftt-action-card:focus {
+        border-color: #6A3E8E;
+        background: #f8f5fb;
+        transform: none;
+        box-shadow: none;
+    }
+    .ftt-action-icon {
+        font-size: 24px;
+        margin: 0;
+        animation: none;
+    }
     .ftt-action-card h3 {
-        font-size: 16px;
+        font-size: 11px;
+        margin: 0;
+        text-align: center;
+        color: #5B347A;
+        font-weight: 600;
+        white-space: nowrap;
     }
-    
     .ftt-action-card p {
-        font-size: 13px;
+        display: none;
     }
-    
+
+    /* Dashboard sections */
     .ftt-dashboard-section {
-        padding: 15px;
+        padding: 12px;
+        margin-bottom: 8px;
+        border-radius: 6px;
     }
-    
+
+    /* Make the section headings look tappable on mobile */
+    .ftt-dashboard-section .ftt-mob-toggle-hdr {
+        padding: 2px 0 8px;
+    }
+
     .ftt-dashboard-header {
         flex-direction: column;
-        gap: 15px;
+        gap: 10px;
+        margin-bottom: 12px;
     }
-    
+
     .ftt-dashboard-header h3 {
-        font-size: 18px;
+        font-size: 17px;
     }
-    
+
     .ftt-dashboard-header .button {
         width: 100%;
         justify-content: center;
     }
-    
+
     .ftt-family-section h3 {
-        font-size: 18px;
+        font-size: 17px;
+        cursor: pointer;
     }
 }
 
@@ -1307,60 +1259,60 @@ console.log('============================');
     .ftt-container {
         padding: 5px;
     }
-    
+
     .ftt-nav-logo h1 {
         font-size: 18px;
     }
-    
+
     .ftt-nav-link {
         font-size: 11px;
         padding: 5px 8px;
     }
-    
+
     .ftt-welcome-content h2 {
         font-size: 20px;
     }
-    
+
     .ftt-group-summary-header h3 {
         font-size: 18px;
     }
-    
+
     .ftt-group-summary-stats {
         grid-template-columns: 1fr 1fr;
     }
-    
+
     .ftt-stat-box {
         padding: 12px 8px;
         gap: 8px;
     }
-    
+
     .ftt-stat-box:nth-child(2) {
         border-right: none;
     }
-    
+
     .ftt-stat-box:nth-child(3) {
         grid-column: span 2;
         border-top: 1px solid #e9ecef;
         border-right: none;
         justify-content: center;
     }
-    
+
     .ftt-stat-box .dashicons {
         font-size: 20px;
         width: 20px;
         height: 20px;
     }
-    
+
     .ftt-stat-box strong {
         font-size: 16px;
     }
-    
+
     .ftt-group-stats {
         grid-template-columns: 1fr;
     }
-    
+
     .ftt-action-card {
-        padding: 15px;
+        padding: 10px 12px;
     }
 }
 </style>
@@ -1369,27 +1321,78 @@ console.log('============================');
 var fttSelectedGroupId = <?php echo $selected_group_id ? intval($selected_group_id) : 'null'; ?>;
 
 jQuery(document).ready(function($) {
-    console.log('FTT DASHBOARD: Quick action handlers ready');
-    console.log('FTT DASHBOARD: Selected Group ID:', fttSelectedGroupId);
-    
     // Quick Add Child button
     $('#ftt-quick-add-child').on('click', function(e) {
         e.preventDefault();
-        console.log('Quick add child clicked');
-        
-        // Redirect to family management page, which has the full add child modal
         window.location.href = '<?php echo esc_js(home_url('/manage-family/')); ?>';
     });
-    
-    // Quick Invite Adult button  
+
+    // Quick Invite Adult button
     $('#ftt-quick-invite-adult').on('click', function(e) {
         e.preventDefault();
-        console.log('Quick invite adult clicked');
-        
-        // Redirect to family management page
         window.location.href = '<?php echo esc_js(home_url('/manage-family/')); ?>';
     });
-    
-    console.log('FTT DASHBOARD: Event handlers attached');
+
+    // ── Mobile collapsible sections ─────────────────────────────────────
+    function initMobileCollapsibles() {
+        if ($(window).width() > 768) return;
+
+        var STORE_KEY = 'ftt_mob_collapse';
+        var state;
+        try { state = JSON.parse(localStorage.getItem(STORE_KEY) || '{}'); } catch(e) { state = {}; }
+
+        function save() {
+            try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch(e) {}
+        }
+
+        // Make $header the toggle for $body, persisted under `id`.
+        // defaultCollapsed = true → starts collapsed on first visit.
+        function attach($header, $body, id, defaultCollapsed) {
+            if (!$header.length || !$body.length) return;
+            var collapsed = (id in state) ? state[id] : defaultCollapsed;
+
+            $header.addClass('ftt-mob-toggle-hdr');
+            var $chev = $('<span class="ftt-mob-chevron" aria-hidden="true"></span>').appendTo($header);
+
+            state[id] = collapsed;
+            if (collapsed) { $body.hide(); $chev.text('›'); } else { $chev.text('˅'); }
+
+            $header.css('cursor', 'pointer').on('click', function(e) {
+                // Don't hijack link/button clicks inside the header
+                if ($(e.target).is('a, button, input, select')) return;
+                state[id] = !state[id];
+                $body.slideToggle(180);
+                $chev.text(state[id] ? '›' : '˅');
+                save();
+            });
+        }
+
+        // 1. Group summary stats (tap the header card to expand)
+        attach(
+            $('.ftt-group-summary-header'),
+            $('.ftt-group-summary-stats'),
+            'group-stats', true
+        );
+
+        // 2. Children list — make the section h3 the toggle
+        attach(
+            $('.ftt-family-section h3').first(),
+            $('.ftt-children-list'),
+            'children', true
+        );
+
+        // 3. Dashboard sections — collapse secondary ones, keep primary open
+        var primarySections = ['ftt-flights-needed', 'ftt-upcoming-travel'];
+        $('.ftt-dashboard-section').each(function() {
+            var $sec     = $(this);
+            var $content = $sec.find('.ftt-dashboard-content').first();
+            var $heading = $sec.find('h4, h3').first();
+            var id       = $content.attr('id') || ('mob-sec-' + $sec.index());
+            if (primarySections.indexOf(id) !== -1) return; // always open
+            attach($heading, $content, id, true);
+        });
+    }
+
+    initMobileCollapsibles();
 });
 </script>

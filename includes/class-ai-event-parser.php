@@ -3,7 +3,7 @@
  * AI Event Parser
  *
  * Converts natural-language prompts into structured FTT event data using
- * the OpenAI Chat Completions API (gpt-4o-mini).
+ * the OpenAI Chat Completions API (gpt-5.4-mini).
  *
  * REST endpoint: POST /wp-json/ftt/v1/ai/parse-event
  *   body: { "prompt": "Emma needs to go to Salem MA on the 25th..." }
@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class FTT_AI_Event_Parser {
 
     const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
-    const OPENAI_MODEL   = 'gpt-4o-mini';
+    const OPENAI_MODEL   = 'gpt-5.4-mini';
 
     /**
      * Register hooks.

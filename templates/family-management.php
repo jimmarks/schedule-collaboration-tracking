@@ -71,23 +71,28 @@ if ($group_id && class_exists('FTT_Family_Groups')) {
 }
 ?>
 
-<div class="ftt-family-management-container">
-    <div class="ftt-page-header">
-        <h1>
-            <?php 
-            if ($group) {
-                printf(esc_html__('Manage %s', 'schedule-collaboration-tracking'), esc_html($group->name));
-            } else {
-                esc_html_e('Manage Family', 'schedule-collaboration-tracking');
-            }
-            ?>
-        </h1>
-        <a href="<?php echo esc_url($group ? home_url('/ftt-groups/') : home_url('/ftt-dashboard/')); ?>" class="ftt-back-btn">
-            <span class="dashicons dashicons-arrow-left-alt"></span>
-            <?php echo $group ? esc_html__('Back to Groups', 'schedule-collaboration-tracking') : esc_html__('Back to Dashboard', 'schedule-collaboration-tracking'); ?>
-        </a>
-    </div>
-    
+<div class="ftt-container">
+    <?php
+    $ftt_page_title  = $group
+        ? sprintf(__('Manage %s', 'schedule-collaboration-tracking'), $group->name)
+        : __('Manage Family', 'schedule-collaboration-tracking');
+    $ftt_active_slug = 'groups';
+    include FTT_PLUGIN_DIR . 'templates/partials/nav.php';
+    ?>
+
+    <!-- Breadcrumb: Back to Groups (contextual — 2 levels deep) -->
+    <p class="ftt-breadcrumb">
+        <?php if ($group): ?>
+            <a href="<?php echo esc_url(FTT_Pages::get_page_url('groups') ?: home_url('/ftt-groups/')); ?>">
+                ← <?php esc_html_e('Back to Family Groups', 'schedule-collaboration-tracking'); ?>
+            </a>
+        <?php else: ?>
+            <a href="<?php echo esc_url(FTT_Pages::get_page_url('dashboard') ?: home_url('/ftt-dashboard/')); ?>">
+                ← <?php esc_html_e('Back to Dashboard', 'schedule-collaboration-tracking'); ?>
+            </a>
+        <?php endif; ?>
+    </p>
+
     <?php if ($group): ?>
     <!-- Group Info Bar -->
     <div class="ftt-group-info-bar">
@@ -565,12 +570,6 @@ if ($group_id && class_exists('FTT_Family_Groups')) {
 </div>
 
 <style>
-.ftt-family-management-container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 20px;
-}
-
 .ftt-page-header {
     display: flex;
     justify-content: space-between;
