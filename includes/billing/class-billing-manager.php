@@ -275,8 +275,14 @@ class FTT_Billing_Manager {
             // Check if addon needed
             self::check_child_limit($parent_id, $child_id);
             
-            // Add child relationship
-            FTT_Roles::add_parent_child($parent_id, $child_id);
+            // Add child relationship via groups (add to parent's primary group)
+            $primary_group = FTT_Family_Groups::get_primary_group($parent_id);
+            if ($primary_group) {
+                FTT_Family_Groups::add_member($primary_group->id, $child_id, 'child', [
+                    'added_by' => $parent_id,
+                    'relationship' => 'child'
+                ]);
+            }
             
             // Update count
             $children_count = (int) get_user_meta($parent_id, 'ftt_children_count', true);
@@ -303,8 +309,11 @@ class FTT_Billing_Manager {
      * @return bool Success
      */
     public static function remove_child_with_billing($parent_id, $child_id) {
-        // Remove relationship
-        FTT_Roles::remove_parent_child($parent_id, $child_id);
+        // Remove relationship via groups (from parent's primary group)
+        $primary_group = FTT_Family_Groups::get_primary_group($parent_id);
+        if ($primary_group) {
+            FTT_Family_Groups::remove_member($primary_group->id, $child_id);
+        }
         
         // Update count
         $children_count = (int) get_user_meta($parent_id, 'ftt_children_count', true);

@@ -88,7 +88,7 @@ class FTT_Shortcodes {
         $uid = get_current_user_id();
         $is_ftt_user = $uid && (
             current_user_can('manage_options') ||
-            FTT_Roles::is_parent($uid) ||
+            FTT_Family_Groups::is_parent($uid) ||
             FTT_Roles::is_member($uid)
         );
         if (!$is_ftt_user) {

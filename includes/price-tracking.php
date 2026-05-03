@@ -524,11 +524,11 @@ class FTT_Price_Tracking {
         // Get current user for filtering (if manual check from parent)
         if ($source === 'manual' && is_user_logged_in()) {
             $current_user_id = get_current_user_id();
-            $is_parent = FTT_Roles::is_parent($current_user_id);
+            $is_parent = FTT_Family_Groups::is_parent($current_user_id);
             
             if ($is_parent) {
                 // Include events for all children
-                $children = FTT_Roles::get_children($current_user_id);
+                $children = FTT_Family_Groups::get_user_children($current_user_id);
                 
                 if (!empty($children)) {
                     // Include events for children, parent, empty, or unassigned

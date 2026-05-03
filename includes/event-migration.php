@@ -58,7 +58,7 @@ class FTT_Event_Migration {
      * Get all members
      */
     public static function get_all_members() {
-        return FTT_Roles::get_all_members();
+        return FTT_Family_Groups::get_all_children();
     }
     
     /**

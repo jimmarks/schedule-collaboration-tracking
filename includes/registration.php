@@ -576,13 +576,27 @@ class FTT_Registration {
                     // Member code
                     $member_id = FTT_Invitations::get_member_by_code($invite_code);
                     if ($member_id) {
-                        FTT_Roles::add_parent_child($user_id, $member_id);
+                        // Link via groups (add to new user's primary group)
+                        $primary_group = FTT_Family_Groups::get_primary_group($user_id);
+                        if ($primary_group) {
+                            FTT_Family_Groups::add_member($primary_group->id, $member_id, 'child', [
+                                'added_by' => $user_id,
+                                'relationship' => 'child'
+                            ]);
+                        }
                     }
                 } elseif (strpos($invite_code, 'INV-') === 0) {
                     // Invitation code
                     $invitation = FTT_Invitations::get_invitation_by_code($invite_code);
                     if ($invitation && $invitation['status'] === 'pending') {
-                        FTT_Roles::add_parent_child($user_id, $invitation['member_id']);
+                        // Link via groups (add to new user's primary group)
+                        $primary_group = FTT_Family_Groups::get_primary_group($user_id);
+                        if ($primary_group) {
+                            FTT_Family_Groups::add_member($primary_group->id, $invitation['member_id'], 'child', [
+                                'added_by' => $user_id,
+                                'relationship' => 'child'
+                            ]);
+                        }
                         FTT_Invitations::update_invitation_status($invite_code, 'accepted', $user_id);
                     }
                 }
@@ -593,7 +607,14 @@ class FTT_Registration {
             if (!empty($member_email)) {
                 $member = get_user_by('email', $member_email);
                 if ($member) {
-                    FTT_Roles::add_parent_child($user_id, $member->ID);
+                    // Link via groups (add to new user's primary group)
+                    $primary_group = FTT_Family_Groups::get_primary_group($user_id);
+                    if ($primary_group) {
+                        FTT_Family_Groups::add_member($primary_group->id, $member->ID, 'child', [
+                            'added_by' => $user_id,
+                            'relationship' => 'child'
+                        ]);
+                    }
                 } else {
                     // Store for later linking
                     update_user_meta($user_id, 'ftt_pending_child_email', $member_email);

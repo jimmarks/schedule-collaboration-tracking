@@ -687,7 +687,7 @@ class FTT_CPT {
             return;
         }
         
-        $members = FTT_Roles::get_all_members();
+        $members = FTT_Family_Groups::get_all_children();
         error_log('Found ' . count($members) . ' members');
         
         if (empty($members)) {
@@ -777,12 +777,12 @@ class FTT_CPT {
             return;
         }
         
-        // Check if FTT_Roles class exists
-        if (!class_exists('FTT_Roles')) {
+        // Check if FTT_Family_Groups class exists
+        if (!class_exists('FTT_Family_Groups')) {
             return;
         }
         
-        $members = FTT_Roles::get_all_members();
+        $members = FTT_Family_Groups::get_all_children();
         
         if (empty($members)) {
             return;

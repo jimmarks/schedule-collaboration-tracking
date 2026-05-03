@@ -271,8 +271,14 @@ class FTT_Invitations {
         ));
         
         foreach ($users as $parent) {
-            // Link them
-            FTT_Roles::add_parent_child($parent->ID, $member_id);
+            // Link them via groups (add to parent's primary group)
+            $primary_group = FTT_Family_Groups::get_primary_group($parent->ID);
+            if ($primary_group) {
+                FTT_Family_Groups::add_member($primary_group->id, $member_id, 'child', [
+                    'added_by' => $parent->ID,
+                    'relationship' => 'child'
+                ]);
+            }
             
             // Clear pending status
             delete_user_meta($parent->ID, 'ftt_pending_child_email');
@@ -347,8 +353,8 @@ class FTT_Invitations {
         }
         
         // If not found, check if current user is a parent of the member who created it
-        if (FTT_Roles::is_parent($current_user_id)) {
-            $children = FTT_Roles::get_children($current_user_id);
+        if (FTT_Family_Groups::is_parent($current_user_id)) {
+            $children = FTT_Family_Groups::get_user_children($current_user_id);
             
             foreach ($children as $child_id) {
                 $child_invitations = get_user_meta($child_id, 'ftt_invitations', true);
@@ -385,14 +391,22 @@ class FTT_Invitations {
                 return new WP_Error('invalid_code', 'Invalid member code', array('status' => 404));
             }
             
-            // Check if already linked
-            $children = FTT_Roles::get_children($parent_id);
+            // Check if already linked via groups
+            $children = FTT_Family_Groups::get_user_children($parent_id);
             if (in_array($member_id, $children)) {
                 return new WP_Error('already_linked', 'You are already linked to this member', array('status' => 400));
             }
             
-            // Link them
-            FTT_Roles::add_parent_child($parent_id, $member_id);
+            // Link them via groups (add to parent's primary group)
+            $primary_group = FTT_Family_Groups::get_primary_group($parent_id);
+            if ($primary_group) {
+                FTT_Family_Groups::add_member($primary_group->id, $member_id, 'child', [
+                    'added_by' => $parent_id,
+                    'relationship' => 'child'
+                ]);
+            } else {
+                return new WP_Error('no_group', 'Parent has no group to add member to', array('status' => 500));
+            }
             
             $member = get_userdata($member_id);
             
@@ -419,14 +433,22 @@ class FTT_Invitations {
             
             $member_id = $invitation['member_id'];
             
-            // Check if already linked
-            $children = FTT_Roles::get_children($parent_id);
+            // Check if already linked via groups
+            $children = FTT_Family_Groups::get_user_children($parent_id);
             if (in_array($member_id, $children)) {
                 return new WP_Error('already_linked', 'You are already linked to this member', array('status' => 400));
             }
             
-            // Link them
-            FTT_Roles::add_parent_child($parent_id, $member_id);
+            // Link them via groups (add to parent's primary group)
+            $primary_group = FTT_Family_Groups::get_primary_group($parent_id);
+            if ($primary_group) {
+                FTT_Family_Groups::add_member($primary_group->id, $member_id, 'child', [
+                    'added_by' => $parent_id,
+                    'relationship' => 'child'
+                ]);
+            } else {
+                return new WP_Error('no_group', 'Parent has no group to add member to', array('status' => 500));
+            }
             
             // Update invitation status
             self::update_invitation_status($code, 'accepted', $parent_id);

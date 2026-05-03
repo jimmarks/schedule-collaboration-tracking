@@ -443,7 +443,7 @@ class FTT_User_Profile {
 		$user_id   = get_current_user_id();
 		$profile   = self::get_profile_data( $user_id );
 		$timezones = timezone_identifiers_list();
-		$children  = FTT_Roles::get_children( $user_id );
+		$children  = FTT_Family_Groups::get_user_children( $user_id );
 
 		// Airports data for JS (PHP side passes it so no additional AJAX needed)
 		$airports_path = plugin_dir_path( __FILE__ ) . '../assets/js/airports.json';

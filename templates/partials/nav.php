@@ -17,7 +17,7 @@ if (!defined('ABSPATH')) exit;
 
 $_ftt_user      = wp_get_current_user();
 $_ftt_logged_in = is_user_logged_in();
-$_ftt_is_parent = $_ftt_logged_in && FTT_Roles::is_parent($_ftt_user->ID);
+$_ftt_is_parent = $_ftt_logged_in && FTT_Family_Groups::is_parent($_ftt_user->ID);
 $_ftt_is_admin  = $_ftt_logged_in && current_user_can('manage_options');
 
 // Resolve each URL once
