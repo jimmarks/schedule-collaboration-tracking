@@ -455,7 +455,7 @@ class FTT_REST {
         $uid = get_current_user_id();
         if (!$uid) return false;
         return current_user_can('manage_options')
-            || FTT_Roles::is_parent($uid)
+            || FTT_Family_Groups::is_parent($uid)
             || FTT_Roles::is_member($uid);
     }
 
@@ -468,7 +468,7 @@ class FTT_REST {
         $uid = get_current_user_id();
         if (!$uid) return false;
         return current_user_can('manage_options')
-            || FTT_Roles::is_parent($uid)
+            || FTT_Family_Groups::is_parent($uid)
             || FTT_Roles::is_member($uid);
     }
 
@@ -525,11 +525,10 @@ class FTT_REST {
             );
         } else {
             // Auto-filter based on user role
-            if (FTT_Roles::is_parent($current_user_id)) {
+            if (FTT_Family_Groups::is_parent($current_user_id)) {
                 // User is a parent - show all children's events
-                $children = FTT_Roles::get_children($current_user_id);
+                $children = FTT_Family_Groups::get_user_children($current_user_id, $group_id);
                 if (!empty($children)) {
-                    // get_children() already returns an array of user IDs
                     $meta_query[] = array(
                         'key'     => 'member_id',
                         'value'   => $children,
@@ -723,7 +722,7 @@ class FTT_REST {
         error_log('Current User ID: ' . $current_user_id);
         error_log('Group ID Filter: ' . ($group_id ?: 'none'));
         error_log('Is Member: '  . (FTT_Roles::is_member($current_user_id)  ? 'yes' : 'no'));
-        error_log('Is Parent: '  . (FTT_Roles::is_parent($current_user_id)  ? 'yes' : 'no'));
+        error_log('Is Parent: '  . (FTT_Family_Groups::is_parent($current_user_id)  ? 'yes' : 'no'));
 
         // ----------------------------------------------------------------
         // Determine event scope
@@ -810,24 +809,13 @@ class FTT_REST {
             $member_ids = array($current_user_id);
             error_log('Member mode: showing events for user ' . $current_user_id);
 
-        } elseif (FTT_Roles::is_parent($current_user_id)) {
-            $children = FTT_Roles::get_children($current_user_id);
+        } elseif (FTT_Family_Groups::is_parent($current_user_id)) {
+            $children = FTT_Family_Groups::get_user_children($current_user_id);
             error_log('Parent mode: found ' . count($children) . ' children');
 
             if (!empty($children)) {
                 $member_ids = $children;
                 error_log('Member IDs to query: ' . implode(', ', $member_ids));
-            } elseif (class_exists('FTT_Family_Groups')) {
-                // Fallback: derive children from group membership if legacy meta is empty.
-                $user_groups = FTT_Family_Groups::get_user_groups($current_user_id);
-                foreach ($user_groups as $ug) {
-                    foreach (FTT_Family_Groups::get_group_members($ug->id, 'child') as $m) {
-                        if (!in_array((int) $m->user_id, $member_ids, true)) {
-                            $member_ids[] = (int) $m->user_id;
-                        }
-                    }
-                }
-                error_log('Parent fallback via groups: ' . count($member_ids) . ' children');
             }
         }
 
@@ -855,7 +843,7 @@ class FTT_REST {
                 );
             }
             // Parents also see unassigned / family events and their own events.
-            if (FTT_Roles::is_parent($current_user_id)) {
+            if (FTT_Family_Groups::is_parent($current_user_id)) {
                 $member_meta_query[] = array('key' => 'member_id', 'compare' => 'NOT EXISTS');
                 $member_meta_query[] = array('key' => 'member_id', 'value' => '',                  'compare' => '=');
                 $member_meta_query[] = array('key' => 'member_id', 'value' => $current_user_id, 'compare' => '=');
@@ -957,8 +945,8 @@ class FTT_REST {
         $member_ids = array($current_user->ID);
         
         // If parent, include children
-        if (FTT_Roles::is_parent($current_user->ID)) {
-            $children = FTT_Roles::get_children($current_user->ID);
+        if (FTT_Family_Groups::is_parent($current_user->ID)) {
+            $children = FTT_Family_Groups::get_user_children($current_user->ID);
             if (!empty($children)) {
                 $member_ids = array_merge($member_ids, $children);
             }
@@ -1924,10 +1912,7 @@ class FTT_REST {
             FTT_Child_Colors::update_color($child_id, $color);
         }
         
-        // Link to parent (legacy system - maintained for backward compatibility)
-        FTT_Roles::add_parent_child($user_id, $child_id);
-
-        // Add child to the correct group (group-based billing system)
+        // Add child to the correct group (group-based system)
         // This is REQUIRED - all children must belong to a group
         if (class_exists('FTT_Family_Groups')) {
             $group_id_to_use = null;
@@ -1995,18 +1980,9 @@ class FTT_REST {
             return new WP_Error('missing_child_id', 'Child ID is required', ['status' => 400]);
         }
 
-        // Verify parent-child relationship via FTT_Roles meta
-        $can_manage = FTT_Roles::is_parent($user_id) && in_array($child_id, FTT_Roles::get_children($user_id));
-
-        // Fallback: check group membership with management permission
-        if (!$can_manage && class_exists('FTT_Family_Groups')) {
-            $primary_group = get_user_meta($user_id, 'ftt_primary_group', true);
-            if ($primary_group && FTT_Family_Groups::can_manage_group((int) $primary_group, $user_id)) {
-                $members = FTT_Family_Groups::get_group_members((int) $primary_group, 'child');
-                $child_ids_in_group = array_map('intval', wp_list_pluck($members, 'user_id'));
-                $can_manage = in_array($child_id, $child_ids_in_group);
-            }
-        }
+        // Verify parent-child relationship via groups
+        $children = FTT_Family_Groups::get_user_children($user_id);
+        $can_manage = FTT_Family_Groups::is_parent($user_id) && in_array($child_id, $children);
 
         if (!$can_manage) {
             return new WP_Error('unauthorized', 'You do not have permission to edit this child', ['status' => 403]);
@@ -2066,28 +2042,21 @@ class FTT_REST {
             return new WP_Error('missing_child_id', 'Child ID is required', ['status' => 400]);
         }
 
-        // Verify parent-child relationship via FTT_Roles meta
-        $can_manage = FTT_Roles::is_parent($user_id) && in_array($child_id, FTT_Roles::get_children($user_id));
-
-        // Fallback: check group membership
+        // Verify parent-child relationship via groups
+        $children = FTT_Family_Groups::get_user_children($user_id);
+        $can_manage = FTT_Family_Groups::is_parent($user_id) && in_array($child_id, $children);
+        
+        // Get primary group for removal
         $primary_group_id = 0;
         if (class_exists('FTT_Family_Groups')) {
             $primary_group_id = (int) get_user_meta($user_id, 'ftt_primary_group', true);
-            if (!$can_manage && $primary_group_id) {
-                $members = FTT_Family_Groups::get_group_members($primary_group_id, 'child');
-                $child_ids_in_group = array_map('intval', wp_list_pluck($members, 'user_id'));
-                $can_manage = in_array($child_id, $child_ids_in_group);
-            }
         }
 
         if (!$can_manage) {
             return new WP_Error('unauthorized', 'You do not have permission to remove this child', ['status' => 403]);
         }
 
-        // Remove parent-child relationship (legacy meta)
-        FTT_Roles::remove_parent_child($user_id, $child_id);
-
-        // Also remove from group (handles group table + residual meta cleanup)
+        // Remove from group (group-based system)
         if ($primary_group_id && class_exists('FTT_Family_Groups')) {
             FTT_Family_Groups::remove_member($primary_group_id, $child_id);
         }
@@ -2134,10 +2103,11 @@ class FTT_REST {
                 ]);
             }
 
-            // Also create the legacy parent-child cross-link
-            $children = FTT_Roles::get_children($user_id);
+            // Add adult as parent to all children in user's groups
+            $children = FTT_Family_Groups::get_user_children($user_id);
             foreach ($children as $child_id) {
-                FTT_Roles::add_parent_child($existing_user->ID, $child_id);
+                // Children are already in the same groups through group membership
+                // No additional linking needed with group-based architecture
             }
 
             // Send a simple notification (not a registration link)
@@ -2325,12 +2295,15 @@ class FTT_REST {
             return new WP_Error('missing_adult_id', 'Adult ID is required', ['status' => 400]);
         }
         
-        // Get current user's children
-        $children = FTT_Roles::get_children($user_id);
+        // Get current user's children from groups
+        $children = FTT_Family_Groups::get_user_children($user_id);
         
-        // Remove adult as parent of all these children
-        foreach ($children as $child_id) {
-            FTT_Roles::remove_parent_child($adult_id, $child_id);
+        // Remove adult from all groups where these children exist
+        // This is handled by FTT_Family_Groups::remove_member() in the calling code
+        // Get user's groups and remove the adult from each
+        $user_groups = FTT_Family_Groups::get_user_groups($user_id);
+        foreach ($user_groups as $group) {
+            FTT_Family_Groups::remove_member($group->id, $adult_id);
         }
         
         return rest_ensure_response([
@@ -2373,18 +2346,8 @@ class FTT_REST {
     public static function get_children_list($request) {
         $user_id = get_current_user_id();
 
-        // Start with children from FTT_Roles meta
-        $child_ids = array_map('intval', FTT_Roles::get_children($user_id));
-
-        // Merge group-based children so both billing paths are covered
-        if (class_exists('FTT_Family_Groups')) {
-            $primary_group_id = (int) get_user_meta($user_id, 'ftt_primary_group', true);
-            if ($primary_group_id) {
-                $members = FTT_Family_Groups::get_group_members($primary_group_id, 'child');
-                $group_child_ids = array_map('intval', wp_list_pluck($members, 'user_id'));
-                $child_ids = array_values(array_unique(array_merge($child_ids, $group_child_ids)));
-            }
-        }
+        // Get children from groups (primary source)
+        $child_ids = FTT_Family_Groups::get_user_children($user_id);
 
         $children = [];
         foreach ($child_ids as $child_id) {
@@ -2414,7 +2377,7 @@ class FTT_REST {
         $user_id = get_current_user_id();
         
         $children = [];
-        $child_ids = FTT_Roles::get_children($user_id);
+        $child_ids = FTT_Family_Groups::get_user_children($user_id);
         
         foreach ($child_ids as $child_id) {
             $child = get_userdata($child_id);
@@ -2434,7 +2397,7 @@ class FTT_REST {
         }
         
         $adults = [];
-        $parent_ids = FTT_Roles::get_parents($user_id);
+        $parent_ids = FTT_Family_Groups::get_user_parents($user_id);
         
         foreach ($parent_ids as $parent_id) {
             if ($parent_id == $user_id) continue; // Skip self
