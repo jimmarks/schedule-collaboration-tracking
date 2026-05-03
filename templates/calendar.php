@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
         <?php
         // Show member selector for parents
         $current_user_id = get_current_user_id();
-        $children = FTT_Roles::get_children($current_user_id);
+        $children = FTT_Family_Groups::get_user_children($current_user_id);
         
         // Get user's groups (v2.1)
         $user_groups = array();

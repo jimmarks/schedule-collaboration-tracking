@@ -11,7 +11,7 @@ if (!defined('ABSPATH')) {
 }
 
 $all_users = get_users(array('orderby' => 'display_name'));
-$members = FTT_Roles::get_all_members();
+$members = FTT_Family_Groups::get_all_children();
 $adults  = FTT_Roles::get_all_adults();
 ?>
 
@@ -53,7 +53,7 @@ $adults  = FTT_Roles::get_all_adults();
                     <?php else : ?>
                         <?php foreach ($members as $member) : ?>
                             <?php
-                            $parents_list = FTT_Roles::get_parents($member->ID);
+                            $parents_list = FTT_Family_Groups::get_user_parents($member->ID);
                             $parent_names = array();
                             foreach ($parents_list as $parent_id) {
                                 $parent = get_user_by('id', $parent_id);
@@ -109,7 +109,7 @@ $adults  = FTT_Roles::get_all_adults();
                     <?php else : ?>
                         <?php foreach ($adults as $adult) : ?>
                             <?php
-                            $children_list  = FTT_Roles::get_children($adult->ID);
+                            $children_list  = FTT_Family_Groups::get_user_children($adult->ID);
                             $children_names = array();
                             foreach ($children_list as $child_id) {
                                 $child = get_user_by('id', $child_id);
@@ -230,7 +230,7 @@ $adults  = FTT_Roles::get_all_adults();
                         <?php
                         $relationships = array();
                         foreach ($all_users as $user) {
-                            $children = FTT_Roles::get_children($user->ID);
+                            $children = FTT_Family_Groups::get_user_children($user->ID);
                             foreach ($children as $child_id) {
                                 $child = get_user_by('id', $child_id);
                                 if ($child) {

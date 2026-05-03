@@ -13,7 +13,7 @@ if (!defined('ABSPATH')) {
 $current_user = wp_get_current_user();
 $is_logged_in = is_user_logged_in();
 $is_member = $is_logged_in && FTT_Roles::is_member($current_user->ID);
-$is_parent = $is_logged_in && FTT_Roles::is_parent($current_user->ID);
+$is_parent = $is_logged_in && FTT_Family_Groups::is_parent($current_user->ID);
 $is_admin = $is_logged_in && current_user_can('manage_options');
 
 // Handle invitation codes - redirect to registration if not logged in
@@ -390,7 +390,7 @@ console.log('============================');
             </div>
 
             <?php
-            $children = FTT_Roles::get_children($current_user->ID);
+            $children = FTT_Family_Groups::get_user_children($current_user->ID);
             if (!empty($children)):
             ?>
                 <div class="ftt-family-section">

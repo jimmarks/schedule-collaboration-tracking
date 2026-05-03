@@ -55,15 +55,15 @@ if ($group_id && class_exists('FTT_Family_Groups')) {
     $children = array_filter($group_members, function($m) { return $m->role === 'child'; });
     $parents = array_filter($group_members, function($m) { return $m->role === 'parent'; });
 } else {
-    // Legacy mode - use old relationship system
-    $is_parent = FTT_Roles::is_parent($current_user->ID);
-    $children_ids = FTT_Roles::get_children($current_user->ID);
+    // No group context - get from user's groups
+    $is_parent = FTT_Family_Groups::is_parent($current_user->ID);
+    $children_ids = FTT_Family_Groups::get_user_children($current_user->ID);
     $children = array_map(function($id) {
         $user = get_userdata($id);
         return (object)['user_id' => $id, 'role' => 'child', 'display_name' => $user ? $user->display_name : ''];
     }, $children_ids);
     
-    $parents_ids = FTT_Roles::get_parents($current_user->ID);
+    $parents_ids = FTT_Family_Groups::get_user_parents($current_user->ID);
     $parents = array_map(function($id) {
         $user = get_userdata($id);
         return (object)['user_id' => $id, 'role' => 'parent', 'display_name' => $user ? $user->display_name : ''];

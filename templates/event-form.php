@@ -91,14 +91,14 @@ $default_airport = get_user_meta($current_user->ID, 'ftt_home_airport', true);
             <?php
             // Show member selector for parents or admins
             $current_user_id = get_current_user_id();
-            $children = FTT_Roles::get_children($current_user_id);
+            $children = FTT_Family_Groups::get_user_children($current_user_id);
             $is_member = FTT_Roles::is_member($current_user_id);
             
             if (!empty($children) || current_user_can('manage_options')) :
                 // Build the list of selectable children
                 $selectable_children = array();
                 if (current_user_can('manage_options')) {
-                    $all_members = FTT_Roles::get_all_members();
+                    $all_members = FTT_Family_Groups::get_all_children();
                     foreach ($all_members as $member) {
                         $selectable_children[] = array('id' => $member->ID, 'name' => $member->display_name);
                     }
