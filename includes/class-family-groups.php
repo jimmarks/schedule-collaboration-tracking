@@ -1887,6 +1887,288 @@ class FTT_Family_Groups {
             return new WP_Error('stripe_error', $e->getMessage());
         }
     }
+    
+    // ========================================================================
+    // LEGACY REPLACEMENT METHODS
+    // These methods replace FTT_Roles legacy user meta system
+    // ========================================================================
+    
+    /**
+     * Get children for a user across their groups
+     * 
+     * Replaces FTT_Roles::get_children()
+     *
+     * @param int $user_id User ID (defaults to current user)
+     * @param int|null $group_id Optional - limit to specific group
+     * @return array Array of user IDs
+     */
+    public static function get_user_children($user_id = null, $group_id = null) {
+        global $wpdb;
+        
+        if (!$user_id) {
+            $user_id = get_current_user_id();
+        }
+        
+        if (!$user_id) {
+            return [];
+        }
+        
+        $table_members = $wpdb->prefix . self::TABLE_MEMBERS;
+        
+        if ($group_id) {
+            // Get children from specific group where user is a parent
+            $children = $wpdb->get_col($wpdb->prepare(
+                "SELECT DISTINCT child.user_id 
+                 FROM {$table_members} parent
+                 INNER JOIN {$table_members} child 
+                    ON parent.group_id = child.group_id
+                 WHERE parent.user_id = %d 
+                   AND parent.role = 'parent'
+                   AND child.role = 'child'
+                   AND parent.group_id = %d",
+                $user_id,
+                $group_id
+            ));
+        } else {
+            // Get children from ALL groups where user is a parent
+            $children = $wpdb->get_col($wpdb->prepare(
+                "SELECT DISTINCT child.user_id 
+                 FROM {$table_members} parent
+                 INNER JOIN {$table_members} child 
+                    ON parent.group_id = child.group_id
+                 WHERE parent.user_id = %d 
+                   AND parent.role = 'parent'
+                   AND child.role = 'child'",
+                $user_id
+            ));
+        }
+        
+        return array_map('intval', $children);
+    }
+    
+    /**
+     * Get parents for a user across their groups
+     * 
+     * Replaces FTT_Roles::get_parents()
+     *
+     * @param int $user_id User ID (defaults to current user)
+     * @param int|null $group_id Optional - limit to specific group
+     * @return array Array of user IDs
+     */
+    public static function get_user_parents($user_id = null, $group_id = null) {
+        global $wpdb;
+        
+        if (!$user_id) {
+            $user_id = get_current_user_id();
+        }
+        
+        if (!$user_id) {
+            return [];
+        }
+        
+        $table_members = $wpdb->prefix . self::TABLE_MEMBERS;
+        
+        if ($group_id) {
+            // Get parents from specific group where user is a child
+            $parents = $wpdb->get_col($wpdb->prepare(
+                "SELECT DISTINCT parent.user_id 
+                 FROM {$table_members} child
+                 INNER JOIN {$table_members} parent 
+                    ON child.group_id = parent.group_id
+                 WHERE child.user_id = %d 
+                   AND child.role = 'child'
+                   AND parent.role = 'parent'
+                   AND child.group_id = %d",
+                $user_id,
+                $group_id
+            ));
+        } else {
+            // Get parents from ALL groups where user is a child
+            $parents = $wpdb->get_col($wpdb->prepare(
+                "SELECT DISTINCT parent.user_id 
+                 FROM {$table_members} child
+                 INNER JOIN {$table_members} parent 
+                    ON child.group_id = parent.group_id
+                 WHERE child.user_id = %d 
+                   AND child.role = 'child'
+                   AND parent.role = 'parent'",
+                $user_id
+            ));
+        }
+        
+        return array_map('intval', $parents);
+    }
+    
+    /**
+     * Check if user is a parent in any group (or specific group)
+     * 
+     * Replaces FTT_Roles::is_parent()
+     *
+     * @param int $user_id User ID (defaults to current user)
+     * @param int|null $group_id Optional - check specific group only
+     * @return bool
+     */
+    public static function is_parent($user_id = null, $group_id = null) {
+        global $wpdb;
+        
+        if (!$user_id) {
+            $user_id = get_current_user_id();
+        }
+        
+        if (!$user_id) {
+            return false;
+        }
+        
+        $table_members = $wpdb->prefix . self::TABLE_MEMBERS;
+        
+        if ($group_id) {
+            $count = $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM {$table_members} 
+                 WHERE user_id = %d AND role = 'parent' AND group_id = %d",
+                $user_id,
+                $group_id
+            ));
+        } else {
+            $count = $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM {$table_members} 
+                 WHERE user_id = %d AND role = 'parent'",
+                $user_id
+            ));
+        }
+        
+        return $count > 0;
+    }
+    
+    /**
+     * Check if user is a child in any group (or specific group)
+     * 
+     * New method to complement is_parent()
+     *
+     * @param int $user_id User ID (defaults to current user)
+     * @param int|null $group_id Optional - check specific group only
+     * @return bool
+     */
+    public static function is_child($user_id = null, $group_id = null) {
+        global $wpdb;
+        
+        if (!$user_id) {
+            $user_id = get_current_user_id();
+        }
+        
+        if (!$user_id) {
+            return false;
+        }
+        
+        $table_members = $wpdb->prefix . self::TABLE_MEMBERS;
+        
+        if ($group_id) {
+            $count = $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM {$table_members} 
+                 WHERE user_id = %d AND role = 'child' AND group_id = %d",
+                $user_id,
+                $group_id
+            ));
+        } else {
+            $count = $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM {$table_members} 
+                 WHERE user_id = %d AND role = 'child'",
+                $user_id
+            ));
+        }
+        
+        return $count > 0;
+    }
+    
+    /**
+     * Get user's primary/default group
+     * 
+     * Returns the group marked as primary in user meta, or the most recent group
+     *
+     * @param int $user_id User ID (defaults to current user)
+     * @return object|null Group object or null
+     */
+    public static function get_primary_group($user_id = null) {
+        if (!$user_id) {
+            $user_id = get_current_user_id();
+        }
+        
+        if (!$user_id) {
+            return null;
+        }
+        
+        // Check for primary group in user meta
+        $primary_group_id = get_user_meta($user_id, 'ftt_primary_group', true);
+        
+        if ($primary_group_id) {
+            $group = self::get_group($primary_group_id);
+            if ($group && !$group->is_archived) {
+                return $group;
+            }
+        }
+        
+        // Fallback: get most recent group
+        $groups = self::get_user_groups($user_id);
+        
+        return !empty($groups) ? $groups[0] : null;
+    }
+    
+    /**
+     * Get all children across all groups (admin function)
+     * 
+     * Replaces FTT_Roles::get_all_members() when filtering for children
+     *
+     * @return array Array of WP_User objects
+     */
+    public static function get_all_children() {
+        global $wpdb;
+        
+        $table_members = $wpdb->prefix . self::TABLE_MEMBERS;
+        
+        $child_ids = $wpdb->get_col(
+            "SELECT DISTINCT user_id FROM {$table_members} WHERE role = 'child' ORDER BY user_id"
+        );
+        
+        if (empty($child_ids)) {
+            return [];
+        }
+        
+        $args = [
+            'include' => $child_ids,
+            'orderby' => 'display_name',
+            'order' => 'ASC',
+        ];
+        
+        return get_users($args);
+    }
+    
+    /**
+     * Get all parents across all groups (admin function)
+     * 
+     * Replaces FTT_Roles::get_all_parents()
+     *
+     * @return array Array of WP_User objects
+     */
+    public static function get_all_parents() {
+        global $wpdb;
+        
+        $table_members = $wpdb->prefix . self::TABLE_MEMBERS;
+        
+        $parent_ids = $wpdb->get_col(
+            "SELECT DISTINCT user_id FROM {$table_members} WHERE role = 'parent' ORDER BY user_id"
+        );
+        
+        if (empty($parent_ids)) {
+            return [];
+        }
+        
+        $args = [
+            'include' => $parent_ids,
+            'orderby' => 'display_name',
+            'order' => 'ASC',
+        ];
+        
+        return get_users($args);
+    }
 }
 
 // Initialize
