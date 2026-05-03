@@ -1910,6 +1910,7 @@ class FTT_Family_Groups {
         }
         
         if (!$user_id) {
+            error_log("FTT get_user_children: No user_id provided");
             return [];
         }
         
@@ -1929,6 +1930,7 @@ class FTT_Family_Groups {
                 $user_id,
                 $group_id
             ));
+            error_log("FTT get_user_children: user_id={$user_id}, group_id={$group_id}, children=" . print_r($children, true));
         } else {
             // Get children from ALL groups where user is a parent
             $children = $wpdb->get_col($wpdb->prepare(
@@ -1941,6 +1943,7 @@ class FTT_Family_Groups {
                    AND child.role = 'child'",
                 $user_id
             ));
+            error_log("FTT get_user_children: user_id={$user_id}, children=" . print_r($children, true));
         }
         
         return array_map('intval', $children);
@@ -2016,6 +2019,7 @@ class FTT_Family_Groups {
         }
         
         if (!$user_id) {
+            error_log("FTT is_parent: No user_id provided");
             return false;
         }
         
@@ -2028,12 +2032,14 @@ class FTT_Family_Groups {
                 $user_id,
                 $group_id
             ));
+            error_log("FTT is_parent: user_id={$user_id}, group_id={$group_id}, count={$count}, table={$table_members}");
         } else {
             $count = $wpdb->get_var($wpdb->prepare(
                 "SELECT COUNT(*) FROM {$table_members} 
                  WHERE user_id = %d AND role = 'parent'",
                 $user_id
             ));
+            error_log("FTT is_parent: user_id={$user_id}, count={$count}, table={$table_members}");
         }
         
         return $count > 0;

@@ -20,14 +20,11 @@ if (!defined('ABSPATH')) {
 
     <div class="ftt-calendar-header">
         <?php
-        // Show member selector for parents
-        $current_user_id = get_current_user_id();
-        $children = FTT_Family_Groups::get_user_children($current_user_id);
-        
-        // Get user's groups (v2.1)
+        // Get user's groups (v2.1) - only for group selector, children loaded via REST API
         $user_groups = array();
         $selected_group_id = null;
         if (class_exists('FTT_Family_Groups')) {
+            $current_user_id = get_current_user_id();
             $user_groups = FTT_Family_Groups::get_user_groups($current_user_id);
             if (isset($_GET['group']) && !empty($_GET['group'])) {
                 $raw_group = sanitize_text_field(wp_unslash($_GET['group']));
@@ -155,37 +152,19 @@ if (!defined('ABSPATH')) {
         </div>
     <?php endif; ?>
     
-    <?php
-    // Child color filter (for parents with multiple children)
-    if (!empty($children) && class_exists('FTT_Child_Colors')) :
-        $children_with_colors = FTT_Child_Colors::get_children_with_colors($current_user_id);
-        ?>
-        <div class="ftt-child-filter">
-            <div class="ftt-child-filter-header">
-                <h3><?php esc_html_e('Show Children', 'schedule-collaboration-tracking'); ?></h3>
-                <button type="button" id="ftt-select-all-children" class="button button-small">
-                    <?php esc_html_e('Select All', 'schedule-collaboration-tracking'); ?>
-                </button>
-            </div>
-            <div class="ftt-filter-list">
-                <?php foreach ($children_with_colors as $child) : ?>
-                    <label class="ftt-filter-item">
-                        <input 
-                            type="checkbox" 
-                            class="ftt-child-toggle" 
-                            data-child-id="<?php echo esc_attr($child['id']); ?>"
-                            checked 
-                        />
-                        <span 
-                            class="ftt-color-indicator" 
-                            style="background-color: <?php echo esc_attr($child['color']['hex']); ?>;"
-                        ></span>
-                        <span class="ftt-child-name"><?php echo esc_html($child['name']); ?></span>
-                    </label>
-                <?php endforeach; ?>
-            </div>
+    <!-- Child filter - populated by JavaScript via REST API -->
+    <div class="ftt-child-filter" id="ftt-child-filter" style="display:none;">
+        <div class="ftt-child-filter-header">
+            <h3><?php esc_html_e('Show Children', 'schedule-collaboration-tracking'); ?></h3>
+            <button type="button" id="ftt-select-all-children" class="button button-small">
+                <?php esc_html_e('Select All', 'schedule-collaboration-tracking'); ?>
+            </button>
         </div>
-    <?php endif; ?>
+        <div class="ftt-filter-list" id="ftt-child-filter-list">
+            <!-- Children loaded via REST API -->
+            <div class="ftt-loading"><?php esc_html_e('Loading children...', 'schedule-collaboration-tracking'); ?></div>
+        </div>
+    </div>
     
     <div id="ftt-calendar"></div>
     

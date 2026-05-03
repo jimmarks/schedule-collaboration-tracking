@@ -89,25 +89,18 @@ $default_airport = get_user_meta($current_user->ID, 'ftt_home_airport', true);
             <h3><?php esc_html_e('Basic Information', 'schedule-collaboration-tracking'); ?></h3>
             
             <?php
-            // Show member selector for parents or admins
+            // Show member selector for parents only
             $current_user_id = get_current_user_id();
             $children = FTT_Family_Groups::get_user_children($current_user_id);
             $is_member = FTT_Roles::is_member($current_user_id);
             
-            if (!empty($children) || current_user_can('manage_options')) :
-                // Build the list of selectable children
+            if (!empty($children)) :
+                // Parent - show their children only
                 $selectable_children = array();
-                if (current_user_can('manage_options')) {
-                    $all_members = FTT_Family_Groups::get_all_children();
-                    foreach ($all_members as $member) {
-                        $selectable_children[] = array('id' => $member->ID, 'name' => $member->display_name);
-                    }
-                } elseif (!empty($children)) {
-                    foreach ($children as $child_id) {
-                        $child = get_user_by('id', $child_id);
-                        if ($child) {
-                            $selectable_children[] = array('id' => $child_id, 'name' => $child->display_name);
-                        }
+                foreach ($children as $child_id) {
+                    $child = get_user_by('id', $child_id);
+                    if ($child) {
+                        $selectable_children[] = array('id' => $child_id, 'name' => $child->display_name);
                     }
                 }
             ?>

@@ -307,31 +307,28 @@ class FTT_AI_Event_Parser {
             'name' => $current_user->display_name,
         ] : null;
 
-        // Get members using the same logic as the event form (FTT_Roles).
+        // Get members - only show children from user's groups (group-based security)
         $members = [];
-        if ( class_exists( 'FTT_Roles' ) ) {
-            if ( user_can( $user_id, 'manage_options' ) ) {
-                // Admin sees all registered members.
-                $all_members = FTT_Family_Groups::get_all_children();
-                foreach ( $all_members as $wp_user ) {
+        $is_member = FTT_Roles::is_member( $user_id );
+        
+        if ( $is_member ) {
+            // Member - can only create events for themselves
+            $members[] = [
+                'id'      => $user_id,
+                'name'    => $current_user->display_name,
+                'is_self' => true,
+            ];
+        } else {
+            // Parent - show only their children from groups
+            $child_ids = FTT_Family_Groups::get_user_children( $user_id );
+            foreach ( $child_ids as $child_id ) {
+                $wp_user = get_userdata( (int) $child_id );
+                if ( $wp_user ) {
                     $members[] = [
                         'id'      => (int) $wp_user->ID,
                         'name'    => $wp_user->display_name,
-                        'is_self' => ( (int) $wp_user->ID === $user_id ),
+                        'is_self' => false,
                     ];
-                }
-            } else {
-                // Parent sees only their linked children.
-                $child_ids = FTT_Family_Groups::get_user_children( $user_id );
-                foreach ( $child_ids as $child_id ) {
-                    $wp_user = get_userdata( (int) $child_id );
-                    if ( $wp_user ) {
-                        $members[] = [
-                            'id'      => (int) $wp_user->ID,
-                            'name'    => $wp_user->display_name,
-                            'is_self' => false,
-                        ];
-                    }
                 }
             }
         }

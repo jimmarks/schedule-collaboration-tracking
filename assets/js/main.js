@@ -64,13 +64,82 @@
         initCalendar: function() {
             const calendarEl = document.getElementById('ftt-calendar');
             if (!calendarEl) return;
-            
+
             // Check if FullCalendar is available
             if (typeof FullCalendar === 'undefined') {
                 console.error('FullCalendar library not loaded');
                 return;
             }
             
+            // Load children first via REST API, then render calendar
+            this.loadChildrenFilter().then(() => {
+                this.renderCalendar(calendarEl);
+            }).catch(error => {
+                console.error('Error loading children:', error);
+                // Render calendar anyway even if children load fails
+                this.renderCalendar(calendarEl);
+            });
+        },
+        
+        /**
+         * Load children via REST API and populate filter
+         */
+        loadChildrenFilter: function() {
+            return fetch(fttData.restUrl + 'children', {
+                headers: {
+                    'X-WP-Nonce': fttData.nonce
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                const children = data.children || [];
+                
+                if (children.length === 0) {
+                    // No children - hide the filter
+                    return;
+                }
+                
+                // Show and populate the child filter
+                const filterEl = document.getElementById('ftt-child-filter');
+                const listEl = document.getElementById('ftt-child-filter-list');
+                
+                if (!filterEl || !listEl) return;
+                
+                filterEl.style.display = 'block';
+                listEl.innerHTML = '';
+                
+                children.forEach(child => {
+                    const label = document.createElement('label');
+                    label.className = 'ftt-filter-item';
+                    
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.className = 'ftt-child-toggle';
+                    checkbox.dataset.childId = child.id;
+                    checkbox.checked = true;
+                    
+                    const colorSpan = document.createElement('span');
+                    colorSpan.className = 'ftt-color-indicator';
+                    colorSpan.style.backgroundColor = child.color || '#2196F3';
+                    
+                    const nameSpan = document.createElement('span');
+                    nameSpan.className = 'ftt-child-name';
+                    nameSpan.textContent = child.name;
+                    
+                    label.appendChild(checkbox);
+                    label.appendChild(colorSpan);
+                    label.appendChild(nameSpan);
+                    listEl.appendChild(label);
+                });
+                
+                console.log('Loaded ' + children.length + ' children via REST API');
+            });
+        },
+        
+        /**
+         * Render calendar (extracted from initCalendar)
+         */
+        renderCalendar: function(calendarEl) {
             const calendar = new FullCalendar.Calendar(calendarEl, {
                 initialView: 'listWeek',
                 timeZone: fttData.userTimezone || 'local',

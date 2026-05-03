@@ -525,25 +525,40 @@ class FTT_REST {
             );
         } else {
             // Auto-filter based on user role
-            if (FTT_Family_Groups::is_parent($current_user_id)) {
-                // User is a parent - show all children's events
+            $is_parent = FTT_Family_Groups::is_parent($current_user_id);
+            $is_member = FTT_Roles::is_member($current_user_id);
+            
+            // Debug logging
+            error_log("FTT REST get_events - User ID: {$current_user_id}, is_parent: " . ($is_parent ? 'true' : 'false') . ", is_member: " . ($is_member ? 'true' : 'false'));
+            
+            if ($is_parent) {
+                // User is a parent - show all children's events from their groups only
                 $children = FTT_Family_Groups::get_user_children($current_user_id, $group_id);
+                error_log("FTT REST get_events - Children found: " . print_r($children, true));
+                
                 if (!empty($children)) {
                     $meta_query[] = array(
                         'key'     => 'member_id',
                         'value'   => $children,
                         'compare' => 'IN',
                     );
+                } else {
+                    // Parent with no children - return empty
+                    error_log("FTT REST get_events - Parent has no children, returning empty");
+                    return rest_ensure_response(array());
                 }
-            } elseif (FTT_Roles::is_member($current_user_id)) {
+            } elseif ($is_member) {
                 // User is a member - show only their own events
                 $meta_query[] = array(
                     'key'     => 'member_id',
                     'value'   => $current_user_id,
                     'compare' => '=',
                 );
+            } else {
+                // Not a parent or member - no access to any events (security)
+                error_log("FTT REST get_events - User is neither parent nor member, returning empty");
+                return rest_ensure_response(array());
             }
-            // Admin/others with no filtering - shows all events
         }
         
         if ($request->get_param('start_date')) {
