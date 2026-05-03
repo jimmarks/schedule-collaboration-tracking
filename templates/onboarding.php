@@ -19,38 +19,24 @@ $user_id          = get_current_user_id();
 $step             = max( 1, min( 3, intval( $_GET['step'] ?? 1 ) ) );
 $stripe_settings  = get_option( 'ftt_stripe_settings', [] );
 $trial_days       = max( 1, intval( $stripe_settings['trial_days'] ?? 14 ) );
-$primary_group_id = get_user_meta( $user_id, 'ftt_primary_group', true );
-$group            = $primary_group_id && class_exists( 'FTT_Family_Groups' )
-                    ? FTT_Family_Groups::get_group( $primary_group_id )
-                    : null;
 
 $first_name = $current_user->first_name ?: $current_user->display_name;
-$group_name = $group ? $group->name : __( 'your family', 'schedule-collaboration-tracking' );
+// Group data will be loaded via REST API
+$group_name = '<span id="ftt-group-name-placeholder">' . esc_html__( 'your family', 'schedule-collaboration-tracking' ) . '</span>';
 
-// Use the actual trial end date stored on the group so returning users see
-// the *remaining* days, not the full configured trial length again.
-$trial_ends_at   = ( $group && ! empty( $group->trial_ends_at ) ) ? $group->trial_ends_at : null;
-$trial_days_left = $trial_ends_at
-    ? max( 0, (int) ceil( ( strtotime( $trial_ends_at ) - time() ) / DAY_IN_SECONDS ) )
-    : $trial_days; // fall back to full length if no end date yet
-$trial_end_label = $trial_ends_at
-    ? date_i18n( get_option( 'date_format' ), strtotime( $trial_ends_at ) )
-    : date_i18n( get_option( 'date_format' ), strtotime( "+{$trial_days} days" ) );
+// Trial data will be loaded via REST API - use defaults for now
+$trial_ends_at   = null;
+$trial_days_left = $trial_days;
+$trial_end_label = '<span id="ftt-trial-end-label">' . date_i18n( get_option( 'date_format' ), strtotime( "+{$trial_days} days" ) ) . '</span>';
 
 $step2_url  = esc_url( add_query_arg( 'step', 2, home_url( '/ftt-onboarding/' ) ) );
 $step3_url  = esc_url( add_query_arg( 'step', 3, home_url( '/ftt-onboarding/' ) ) );
 $finish_url = esc_url( home_url( '/ftt-groups/?welcome=1' ) );
 
-// Pre-load existing profile values so Step 3 reflects what's already saved.
-$saved_home_airport = get_user_meta( $user_id, 'ftt_home_airport', true );
-// Also check the ftt_home_airports array (primary = index 0).
-if ( empty( $saved_home_airport ) ) {
-    $airports_raw       = get_user_meta( $user_id, 'ftt_home_airports', true );
-    $airports_arr       = is_array( $airports_raw ) ? $airports_raw : ( $airports_raw ? json_decode( $airports_raw, true ) : [] );
-    $saved_home_airport = ! empty( $airports_arr[0] ) ? $airports_arr[0] : '';
-}
+// Profile values will be loaded via REST API
+$saved_home_airport = '';
 $site_tz        = get_option( 'ftt_settings', [] )['default_timezone'] ?? wp_timezone_string();
-$saved_timezone = get_user_meta( $user_id, 'ftt_timezone', true ) ?: $site_tz;
+$saved_timezone = $site_tz;
 
 // Build this user's personal calendar subscribe URLs for the Step 1 modal.
 $cal_webcal_url = '';
@@ -59,10 +45,14 @@ $cal_qr_url     = '';
 $cal_https_url  = '';
 $ical_enabled   = ! empty( get_option( 'ftt_settings', [] )['enable_ical_feed'] );
 if ( $ical_enabled ) {
-    $cal_token = get_user_meta( $user_id, 'ftt_calendar_token', true );
-    if ( empty( $cal_token ) ) {
-        $cal_token = wp_generate_password( 32, false );
+    // Calendar token will be generated on demand
+    $cal_token = wp_generate_password( 32, false );
+    // Store it if needed
+    $existing_token = get_user_meta( $user_id, 'ftt_calendar_token', true );
+    if ( empty( $existing_token ) ) {
         update_user_meta( $user_id, 'ftt_calendar_token', $cal_token );
+    } else {
+        $cal_token = $existing_token;
     }
     $cal_https_url  = add_query_arg(
         [ 'ftt_calendar' => '1', 'token' => $cal_token, 'user_id' => $user_id ],
@@ -511,4 +501,55 @@ if ( $ical_enabled ) {
     }
 
 }(jQuery));
+</script>
+
+<script>
+// Load user profile and group data via REST API
+(function($) {
+    var restUrl = <?php echo wp_json_encode( rest_url( 'ftt/v1/' ) ); ?>;
+    var nonce   = <?php echo wp_json_encode( wp_create_nonce( 'wp_rest' ) ); ?>;
+    
+    // Load dashboard context (includes groups, user data)
+    $.ajax({
+        url: restUrl + 'dashboard-context',
+        method: 'GET',
+        headers: { 'X-WP-Nonce': nonce },
+        success: function(res) {
+            // Update group name
+            if (res.selected_group && res.selected_group.name) {
+                $('#ftt-group-name-placeholder').text(res.selected_group.name);
+                
+                // Update trial end date if available
+                if (res.selected_group.billing && res.selected_group.billing.trial_end) {
+                    var endDate = new Date(res.selected_group.billing.trial_end);
+                    var dateStr = endDate.toLocaleDateString(undefined, { 
+                        year: 'numeric', month: 'long', day: 'numeric' 
+                    });
+                    $('#ftt-trial-end-label').text(dateStr);
+                }
+            }
+        },
+        error: function() {
+            console.error('Failed to load dashboard context');
+        }
+    });
+    
+    // Load user preferences (airport, timezone)
+    $.ajax({
+        url: restUrl + 'user-preferences',
+        method: 'GET',
+        headers: { 'X-WP-Nonce': nonce },
+        success: function(res) {
+            if (res.home_airport) {
+                $('#ftt-onboard-airport').val(res.home_airport);
+            }
+            if (res.timezone) {
+                $('#ftt-onboard-timezone').val(res.timezone);
+            }
+        },
+        error: function() {
+            console.error('Failed to load user preferences');
+        }
+    });
+})(jQuery);
 </script>

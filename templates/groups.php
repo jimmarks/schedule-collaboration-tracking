@@ -15,12 +15,13 @@ if (!is_user_logged_in()) {
 }
 
 $current_user_id = get_current_user_id();
-$groups = FTT_Family_Groups::get_user_groups($current_user_id);
-$primary_group = get_user_meta($current_user_id, 'ftt_primary_group', true);
+// Groups will be loaded dynamically via REST API
+$groups = array();
+$primary_group = null;
 
 // Check if this is a new user welcome
 $show_welcome = isset($_GET['welcome']) && $_GET['welcome'] == '1';
-$primary_group_id = get_user_meta($current_user_id, 'ftt_primary_group_id', true);
+$primary_group_id = null;
 
 // Check for checkout status
 $checkout_success = isset($_GET['checkout']) && $_GET['checkout'] === 'success';
