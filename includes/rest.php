@@ -248,6 +248,20 @@ class FTT_REST {
             'permission_callback' => 'is_user_logged_in',
         ));
         
+        // Get comprehensive dashboard context data
+        register_rest_route('ftt/v1', '/dashboard-context', array(
+            'methods'             => 'GET',
+            'callback'            => array(__CLASS__, 'get_dashboard_context'),
+            'permission_callback' => 'is_user_logged_in',
+            'args'                => array(
+                'group_id' => array(
+                    'type'              => 'integer',
+                    'description'       => 'Filter data by group ID',
+                    'sanitize_callback' => 'absint',
+                ),
+            ),
+        ));
+        
         // Update user's primary group
         register_rest_route('ftt/v1', '/user/primary-group', array(
             'methods'             => 'POST',
@@ -1620,6 +1634,114 @@ class FTT_REST {
     }
     
     /**
+     * Get comprehensive dashboard context data
+     * Returns user role info, groups, children, and other dashboard data
+     * 
+     * @param WP_REST_Request $request
+     * @return WP_REST_Response
+     */
+    public static function get_dashboard_context($request) {
+        $user_id = get_current_user_id();
+        $group_id = $request->get_param('group_id');
+        
+        // User role information
+        $is_member = FTT_Roles::is_member($user_id);
+        $is_parent = FTT_Family_Groups::is_parent($user_id);
+        $is_admin = current_user_can('manage_options');
+        
+        // Get user groups
+        $user_groups = array();
+        $selected_group = null;
+        $primary_group_id = (int) get_user_meta($user_id, 'ftt_primary_group', true);
+        
+        if (class_exists('FTT_Family_Groups')) {
+            $groups = FTT_Family_Groups::get_user_groups($user_id);
+            
+            foreach ($groups as $group) {
+                $group_data = array(
+                    'id' => $group->id,
+                    'name' => $group->name,
+                    'description' => $group->description ?? '',
+                    'color' => $group->color ?? '#6A3E8E',
+                    'child_count' => $group->child_count,
+                    'parent_count' => $group->parent_count,
+                    'member_count' => $group->member_count,
+                    'planned_children' => $group->planned_children ?? 0,
+                    'is_primary' => ($group->id == $primary_group_id),
+                    'can_manage' => FTT_Family_Groups::can_manage_group($group->id, $user_id),
+                    'billing_owner' => $group->billing_owner,
+                );
+                
+                // Add billing info if available
+                if (class_exists('FTT_Billing_Manager')) {
+                    $billing_info = FTT_Billing_Manager::get_group_billing_summary($group->id);
+                    $group_data['billing'] = $billing_info;
+                }
+                
+                $user_groups[] = $group_data;
+                
+                // Track selected group
+                if ($group_id && $group->id == $group_id) {
+                    $selected_group = $group_data;
+                }
+            }
+            
+            // If group_id not specified but user has groups, default to primary
+            if (!$selected_group && !empty($user_groups)) {
+                if ($primary_group_id) {
+                    foreach ($user_groups as $g) {
+                        if ($g['id'] == $primary_group_id) {
+                            $selected_group = $g;
+                            break;
+                        }
+                    }
+                }
+                if (!$selected_group) {
+                    $selected_group = $user_groups[0];
+                }
+            }
+        }
+        
+        // Get children with full details
+        $children = array();
+        if ($is_parent) {
+            $child_ids = FTT_Family_Groups::get_user_children($user_id);
+            
+            foreach ($child_ids as $child_id) {
+                $child = get_userdata($child_id);
+                if (!$child) continue;
+                
+                $child_color = FTT_Child_Colors::get_child_color($child_id);
+                
+                $children[] = array(
+                    'id' => $child_id,
+                    'display_name' => $child->display_name,
+                    'email' => $child->user_email,
+                    'section' => get_user_meta($child_id, 'ftt_section', true),
+                    'instrument' => get_user_meta($child_id, 'ftt_instrument', true),
+                    'age' => get_user_meta($child_id, 'child_age', true),
+                    'grade' => get_user_meta($child_id, 'child_grade', true),
+                    'school' => get_user_meta($child_id, 'child_school', true),
+                    'color' => $child_color,
+                );
+            }
+        }
+        
+        return rest_ensure_response(array(
+            'user' => array(
+                'id' => $user_id,
+                'is_member' => $is_member,
+                'is_parent' => $is_parent,
+                'is_admin' => $is_admin,
+            ),
+            'groups' => $user_groups,
+            'selected_group' => $selected_group,
+            'primary_group_id' => $primary_group_id,
+            'children' => $children,
+        ));
+    }
+    
+    /**
      * Update user's primary group
      */
     public static function update_primary_group($request) {
@@ -1742,6 +1864,22 @@ class FTT_REST {
         } else {
             $event['member_id'] = null;
             $event['member_name'] = null;
+        }
+        
+        // Add group information
+        $group_id = get_post_meta($post->ID, 'group_id', true);
+        if ($group_id && class_exists('FTT_Family_Groups')) {
+            $group = FTT_Family_Groups::get_group($group_id);
+            if ($group) {
+                $event['group_id'] = $group_id;
+                $event['group_name'] = $group->name;
+            } else {
+                $event['group_id'] = $group_id;
+                $event['group_name'] = null;
+            }
+        } else {
+            $event['group_id'] = null;
+            $event['group_name'] = null;
         }
         
         return $event;

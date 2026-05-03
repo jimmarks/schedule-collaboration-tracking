@@ -13,31 +13,15 @@ if ( ! is_user_logged_in() ) {
     exit;
 }
 
-$user_id          = get_current_user_id();
-$primary_group_id = get_user_meta( $user_id, 'ftt_primary_group', true );
-$group            = $primary_group_id && class_exists( 'FTT_Family_Groups' )
-                    ? FTT_Family_Groups::get_group( $primary_group_id )
-                    : null;
-$trial_end_date   = $group ? $group->trial_ends_at : null;
-$end_display      = $trial_end_date
-                    ? date_i18n( get_option( 'date_format' ), strtotime( $trial_end_date ) )
-                    : '';
+$user_id = get_current_user_id();
 ?>
 <div class="ftt-trial-expired-wrapper">
 
-    <div class="ftt-trial-expired-header">
+    <div class="ftt-trial-expired-header" id="ftt-trial-header">
         <div class="ftt-trial-expired-icon">⏰</div>
         <h2><?php esc_html_e( 'Your free trial has ended', 'schedule-collaboration-tracking' ); ?></h2>
-        <p>
-            <?php if ( $end_display ) :
-                printf(
-                    /* translators: %s: trial end date */
-                    esc_html__( 'Your trial ended on %s. Your data is safe and waiting — nothing has been deleted.', 'schedule-collaboration-tracking' ),
-                    '<strong>' . esc_html( $end_display ) . '</strong>'
-                );
-            else :
-                esc_html_e( 'Your trial has ended. Your data is safe — nothing has been deleted.', 'schedule-collaboration-tracking' );
-            endif; ?>
+        <p id="ftt-trial-message">
+            <?php esc_html_e( 'Your data is safe — nothing has been deleted.', 'schedule-collaboration-tracking' ); ?>
         </p>
         <p><?php esc_html_e( 'Choose a plan below to restore access instantly.', 'schedule-collaboration-tracking' ); ?></p>
     </div>
@@ -94,7 +78,39 @@ $end_display      = $trial_end_date
 (function ($) {
     var restUrl = <?php echo wp_json_encode( rest_url( 'ftt/v1/' ) ); ?>;
     var nonce   = <?php echo wp_json_encode( wp_create_nonce( 'wp_rest' ) ); ?>;
-    var groupId = <?php echo intval( $primary_group_id ?: 0 ); ?>;
+    var groupId = null;
+
+    // Load group data via REST API
+    $.ajax({
+        url: restUrl + 'groups',
+        method: 'GET',
+        beforeSend: function (xhr) { xhr.setRequestHeader('X-WP-Nonce', nonce); },
+        success: function (res) {
+            if (res.primary_group_id) {
+                groupId = res.primary_group_id;
+                
+                // Find the primary group details
+                var primaryGroup = res.groups.find(g => g.id === groupId);
+                
+                // Update message if we have trial end date
+                if (primaryGroup && primaryGroup.billing && primaryGroup.billing.trial_end) {
+                    var endDate = new Date(primaryGroup.billing.trial_end);
+                    var dateStr = endDate.toLocaleDateString(undefined, { 
+                        year: 'numeric', month: 'long', day: 'numeric' 
+                    });
+                    $('#ftt-trial-message').html(
+                        <?php
+                        /* translators: %s: trial end date (filled by JS) */
+                        echo wp_json_encode( __( 'Your trial ended on <strong>{{DATE}}</strong>. Your data is safe and waiting — nothing has been deleted.', 'schedule-collaboration-tracking' ) );
+                        ?>.replace('{{DATE}}', dateStr)
+                    );
+                }
+            }
+        },
+        error: function () {
+            console.error('Failed to load group data');
+        }
+    });
 
     $('.ftt-expired-start-billing').on('click', function () {
         var interval = $(this).data('interval');

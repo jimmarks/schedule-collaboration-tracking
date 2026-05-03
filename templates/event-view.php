@@ -57,14 +57,9 @@ if ($member_id) {
     }
 }
 
-// Get group name
+// Group name will be loaded via REST API on page load
 $group_name = '';
-if ($group_id) {
-    $group = FTT_Family_Groups::get_group($group_id);
-    if ($group) {
-        $group_name = $group->name;
-    }
-}
+
 
 // Parse time blocks
 $time_blocks_data = array();
@@ -134,10 +129,10 @@ if ($travel_legs) {
                 </div>
                 <?php endif; ?>
                 
-                <?php if ($group_name) : ?>
-                <div class="ftt-view-field">
+                <?php if ($group_id) : ?>
+                <div class="ftt-view-field" id="ftt-group-field">
                     <span class="ftt-view-label"><?php esc_html_e('Family Group:', 'schedule-collaboration-tracking'); ?></span>
-                    <span class="ftt-view-value"><?php echo esc_html($group_name); ?></span>
+                    <span class="ftt-view-value" id="ftt-group-name">Loading...</span>
                 </div>
                 <?php endif; ?>
                 
@@ -525,3 +520,29 @@ if ($travel_legs) {
     }
 }
 </style>
+
+<script>
+// Load group name via REST API
+<?php if ($group_id) : ?>
+(function($) {
+    $.ajax({
+        url: fttData.restUrl + 'groups',
+        method: 'GET',
+        headers: { 'X-WP-Nonce': fttData.nonce },
+        success: function(res) {
+            if (res.groups) {
+                var group = res.groups.find(g => g.id === <?php echo intval($group_id); ?>);
+                if (group) {
+                    $('#ftt-group-name').text(group.name);
+                } else {
+                    $('#ftt-group-field').hide();
+                }
+            }
+        },
+        error: function() {
+            $('#ftt-group-field').hide();
+        }
+    });
+})(jQuery);
+<?php endif; ?>
+</script>
