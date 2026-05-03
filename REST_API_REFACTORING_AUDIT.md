@@ -38,36 +38,39 @@
 
 ---
 
-## 2. 🔴 event-form.php - Add/Edit Event Form
-**Current Architecture:** Direct PHP  
-**Direct DB Calls:** 6 instances
+## 2. ✅ event-form.php - Add/Edit Event Form [COMPLETE]
+**Current Architecture:** REST API ✅  
+**Direct DB Calls:** 0 (was 6)
 
-### PHP Calls Made On Page Load:
+### Status: **REFACTORED** (Commit: d7659e3)
+All data now loaded via REST APIs in JavaScript (loadEventFormData method).
+
+### Previous PHP Calls (Now Eliminated):
 ```php
-❌ DIRECT PHP:
-- get_user_meta($user->ID, 'ftt_home_airport', true)             [line 16]
-- FTT_Family_Groups::get_user_children($user_id)                 [line 94] ✅ SECURITY FIXED
-- FTT_Roles::is_member($user_id)                                 [line 95]
-- FTT_Family_Groups::get_user_groups($user_id)                   [line 133]
-- get_user_meta($user_id, 'ftt_primary_group', true)             [line 134]
+✅ ELIMINATED:
+- get_user_meta($user->ID, 'ftt_home_airport', true)             [REMOVED - unused dead code]
+- FTT_Family_Groups::get_user_children($user_id)                 [NOW: GET /ftt/v1/children]
+- FTT_Roles::is_member($user_id)                                 [NOW: GET /ftt/v1/children]
+- FTT_Family_Groups::get_user_groups($user_id)                   [NOW: GET /ftt/v1/groups]
+- get_user_meta($user_id, 'ftt_primary_group', true)             [NOW: GET /ftt/v1/groups]
 ```
 
-### JavaScript Already Makes:
+### REST APIs Used:
 ```javascript
-- fetch('/ftt/v1/events/' + eventId) - Load event for editing
-- fetch('/ftt/v1/events', {method: 'POST'}) - Save event
+✅ USING REST:
+- GET /ftt/v1/children - Returns child array or is_member flag
+- GET /ftt/v1/groups - Returns groups with primary_group_id
+- GET /ftt/v1/events/{id} - Load event for editing
+- POST /ftt/v1/events - Save event
 ```
 
-### Recommended Refactoring:
-Load all form data via JavaScript:
-```javascript
-1. GET /ftt/v1/children - Get selectable children
-2. GET /ftt/v1/groups - Get user's groups
-3. GET /ftt/v1/user/preferences - Get home airport, timezone
-4. Render form dynamically
-```
+### Implementation:
+- Template renders skeleton HTML only
+- loadEventFormData() in main.js fetches data on page load
+- Dynamically populates member checkboxes and group dropdown
+- Security enforced at REST layer (no PHP bypasses)
 
-### Priority: **HIGH** (security and architecture consistency)
+### Priority: **HIGH** (security and architecture consistency) - ✅ COMPLETE
 
 ---
 
@@ -300,11 +303,11 @@ foreach ($children as $child_id) {
 
 ## Recommended Refactoring Priorities
 
-### Phase 1 - Critical (Security & High Traffic) ✅ STARTED
-1. ✅ **calendar.php** - Partially complete (children via REST)
-2. ✅ **REST API security** - Fixed to enforce group-based access
-3. ❌ **event-form.php** - Load children & groups via REST
-4. ❌ **dashboard.php** - Most complex, highest traffic
+### Phase 1 - Critical (Security & High Traffic) ⏳ IN PROGRESS
+1. ✅ **calendar.php** - COMPLETE (children via REST)
+2. ✅ **REST API security** - COMPLETE (group-based access enforced)
+3. ✅ **event-form.php** - COMPLETE (all data via REST APIs)
+4. ❌ **dashboard.php** - Most complex, highest traffic [NEXT]
 
 ### Phase 2 - High Value
 5. **family-management.php** - Many redundant queries
@@ -394,11 +397,12 @@ Enhance to include:
 
 ## Estimated Effort
 
-- **Phase 1 (Critical):** 16-20 hours
-  - event-form.php refactor: 4 hours
-  - dashboard.php refactor: 8 hours
-  - New REST endpoints: 4 hours
-  - Testing: 4 hours
+- **Phase 1 (Critical):** 16-20 hours (⏳ 8-12 hours remaining)
+  - ✅ event-form.php refactor: 4 hours [COMPLETE]
+  - ❌ dashboard.php refactor: 8 hours [NEXT]
+  - ✅ New REST endpoint (GET /ftt/v1/groups): 2 hours [COMPLETE]
+  - ❌ Dashboard REST endpoint: 2 hours
+  - ❌ Testing: 4 hours
 
 - **Phase 2 (High Value):** 8-12 hours
   - family-management.php: 6 hours
@@ -409,7 +413,9 @@ Enhance to include:
   - Remaining simple pages: 3 hours
   - Testing: 2 hours
 
-**Total Estimated Effort:** 28-38 hours
+**Total Estimated Effort:** 28-38 hours  
+**Completed So Far:** ~6 hours  
+**Remaining:** ~22-32 hours
 
 ---
 
@@ -419,10 +425,14 @@ Enhance to include:
 - calendar.php children loading (via REST)
 - REST API security fixes (3 locations)
 - Security audit complete
+- event-form.php refactor complete (GET /ftt/v1/groups endpoint added)
+
+⏳ **In Progress:**
+- Phase 1 refactoring (3 of 4 complete)
 
 ❌ **Remaining:**
-- 10 templates still using direct PHP calls
-- 65+ direct database call instances
-- 4-5 new REST endpoints needed
+- 9 templates still using direct PHP calls
+- ~59 direct database call instances (down from 71+)
+- 3-4 new REST endpoints needed
 
-**Recommendation:** Proceed with Phase 1 refactoring to address security and performance on highest-traffic pages.
+**Recommendation:** Continue with dashboard.php refactoring as next critical step.
