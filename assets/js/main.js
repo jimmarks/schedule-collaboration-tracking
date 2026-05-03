@@ -300,11 +300,106 @@
         },
         
         /**
+         * Load event form data from REST APIs
+         * Dynamically populates children and groups without direct PHP calls
+         */
+        loadEventFormData: function() {
+            // Load children data
+            fetch(fttData.restUrl + '/ftt/v1/children', {
+                method: 'GET',
+                headers: {
+                    'X-WP-Nonce': fttData.nonce
+                }
+            })
+            .then(response => {
+                if (!response.ok) throw new Error('Failed to load children');
+                return response.json();
+            })
+            .then(data => {
+                const memberContainer = document.getElementById('ftt-member-selector-container');
+                const memberCheckboxes = document.getElementById('ftt-member-checkboxes');
+                
+                if (data.is_member) {
+                    // Member creating their own event
+                    memberCheckboxes.innerHTML = '<input type="hidden" id="member_id" name="member_id" value="' + data.user_id + '">';
+                } else if (data.children && data.children.length > 0) {
+                    // Parent - show children
+                    memberContainer.style.display = 'block';
+                    
+                    let html = '';
+                    
+                    // Add "Family Event" option if multiple children
+                    if (data.children.length > 1) {
+                        html += '<label class="ftt-member-check ftt-member-check--family">';
+                        html += '  <input type="checkbox" id="ftt-family-event" value="family">';
+                        html += '  <span>Family Event (all children)</span>';
+                        html += '</label>';
+                        html += '<hr class="ftt-member-divider">';
+                    }
+                    
+                    // Add individual child checkboxes
+                    data.children.forEach(child => {
+                        html += '<label class="ftt-member-check">';
+                        html += '  <input type="checkbox" class="ftt-child-checkbox" value="' + child.id + '">';
+                        html += '  <span>' + child.display_name + '</span>';
+                        html += '</label>';
+                    });
+                    
+                    memberCheckboxes.innerHTML = html;
+                }
+            })
+            .catch(error => {
+                console.error('Error loading children:', error);
+                document.getElementById('ftt-member-checkboxes').innerHTML = 
+                    '<div class="ftt-error">Error loading children. Please refresh the page.</div>';
+            });
+            
+            // Load groups data
+            fetch(fttData.restUrl + '/ftt/v1/groups', {
+                method: 'GET',
+                headers: {
+                    'X-WP-Nonce': fttData.nonce
+                }
+            })
+            .then(response => {
+                if (!response.ok) throw new Error('Failed to load groups');
+                return response.json();
+            })
+            .then(data => {
+                const groupContainer = document.getElementById('ftt-group-selector-container');
+                const groupSelect = document.getElementById('group_id');
+                
+                if (data.groups && data.groups.length > 0) {
+                    groupContainer.style.display = 'block';
+                    
+                    let html = '';
+                    data.groups.forEach(group => {
+                        const selected = group.is_primary ? ' selected' : '';
+                        const primaryLabel = group.is_primary ? ' (Primary)' : '';
+                        html += '<option value="' + group.id + '"' + selected + '>';
+                        html += group.name + primaryLabel;
+                        html += '</option>';
+                    });
+                    
+                    groupSelect.innerHTML = html;
+                }
+            })
+            .catch(error => {
+                console.error('Error loading groups:', error);
+                document.getElementById('group_id').innerHTML = 
+                    '<option value="">Error loading groups. Please refresh the page.</option>';
+            });
+        },
+        
+        /**
          * Initialize event form
          */
         initEventForm: function() {
             const form = document.getElementById('ftt-event-form');
             if (!form) return;
+            
+            // Load form data from REST APIs
+            this.loadEventFormData();
             
             // Get event ID from URL if editing
             const urlParams = new URLSearchParams(window.location.search);

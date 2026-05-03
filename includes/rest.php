@@ -241,6 +241,13 @@ class FTT_REST {
             'permission_callback' => 'is_user_logged_in',
         ));
         
+        // Get user's groups
+        register_rest_route('ftt/v1', '/groups', array(
+            'methods'             => 'GET',
+            'callback'            => array(__CLASS__, 'get_user_groups'),
+            'permission_callback' => 'is_user_logged_in',
+        ));
+        
         // Update user's primary group
         register_rest_route('ftt/v1', '/user/primary-group', array(
             'methods'             => 'POST',
@@ -1575,6 +1582,41 @@ class FTT_REST {
         }
         
         return rest_ensure_response(array('success' => true, 'message' => 'Preferences updated'));
+    }
+    
+    /**
+     * Get user's groups with details
+     * 
+     * @param WP_REST_Request $request
+     * @return WP_REST_Response
+     */
+    public static function get_user_groups($request) {
+        $user_id = get_current_user_id();
+        
+        if (!class_exists('FTT_Family_Groups')) {
+            return rest_ensure_response(array('groups' => array()));
+        }
+        
+        $groups = FTT_Family_Groups::get_user_groups($user_id);
+        $primary_group_id = get_user_meta($user_id, 'ftt_primary_group', true);
+        
+        $formatted_groups = array();
+        foreach ($groups as $group) {
+            $formatted_groups[] = array(
+                'id' => $group->id,
+                'name' => $group->name,
+                'child_count' => $group->child_count,
+                'parent_count' => $group->parent_count,
+                'is_primary' => ($group->id == $primary_group_id),
+                'can_manage' => FTT_Family_Groups::can_manage_group($group->id, $user_id),
+                'billing_owner' => $group->billing_owner,
+            );
+        }
+        
+        return rest_ensure_response(array(
+            'groups' => $formatted_groups,
+            'primary_group_id' => (int) $primary_group_id,
+        ));
     }
     
     /**

@@ -13,7 +13,6 @@ if (!defined('ABSPATH')) {
 $settings = get_option('ftt_settings', array());
 $default_timezone = $settings['default_timezone'] ?? wp_timezone_string();
 $current_user = wp_get_current_user();
-$default_airport = get_user_meta($current_user->ID, 'ftt_home_airport', true);
 ?>
 
 <div class="ftt-container">
@@ -88,68 +87,23 @@ $default_airport = get_user_meta($current_user->ID, 'ftt_home_airport', true);
         <div class="ftt-form-section">
             <h3><?php esc_html_e('Basic Information', 'schedule-collaboration-tracking'); ?></h3>
             
-            <?php
-            // Show member selector for parents only
-            $current_user_id = get_current_user_id();
-            $children = FTT_Family_Groups::get_user_children($current_user_id);
-            $is_member = FTT_Roles::is_member($current_user_id);
-            
-            if (!empty($children)) :
-                // Parent - show their children only
-                $selectable_children = array();
-                foreach ($children as $child_id) {
-                    $child = get_user_by('id', $child_id);
-                    if ($child) {
-                        $selectable_children[] = array('id' => $child_id, 'name' => $child->display_name);
-                    }
-                }
-            ?>
-                <div class="ftt-form-field">
-                    <label><?php esc_html_e('Event For', 'schedule-collaboration-tracking'); ?> *</label>
-                    <div id="ftt-member-checkboxes" class="ftt-member-checkboxes">
-                        <?php if (count($selectable_children) > 1) : ?>
-                        <label class="ftt-member-check ftt-member-check--family">
-                            <input type="checkbox" id="ftt-family-event" value="family">
-                            <span><?php esc_html_e('Family Event (all children)', 'schedule-collaboration-tracking'); ?></span>
-                        </label>
-                        <hr class="ftt-member-divider">
-                        <?php endif; ?>
-                        <?php foreach ($selectable_children as $sc) : ?>
-                        <label class="ftt-member-check">
-                            <input type="checkbox" class="ftt-child-checkbox" value="<?php echo esc_attr($sc['id']); ?>">
-                            <span><?php echo esc_html($sc['name']); ?></span>
-                        </label>
-                        <?php endforeach; ?>
-                    </div>
-                    <small class="description"><?php esc_html_e('Select one or more children, or choose Family Event to attach to all.', 'schedule-collaboration-tracking'); ?></small>
+            <!-- Member selector - populated dynamically via REST API -->
+            <div class="ftt-form-field" id="ftt-member-selector-container" style="display:none;">
+                <label><?php esc_html_e('Event For', 'schedule-collaboration-tracking'); ?> *</label>
+                <div id="ftt-member-checkboxes" class="ftt-member-checkboxes">
+                    <div class="ftt-loading"><?php esc_html_e('Loading...', 'schedule-collaboration-tracking'); ?></div>
                 </div>
-            <?php elseif ($is_member) : ?>
-                <!-- Member creating their own event — no child selector needed -->
-                <input type="hidden" id="member_id" name="member_id" value="<?php echo esc_attr($current_user_id); ?>">
-            <?php endif; ?>
+                <small class="description"><?php esc_html_e('Select one or more children, or choose Family Event to attach to all.', 'schedule-collaboration-tracking'); ?></small>
+            </div>
             
-            <?php
-            // Group selector (v2.1 - Family Groups)
-            $user_groups = FTT_Family_Groups::get_user_groups($current_user_id);
-            $primary_group = get_user_meta($current_user_id, 'ftt_primary_group', true);
-            
-            if (!empty($user_groups)) : ?>
-                <div class="ftt-form-field">
-                    <label for="group_id"><?php esc_html_e('Family Group', 'schedule-collaboration-tracking'); ?> *</label>
-                    <select id="group_id" name="group_id" required>
-                        <?php foreach ($user_groups as $group) : ?>
-                            <option value="<?php echo esc_attr($group->id); ?>" 
-                                    <?php selected($group->id, $primary_group); ?>>
-                                <?php echo esc_html($group->name); ?>
-                                <?php if ($group->id == $primary_group) : ?>
-                                    (Primary)
-                                <?php endif; ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                    <small class="description"><?php esc_html_e('Select which family group this event belongs to', 'schedule-collaboration-tracking'); ?></small>
-                </div>
-            <?php endif; ?>
+            <!-- Group selector - populated dynamically via REST API -->
+            <div class="ftt-form-field" id="ftt-group-selector-container" style="display:none;">
+                <label for="group_id"><?php esc_html_e('Family Group', 'schedule-collaboration-tracking'); ?> *</label>
+                <select id="group_id" name="group_id" required>
+                    <option value=""><?php esc_html_e('Loading...', 'schedule-collaboration-tracking'); ?></option>
+                </select>
+                <small class="description"><?php esc_html_e('Select which family group this event belongs to', 'schedule-collaboration-tracking'); ?></small>
+            </div>
             
             <div class="ftt-form-field">
                 <label for="event_title"><?php esc_html_e('Event Title', 'schedule-collaboration-tracking'); ?> *</label>
