@@ -12,9 +12,10 @@ if (!defined('ABSPATH')) {
 
 $current_user = wp_get_current_user();
 $is_logged_in = is_user_logged_in();
+// Role checks now use proper methods (no admin bypass)
 $is_member = $is_logged_in && FTT_Roles::is_member($current_user->ID);
 $is_parent = $is_logged_in && FTT_Family_Groups::is_parent($current_user->ID);
-$is_admin = $is_logged_in && current_user_can('manage_options');
+$is_admin = false; // Admin role doesn't grant frontend data access
 
 // Handle invitation codes - redirect to registration if not logged in
 if (isset($_GET['ftt_invite'])) {
@@ -102,7 +103,7 @@ $invitation = $invitations[$invite_code];
     }
 }
 
-// Get user's groups (v2.1)
+// Get user's groups (v2.1 - properly scoped to user's actual groups)
 $user_groups = [];
 $selected_group_id = null;
 $show_group_selector = false;
