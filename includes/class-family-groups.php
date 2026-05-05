@@ -987,7 +987,10 @@ class FTT_Family_Groups {
             }
         ]);
         
-        // Get user's groups
+        // REMOVED: Get user's groups - now handled by FTT_REST::get_user_groups()
+        // This duplicate registration was causing the old handler to run instead of the new one
+        // The new handler in rest.php has proper formatting, type casting, and security
+        /*
         register_rest_route('ftt/v1', '/groups', [
             'methods' => 'GET',
             'callback' => [__CLASS__, 'rest_get_user_groups'],
@@ -995,6 +998,7 @@ class FTT_Family_Groups {
                 return is_user_logged_in();
             }
         ]);
+        */
         
         // Get specific group
         register_rest_route('ftt/v1', '/groups/(?P<id>\d+)', [
