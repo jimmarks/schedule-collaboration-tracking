@@ -1280,6 +1280,9 @@ jQuery(document).ready(function($) {
                     return;
                 }
                 
+                // Store primary group ID globally for use in other functions
+                window.fttUserPrimaryGroup = response.primary_group_id;
+                
                 // Render groups
                 const $groupsList = $('#ftt-groups-list');
                 $groupsList.empty();
@@ -1695,7 +1698,7 @@ jQuery(document).ready(function($) {
     
     // Render/update a group card element
     function renderGroupCard($card, group) {
-        const isPrimary = (group.id == fttUserPrimaryGroup);
+        const isPrimary = (group.id == window.fttUserPrimaryGroup);
         const currentUserId = <?php echo get_current_user_id(); ?>;
         const canManage = group.members?.some(m => m.user_id == currentUserId && m.can_manage_group);
         const isBillingOwner = (group.billing_owner == currentUserId);
@@ -1819,7 +1822,7 @@ jQuery(document).ready(function($) {
         $('#manage-group-color').val(group.color || '#2196F3');
         
         // Check if this is the user's primary group
-        const isPrimary = (group.id == fttUserPrimaryGroup);
+        const isPrimary = (group.id == window.fttUserPrimaryGroup);
         $('#manage-primary-group').prop('checked', isPrimary);
     }
     
@@ -2078,7 +2081,7 @@ jQuery(document).ready(function($) {
             },
             success: function(response) {
                 // If primary checkbox is checked and this wasn't the primary group, update it
-                if (isPrimaryChecked && currentManageGroupId != fttUserPrimaryGroup) {
+                if (isPrimaryChecked && currentManageGroupId != window.fttUserPrimaryGroup) {
                     $.ajax({
                         url: fttData.restUrl + 'user/primary-group',
                         method: 'POST',
@@ -2088,7 +2091,7 @@ jQuery(document).ready(function($) {
                             'X-WP-Nonce': fttData.nonce
                         },
                         success: function() {
-                            fttUserPrimaryGroup = currentManageGroupId;
+                            window.fttUserPrimaryGroup = currentManageGroupId;
                             showSuccessAndReload();
                         },
                         error: function() {
