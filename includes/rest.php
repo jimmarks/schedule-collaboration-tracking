@@ -25,6 +25,24 @@ class FTT_REST {
     public static function register_routes() {
         error_log('FTT REST: register_routes() called - registering all endpoints');
         
+        // Debug: Log all registered routes for our namespace at the end
+        add_action('rest_api_init', function() {
+            $routes = rest_get_server()->get_routes();
+            error_log('FTT REST: Total routes registered: ' . count($routes));
+            if (isset($routes['/ftt/v1/groups'])) {
+                error_log('FTT REST: /ftt/v1/groups IS registered in WordPress REST API');
+                error_log('FTT REST: Route details: ' . print_r($routes['/ftt/v1/groups'], true));
+            } else {
+                error_log('FTT REST: /ftt/v1/groups NOT FOUND in registered routes!');
+                // Log similar routes
+                foreach ($routes as $route => $handlers) {
+                    if (strpos($route, '/ftt/v1/') === 0) {
+                        error_log('FTT REST: Found route: ' . $route);
+                    }
+                }
+            }
+        }, 999);
+        
         // Get events list
         register_rest_route('ftt/v1', '/events', array(
             'methods'             => 'GET',

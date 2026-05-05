@@ -22,6 +22,23 @@ class FTT_CORS {
     public static function init() {
         add_action('rest_api_init', [__CLASS__, 'add_cors_headers'], 15);
         add_action('init', [__CLASS__, 'handle_preflight']);
+        
+        // Debug: Log all REST requests
+        add_filter('rest_pre_dispatch', [__CLASS__, 'log_rest_dispatch'], 10, 3);
+    }
+    
+    /**
+     * Log REST dispatch for debugging
+     */
+    public static function log_rest_dispatch($result, $server, $request) {
+        $route = $request->get_route();
+        $method = $request->get_method();
+        error_log('FTT REST DISPATCH: ' . $method . ' ' . $route);
+        error_log('FTT REST DISPATCH: Already handled: ' . ($result === null ? 'NO' : 'YES'));
+        if ($result !== null) {
+            error_log('FTT REST DISPATCH: Pre-dispatch result type: ' . gettype($result));
+        }
+        return $result;
     }
     
     /**
