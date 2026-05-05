@@ -305,7 +305,7 @@
          */
         loadEventFormData: function() {
             // Load children data
-            fetch(fttData.restUrl + '/ftt/v1/children', {
+            fetch(fttData.restUrl + 'children', {
                 method: 'GET',
                 headers: {
                     'X-WP-Nonce': fttData.nonce
@@ -355,7 +355,7 @@
             });
             
             // Load groups data
-            fetch(fttData.restUrl + '/ftt/v1/groups', {
+            fetch(fttData.restUrl + 'groups', {
                 method: 'GET',
                 headers: {
                     'X-WP-Nonce': fttData.nonce

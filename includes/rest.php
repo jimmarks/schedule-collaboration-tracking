@@ -23,6 +23,8 @@ class FTT_REST {
      * Register REST routes
      */
     public static function register_routes() {
+        error_log('FTT REST: register_routes() called - registering all endpoints');
+        
         // Get events list
         register_rest_route('ftt/v1', '/events', array(
             'methods'             => 'GET',
@@ -245,8 +247,9 @@ class FTT_REST {
         register_rest_route('ftt/v1', '/groups', array(
             'methods'             => 'GET',
             'callback'            => array(__CLASS__, 'get_user_groups'),
-            'permission_callback' => 'is_user_logged_in',
+            'permission_callback' => array(__CLASS__, 'check_groups_permission'),
         ));
+        error_log('FTT REST: /groups endpoint registered');
         
         // Get comprehensive dashboard context data
         register_rest_route('ftt/v1', '/dashboard-context', array(
@@ -478,6 +481,27 @@ class FTT_REST {
         return current_user_can('manage_options')
             || FTT_Family_Groups::is_parent($uid)
             || FTT_Roles::is_member($uid);
+    }
+
+    /**
+     * Check groups permission (with debug logging).
+     * Same as check_read_permission but with logging to diagnose issues.
+     */
+    public static function check_groups_permission() {
+        error_log('FTT REST: check_groups_permission() called');
+        error_log('FTT REST: is_user_logged_in = ' . (is_user_logged_in() ? 'true' : 'false'));
+        error_log('FTT REST: current_user_id = ' . get_current_user_id());
+        
+        $settings = get_option('ftt_settings', array());
+        $require_login = $settings['require_login'] ?? false;
+        
+        if ($require_login && !is_user_logged_in()) {
+            error_log('FTT REST: Permission DENIED (login required)');
+            return false;
+        }
+        
+        error_log('FTT REST: Permission GRANTED');
+        return true;
     }
 
     /**
@@ -1605,32 +1629,56 @@ class FTT_REST {
      * @return WP_REST_Response
      */
     public static function get_user_groups($request) {
+        error_log('FTT REST: get_user_groups() called');
         $user_id = get_current_user_id();
+        error_log('FTT REST: user_id = ' . $user_id);
         
         if (!class_exists('FTT_Family_Groups')) {
+            error_log('FTT REST: FTT_Family_Groups class not found');
             return rest_ensure_response(array('groups' => array()));
         }
         
         $groups = FTT_Family_Groups::get_user_groups($user_id);
+        error_log('FTT REST: Got ' . count($groups) . ' groups from database');
+        
         $primary_group_id = get_user_meta($user_id, 'ftt_primary_group', true);
+        error_log('FTT REST: primary_group_id = ' . $primary_group_id);
         
         $formatted_groups = array();
         foreach ($groups as $group) {
-            $formatted_groups[] = array(
-                'id' => $group->id,
+            error_log('FTT REST: Formatting group ' . $group->id . ' - ' . $group->name);
+            $group_data = array(
+                'id' => (int) $group->id,
                 'name' => $group->name,
-                'child_count' => $group->child_count,
-                'parent_count' => $group->parent_count,
+                'description' => $group->description ?? '',
+                'color' => $group->color ?? '#6A3E8E',
+                'child_count' => (int) $group->child_count,
+                'parent_count' => (int) $group->parent_count,
+                'member_count' => (int) ($group->member_count ?? ($group->child_count + $group->parent_count)),
+                'planned_children' => (int) ($group->planned_children ?? 0),
+                'group_token' => FTT_Family_Groups::get_group_token($group->id),
                 'is_primary' => ($group->id == $primary_group_id),
                 'can_manage' => FTT_Family_Groups::can_manage_group($group->id, $user_id),
-                'billing_owner' => $group->billing_owner,
+                'billing_owner' => (int) $group->billing_owner,
             );
+            
+            // Add billing info if available
+            if (class_exists('FTT_Billing_Manager')) {
+                $billing_info = FTT_Billing_Manager::get_group_billing_summary($group->id);
+                $group_data['billing'] = $billing_info;
+            }
+            
+            error_log('FTT REST: Formatted group data: ' . json_encode($group_data));
+            $formatted_groups[] = $group_data;
         }
         
-        return rest_ensure_response(array(
+        $response = array(
             'groups' => $formatted_groups,
             'primary_group_id' => (int) $primary_group_id,
-        ));
+        );
+        error_log('FTT REST: Returning response: ' . json_encode($response));
+        
+        return rest_ensure_response($response);
     }
     
     /**
@@ -2549,15 +2597,16 @@ class FTT_REST {
             $child = get_userdata($child_id);
             if ($child) {
                 $children[] = [
-                    'id'         => $child_id,
-                    'name'       => $child->display_name,
-                    'first_name' => $child->first_name,
-                    'last_name'  => $child->last_name,
-                    'email'      => $child->user_email,
-                    'age'        => get_user_meta($child_id, 'child_age', true),
-                    'grade'      => get_user_meta($child_id, 'child_grade', true),
-                    'school'     => get_user_meta($child_id, 'child_school', true),
-                    'color'      => get_user_meta($child_id, 'child_color', true),
+                    'id'           => $child_id,
+                    'display_name' => $child->display_name,
+                    'name'         => $child->display_name,  // Alias for compatibility
+                    'first_name'   => $child->first_name,
+                    'last_name'    => $child->last_name,
+                    'email'        => $child->user_email,
+                    'age'          => get_user_meta($child_id, 'child_age', true),
+                    'grade'        => get_user_meta($child_id, 'child_grade', true),
+                    'school'       => get_user_meta($child_id, 'child_school', true),
+                    'color'        => get_user_meta($child_id, 'child_color', true),
                 ];
             }
         }
@@ -2578,15 +2627,16 @@ class FTT_REST {
             $child = get_userdata($child_id);
             if ($child) {
                 $children[] = [
-                    'id' => $child_id,
-                    'name' => $child->display_name,
-                    'first_name' => $child->first_name,
-                    'last_name' => $child->last_name,
-                    'email' => $child->user_email,
-                    'age' => get_user_meta($child_id, 'child_age', true),
-                    'grade' => get_user_meta($child_id, 'child_grade', true),
-                    'school' => get_user_meta($child_id, 'child_school', true),
-                    'color' => get_user_meta($child_id, 'child_color', true),
+                    'id'           => $child_id,
+                    'display_name' => $child->display_name,
+                    'name'         => $child->display_name,  // Alias for compatibility
+                    'first_name'   => $child->first_name,
+                    'last_name'    => $child->last_name,
+                    'email'        => $child->user_email,
+                    'age'          => get_user_meta($child_id, 'child_age', true),
+                    'grade'        => get_user_meta($child_id, 'child_grade', true),
+                    'school'       => get_user_meta($child_id, 'child_school', true),
+                    'color'        => get_user_meta($child_id, 'child_color', true),
                 ];
             }
         }
@@ -2600,9 +2650,10 @@ class FTT_REST {
             $parent = get_userdata($parent_id);
             if ($parent) {
                 $adults[] = [
-                    'id' => $parent_id,
-                    'name' => $parent->display_name,
-                    'email' => $parent->user_email,
+                    'id'           => $parent_id,
+                    'display_name' => $parent->display_name,
+                    'name'         => $parent->display_name,  // Alias for compatibility
+                    'email'        => $parent->user_email,
                     'relationship' => get_user_meta($parent_id, 'relationship_to_' . $user_id, true),
                 ];
             }

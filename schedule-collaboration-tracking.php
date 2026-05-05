@@ -3,7 +3,7 @@
  * Plugin Name: Family Travel Tracker
  * Plugin URI: https://github.com/jimmarks/schedule-collaboration-tracking
  * Description: Multi-child schedule coordination with travel planning, flight tracking, and shared calendars for families. Perfect for busy parents, co-parenting families, and children's activities.
- * Version: 3.0.17
+ * Version: 3.0.24
  * Author: Jim Marks
  * Author URI: https://github.com/jimmarks
  * License: GPL v2 or later
@@ -19,7 +19,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('FTT_VERSION', '3.0.17');
+define('FTT_VERSION', '3.0.24');
 define('FTT_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('FTT_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('FTT_PLUGIN_BASENAME', plugin_basename(__FILE__));
@@ -107,6 +107,11 @@ class Family_Travel_Tracker {
         require_once FTT_PLUGIN_DIR . 'includes/class-ai-event-parser.php';
         // Domain routing removed - single domain setup (www.familytraveltracker.app only)
         // require_once FTT_PLUGIN_DIR . 'includes/domain-routing.php';
+        
+        // Admin validation page for REST API security testing
+        if (is_admin()) {
+            require_once FTT_PLUGIN_DIR . 'includes/admin-validation-page.php';
+        }
         
         // Stripe Settings (always load - needed to configure API keys)
         require_once FTT_PLUGIN_DIR . 'includes/stripe/class-stripe-settings.php';

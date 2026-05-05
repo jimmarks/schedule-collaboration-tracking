@@ -295,6 +295,7 @@ class FTT_Family_Groups {
         foreach ($groups as $group) {
             $group->member_count = self::get_member_count($group->id);
             $group->child_count = self::get_member_count($group->id, 'child');
+            $group->parent_count = self::get_member_count($group->id, 'parent');
             
             // Strip slashes for proper display
             $group->name = stripslashes($group->name);

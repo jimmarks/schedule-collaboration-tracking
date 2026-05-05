@@ -15,13 +15,9 @@ if (!is_user_logged_in()) {
 }
 
 $current_user_id = get_current_user_id();
-// Groups will be loaded dynamically via REST API
-$groups = array();
-$primary_group = null;
 
-// Check if this is a new user welcome
+// Groups will be loaded via REST API
 $show_welcome = isset($_GET['welcome']) && $_GET['welcome'] == '1';
-$primary_group_id = null;
 
 // Check for checkout status
 $checkout_success = isset($_GET['checkout']) && $_GET['checkout'] === 'success';
@@ -94,113 +90,12 @@ $billing_error = isset($_GET['billing_error']) && $_GET['billing_error'] === '1'
     </div>
     <?php endif; ?>
     
-    <!-- Groups List -->
-    <div class="ftt-groups-list">
-        <?php if (empty($groups)): ?>
-            <div class="ftt-no-groups">
-                <p>You don't have any family groups yet.</p>
-                <p>Create your first group to start organizing your family's activities.</p>
-            </div>
-        <?php else: ?>
-            <?php foreach ($groups as $group): ?>
-                <div class="ftt-group-card" data-group-id="<?php echo esc_attr($group->id); ?>">
-                    <div class="ftt-group-header">
-                        <div class="ftt-group-color" style="background-color: <?php echo esc_attr($group->color); ?>"></div>
-                        <div class="ftt-group-info">
-                            <h2>
-                                <?php echo esc_html($group->name); ?>
-                                <?php if ($group->id == $primary_group): ?>
-                                    <span class="ftt-badge-primary">Primary</span>
-                                <?php endif; ?>
-                            </h2>
-                            <?php if ($group->description): ?>
-                                <p class="ftt-group-description"><?php echo esc_html($group->description); ?></p>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                    
-                    <div class="ftt-group-stats">
-                        <div class="ftt-stat">
-                            <span class="ftt-stat-label">Parents</span>
-                            <span class="ftt-stat-value"><?php echo esc_html($group->member_count - $group->child_count); ?></span>
-                        </div>
-                        <div class="ftt-stat">
-                            <span class="ftt-stat-label">Children</span>
-                            <span class="ftt-stat-value">
-                                <?php 
-                                if ($group->planned_children > 0) {
-                                    echo esc_html($group->child_count . ' / ' . $group->planned_children);
-                                } else {
-                                    echo esc_html($group->child_count);
-                                }
-                                ?>
-                            </span>
-                        </div>
-                        <div class="ftt-stat">
-                            <span class="ftt-stat-label">Billing</span>
-                            <span class="ftt-stat-value status-<?php echo esc_attr($group->subscription_status ?: 'trial'); ?>">
-                                <?php 
-                                // If billing owner, check user meta for trial status
-                                $display_status = $group->subscription_status;
-                                $trial_ends = $group->trial_ends_at;
-                                
-                                // If no subscription_status in group, check billing owner's user meta
-                                if (empty($display_status) && !empty($group->billing_owner)) {
-                                    $owner_status = get_user_meta($group->billing_owner, 'ftt_subscription_status', true);
-                                    $owner_trial_ends = get_user_meta($group->billing_owner, 'ftt_trial_end', true);
-                                    if (!empty($owner_status)) {
-                                        $display_status = $owner_status;
-                                        if (!empty($owner_trial_ends)) {
-                                            $trial_ends = date('Y-m-d H:i:s', $owner_trial_ends);
-                                        }
-                                    }
-                                }
-                                
-                                if ($display_status) {
-                                    echo ucfirst($display_status);
-                                    
-                                    // Show days remaining for trialing or canceled status
-                                    if (($display_status === 'trialing' || $display_status === 'canceled') && !empty($trial_ends)) {
-                                        $end_date = strtotime($trial_ends);
-                                        $now = time();
-                                        $days_remaining = ceil(($end_date - $now) / (60 * 60 * 24));
-                                        
-                                        if ($days_remaining > 0) {
-                                            echo '<br><small style="font-size: 11px; font-weight: normal;">' . esc_html($days_remaining) . ' days remaining</small>';
-                                        } elseif ($days_remaining === 0) {
-                                            echo '<br><small style="font-size: 11px; font-weight: normal;">Ends today</small>';
-                                        }
-                                    }
-                                } else {
-                                    echo 'Trial';
-                                }
-                                ?>
-                            </span>
-                        </div>
-                    </div>
-                    
-                    <div class="ftt-group-actions">
-                        <a href="<?php echo esc_url(home_url('/ftt-calendar/?group=' . FTT_Family_Groups::get_group_token($group->id))); ?>" class="button button-primary ftt-calendar-btn">
-                            <span class="dashicons dashicons-calendar-alt" style="vertical-align: middle; margin-top: 3px;"></span>
-                            View Calendar
-                        </a>
-                        <button class="button ftt-view-group-btn" data-group-id="<?php echo esc_attr($group->id); ?>">
-                            View Details
-                        </button>
-                        <?php if (FTT_Family_Groups::can_manage_group($group->id, $current_user_id)): ?>
-                            <a href="<?php echo esc_url(home_url('/manage-family/?group=' . FTT_Family_Groups::get_group_token($group->id))); ?>" class="button ftt-manage-group-btn">
-                                Manage
-                            </a>
-                        <?php endif; ?>
-                        <?php if ($group->billing_owner == $current_user_id): ?>
-                            <button class="button ftt-billing-btn" data-group-id="<?php echo esc_attr($group->id); ?>">
-                                Billing
-                            </button>
-                        <?php endif; ?>
-                    </div>
-                </div>
-            <?php endforeach; ?>
-        <?php endif; ?>
+    <!-- Groups List (loaded via REST API) -->
+    <div id="ftt-groups-loading" style="text-align: center; padding: 40px;">
+        <p>Loading your family groups...</p>
+    </div>
+    <div class="ftt-groups-list" id="ftt-groups-list" style="display: none;">
+        <!-- Groups will be rendered here via JavaScript -->
     </div>
 
     <!-- Create New Group Section (Bottom of Page) -->
@@ -1351,9 +1246,196 @@ $billing_error = isset($_GET['billing_error']) && $_GET['billing_error'] === '1'
 </style>
 
 <script>
-const fttUserPrimaryGroup = <?php echo json_encode(intval($primary_group)); ?>;
-
 jQuery(document).ready(function($) {
+    
+    // Load groups via REST API
+    function loadGroups() {
+        const groupsUrl = fttData.restUrl + 'groups';
+        console.log('=== GROUPS REST DEBUG ===');
+        console.log('fttData.restUrl:', fttData.restUrl);
+        console.log('Full URL:', groupsUrl);
+        console.log('Nonce:', fttData.nonce);
+        console.log('========================');
+        
+        $.ajax({
+            url: groupsUrl,
+            method: 'GET',
+            headers: {
+                'X-WP-Nonce': fttData.nonce
+            },
+            success: function(response) {
+                console.log('Groups loaded:', response);
+                console.log('Groups array:', response.groups);
+                
+                $('#ftt-groups-loading').hide();
+                
+                if (!response.groups || response.groups.length === 0) {
+                    // No groups - show empty state
+                    $('#ftt-groups-list').html(
+                        '<div class="ftt-no-groups">' +
+                        '<p>You don\'t have any family groups yet.</p>' +
+                        '<p>Create your first group to start organizing your family\'s activities.</p>' +
+                        '</div>'
+                    ).show();
+                    return;
+                }
+                
+                // Render groups
+                const $groupsList = $('#ftt-groups-list');
+                $groupsList.empty();
+                
+                response.groups.forEach(function(group) {
+                    console.log('Rendering group:', group);
+                    if (!group || !group.id) {
+                        console.error('Invalid group object:', group);
+                        return;
+                    }
+                    const groupHtml = renderGroupCard(group, response.primary_group_id);
+                    $groupsList.append(groupHtml);
+                });
+                
+                $groupsList.show();
+                
+                // Re-attach event handlers for dynamically created elements
+                attachGroupEventHandlers();
+            },
+            error: function(xhr) {
+                console.error('Failed to load groups:', xhr);
+                $('#ftt-groups-loading').html(
+                    '<div class="ftt-error">' +
+                    '<p>Failed to load family groups. Please refresh the page.</p>' +
+                    '</div>'
+                );
+            }
+        });
+    }
+    
+    // Render a single group card
+    function renderGroupCard(group, primaryGroupId) {
+        console.log('renderGroupCard called with:', group, 'primaryGroupId:', primaryGroupId);
+        
+        // Safety check
+        if (!group || typeof group !== 'object') {
+            console.error('Invalid group passed to renderGroupCard:', group);
+            return '';
+        }
+        
+        if (!group.id) {
+            console.error('Group missing id property:', group);
+            return '';
+        }
+        
+        const isPrimary = group.id === primaryGroupId;
+        const parentCount = (group.parent_count || 0);
+        const childCount = group.child_count || 0;
+        
+        // Build children display
+        let childDisplay = childCount.toString();
+        if (group.planned_children && group.planned_children > 0) {
+            childDisplay = childCount + ' / ' + group.planned_children;
+        }
+        
+        // Build billing status
+        let billingStatus = 'Trial';
+        let billingClass = 'trial';
+        if (group.billing && group.billing.subscription_status) {
+            billingStatus = group.billing.subscription_status.charAt(0).toUpperCase() + 
+                          group.billing.subscription_status.slice(1);
+            billingClass = group.billing.subscription_status;
+            
+            // Add days remaining for trial/canceled
+            if ((group.billing.subscription_status === 'trialing' || group.billing.subscription_status === 'canceled') && 
+                group.billing.trial_ends_at) {
+                const endDate = new Date(group.billing.trial_ends_at);
+                const now = new Date();
+                const daysRemaining = Math.ceil((endDate - now) / (1000 * 60 * 60 * 24));
+                
+                if (daysRemaining > 0) {
+                    billingStatus += '<br><small style="font-size: 11px; font-weight: normal;">' + 
+                                   daysRemaining + ' days remaining</small>';
+                } else if (daysRemaining === 0) {
+                    billingStatus += '<br><small style="font-size: 11px; font-weight: normal;">Ends today</small>';
+                }
+            }
+        }
+        
+        // Get group token (we'll need to fetch this via another endpoint or include in groups response)
+        // For now, use group ID - this will need to be updated in the REST API response
+        const groupToken = group.group_token || group.id;
+        
+        // Check if current user can manage
+        const canManage = group.can_manage;
+        const isBillingOwner = group.billing_owner === <?php echo get_current_user_id(); ?>;
+        
+        let html = '<div class="ftt-group-card" data-group-id="' + group.id + '">';
+        html += '  <div class="ftt-group-header">';
+        html += '    <div class="ftt-group-color" style="background-color: ' + (group.color || '#6A3E8E') + '"></div>';
+        html += '    <div class="ftt-group-info">';
+        html += '      <h2>' + escapeHtml(group.name);
+        if (isPrimary) {
+            html += ' <span class="ftt-badge-primary">Primary</span>';
+        }
+        html += '      </h2>';
+        if (group.description) {
+            html += '      <p class="ftt-group-description">' + escapeHtml(group.description) + '</p>';
+        }
+        html += '    </div>';
+        html += '  </div>';
+        
+        html += '  <div class="ftt-group-stats">';
+        html += '    <div class="ftt-stat">';
+        html += '      <span class="ftt-stat-label">Parents</span>';
+        html += '      <span class="ftt-stat-value">' + parentCount + '</span>';
+        html += '    </div>';
+        html += '    <div class="ftt-stat">';
+        html += '      <span class="ftt-stat-label">Children</span>';
+        html += '      <span class="ftt-stat-value">' + childDisplay + '</span>';
+        html += '    </div>';
+        html += '    <div class="ftt-stat">';
+        html += '      <span class="ftt-stat-label">Billing</span>';
+        html += '      <span class="ftt-stat-value status-' + billingClass + '">' + billingStatus + '</span>';
+        html += '    </div>';
+        html += '  </div>';
+        
+        html += '  <div class="ftt-group-actions">';
+        html += '    <a href="/ftt-calendar/?group=' + groupToken + '" class="button button-primary ftt-calendar-btn">';
+        html += '      <span class="dashicons dashicons-calendar-alt" style="vertical-align: middle; margin-top: 3px;"></span>';
+        html += '      View Calendar';
+        html += '    </a>';
+        html += '    <button class="button ftt-view-group-btn" data-group-id="' + group.id + '">View Details</button>';
+        if (canManage) {
+            html += '    <a href="/manage-family/?group=' + groupToken + '" class="button ftt-manage-group-btn">Manage</a>';
+        }
+        if (isBillingOwner) {
+            html += '    <button class="button ftt-billing-btn" data-group-id="' + group.id + '">Billing</button>';
+        }
+        html += '  </div>';
+        html += '</div>';
+        
+        return html;
+    }
+    
+    // Attach event handlers to dynamically created elements
+    function attachGroupEventHandlers() {
+        $('.ftt-view-group-btn').off('click').on('click', function() {
+            const groupId = $(this).data('group-id');
+            loadGroupDetails(groupId);
+        });
+        
+        $('.ftt-billing-btn').off('click').on('click', function() {
+            window.location.href = '/manage-subscription/';
+        });
+    }
+    
+    // Escape HTML helper
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    // Load groups on page load
+    loadGroups();
     
     // Create Group - Show Explainer Modal First
     $('#ftt-create-group-btn').on('click', function() {
@@ -1469,20 +1551,6 @@ jQuery(document).ready(function($) {
             }
         });
     }
-    
-    // View Group Details
-    $('.ftt-view-group-btn').on('click', function() {
-        const groupId = $(this).data('group-id');
-        loadGroupDetails(groupId);
-    });
-    
-    // Manage Group - now handled by direct links to /manage-family/?group=X
-    // Legacy modal code removed in favor of dedicated page navigation
-    
-    // Billing
-    $('.ftt-billing-btn').on('click', function() {
-        window.location.href = '/manage-subscription/';
-    });
     
     // Load group details
     function loadGroupDetails(groupId) {
