@@ -105,29 +105,69 @@ class FTT_Price_Tracking {
      * Upgrade database schema for existing installations
      */
     public static function upgrade_schema() {
-        if (get_option('ftt_price_tracking_schema_v2')) {
-            return;
-        }
-        
         global $wpdb;
-        $table_name = $wpdb->prefix . 'ftt_price_history';
+        $history_table = $wpdb->prefix . 'ftt_price_history';
+        $alerts_table = $wpdb->prefix . 'ftt_price_alerts';
         
         // Check if table exists
-        $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table_name'");
+        $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$history_table'");
         if (!$table_exists) {
             return; // Table hasn't been created yet, create_tables() will handle it
         }
         
-        // Check if google_insights column exists
-        $column_exists = $wpdb->get_results("SHOW COLUMNS FROM $table_name LIKE 'google_insights'");
-        
-        if (empty($column_exists)) {
-            // Add google_insights column
-            $wpdb->query("ALTER TABLE $table_name ADD COLUMN google_insights TEXT DEFAULT NULL AFTER checked_at");
-            error_log('SRT: Added google_insights column to price_history table');
+        // Upgrade v2: Add google_insights column
+        if (!get_option('ftt_price_tracking_schema_v2')) {
+            // Check if google_insights column exists
+            $column_exists = $wpdb->get_results("SHOW COLUMNS FROM $history_table LIKE 'google_insights'");
+            
+            if (empty($column_exists)) {
+                // Add google_insights column
+                $wpdb->query("ALTER TABLE $history_table ADD COLUMN google_insights TEXT DEFAULT NULL AFTER checked_at");
+                error_log('FTT: Added google_insights column to price_history table');
+            }
+            
+            update_option('ftt_price_tracking_schema_v2', true);
         }
         
-        update_option('ftt_price_tracking_schema_v2', true);
+        // Upgrade v3: Add trip-level tracking columns
+        if (!get_option('ftt_price_tracking_schema_v3')) {
+            // Add scope column to price_history
+            $column_exists = $wpdb->get_results("SHOW COLUMNS FROM $history_table LIKE 'scope'");
+            if (empty($column_exists)) {
+                $wpdb->query("ALTER TABLE $history_table ADD COLUMN scope VARCHAR(10) DEFAULT 'leg' AFTER id");
+                $wpdb->query("ALTER TABLE $history_table ADD COLUMN return_date DATE NULL AFTER depart_date");
+                $wpdb->query("ALTER TABLE $history_table ADD COLUMN trip_hash VARCHAR(32) NULL AFTER return_date");
+                $wpdb->query("ALTER TABLE $history_table ADD INDEX scope_idx (scope)");
+                $wpdb->query("ALTER TABLE $history_table ADD INDEX trip_hash_idx (trip_hash)");
+                error_log('FTT: Added trip-level columns to price_history table');
+            }
+            
+            // Add scope column to price_alerts
+            $column_exists = $wpdb->get_results("SHOW COLUMNS FROM $alerts_table LIKE 'scope'");
+            if (empty($column_exists)) {
+                $wpdb->query("ALTER TABLE $alerts_table ADD COLUMN scope VARCHAR(10) DEFAULT 'leg' AFTER id");
+                $wpdb->query("ALTER TABLE $alerts_table ADD COLUMN return_date DATE NULL AFTER leg_index");
+                $wpdb->query("ALTER TABLE $alerts_table ADD COLUMN trip_hash VARCHAR(32) NULL AFTER return_date");
+                $wpdb->query("ALTER TABLE $alerts_table MODIFY COLUMN leg_index INT(11) NULL"); // Make nullable
+                $wpdb->query("ALTER TABLE $alerts_table ADD INDEX scope_idx (scope)");
+                $wpdb->query("ALTER TABLE $alerts_table ADD INDEX trip_hash_idx (trip_hash)");
+                error_log('FTT: Added trip-level columns to price_alerts table');
+            }
+            
+            update_option('ftt_price_tracking_schema_v3', true);
+        }
+        
+        // Upgrade v4: Add google_flights_url column
+        if (!get_option('ftt_price_tracking_schema_v4')) {
+            // Add google_flights_url column to price_history
+            $column_exists = $wpdb->get_results("SHOW COLUMNS FROM $history_table LIKE 'google_flights_url'");
+            if (empty($column_exists)) {
+                $wpdb->query("ALTER TABLE $history_table ADD COLUMN google_flights_url TEXT NULL AFTER google_insights");
+                error_log('FTT: Added google_flights_url column to price_history table');
+            }
+            
+            update_option('ftt_price_tracking_schema_v4', true);
+        }
     }
     
     /**
@@ -206,17 +246,22 @@ class FTT_Price_Tracking {
         
         $sql = "CREATE TABLE IF NOT EXISTS $table_name (
             id bigint(20) NOT NULL AUTO_INCREMENT,
+            scope VARCHAR(10) DEFAULT 'leg',
             event_id bigint(20) NOT NULL,
-            leg_index int(11) NOT NULL,
+            leg_index int(11) DEFAULT NULL,
             origin varchar(3) NOT NULL,
             destination varchar(3) NOT NULL,
             depart_date date NOT NULL,
+            return_date DATE NULL,
+            trip_hash VARCHAR(32) NULL,
             price decimal(10,2) NOT NULL,
             checked_at datetime NOT NULL,
             google_insights TEXT DEFAULT NULL,
             PRIMARY KEY  (id),
+            KEY scope_idx (scope),
             KEY event_id (event_id),
             KEY route_date (origin, destination, depart_date),
+            KEY trip_hash_idx (trip_hash),
             KEY checked_at (checked_at)
         ) $charset_collate;";
         
@@ -228,9 +273,12 @@ class FTT_Price_Tracking {
         
         $sql_alerts = "CREATE TABLE IF NOT EXISTS $alerts_table (
             id bigint(20) NOT NULL AUTO_INCREMENT,
+            scope VARCHAR(10) DEFAULT 'leg',
             user_id bigint(20) NOT NULL,
             event_id bigint(20) NOT NULL,
-            leg_index int(11) NOT NULL,
+            leg_index int(11) DEFAULT NULL,
+            return_date DATE NULL,
+            trip_hash VARCHAR(32) NULL,
             alert_type varchar(50) NOT NULL,
             threshold_price decimal(10,2),
             threshold_percent int(11),
@@ -238,8 +286,10 @@ class FTT_Price_Tracking {
             last_triggered datetime,
             created_at datetime NOT NULL,
             PRIMARY KEY  (id),
+            KEY scope_idx (scope),
             KEY user_id (user_id),
             KEY event_id (event_id),
+            KEY trip_hash_idx (trip_hash),
             KEY is_active (is_active)
         ) $charset_collate;";
         
@@ -359,6 +409,118 @@ class FTT_Price_Tracking {
         
         return $insert_id;
     }
+    
+    /**
+     * Detect if an event has a round-trip flight pattern
+     * Returns trip info or null
+     */
+    public static function detect_round_trip($event_id) {
+        $travel_legs = json_decode(get_post_meta($event_id, 'travel_legs', true) ?: '[]', true);
+        
+        // Must have exactly 2 flight legs
+        $flight_legs = array_filter($travel_legs, function($leg, $index) {
+            return !empty($leg['mode']) && $leg['mode'] === 'fly' && !empty($leg['depart_airport']) && !empty($leg['arrive_airport']);
+        }, ARRAY_FILTER_USE_BOTH);
+        
+        if (count($flight_legs) !== 2) {
+            return null;
+        }
+        
+        $leg_indices = array_keys($flight_legs);
+        $leg0 = $travel_legs[$leg_indices[0]];
+        $leg1 = $travel_legs[$leg_indices[1]];
+        
+        // Check if it's a round trip: A → B, then B → A
+        $is_round_trip = (
+            $leg0['depart_airport'] === $leg1['arrive_airport'] &&
+            $leg0['arrive_airport'] === $leg1['depart_airport']
+        );
+        
+        if (!$is_round_trip) {
+            return null;
+        }
+        
+        // Extract dates
+        $depart_date = $leg0['depart_date'] ?? null;
+        $return_date = $leg1['depart_date'] ?? null;
+        
+        if (!$depart_date || !$return_date) {
+            return null;
+        }
+        
+        // Generate trip hash for tracking
+        $trip_hash = md5($event_id . ':' . $leg0['depart_airport'] . ':' . $leg0['arrive_airport'] . ':' . $depart_date . ':' . $return_date);
+        
+        return array(
+            'event_id' => $event_id,
+            'leg_indices' => $leg_indices,
+            'origin' => $leg0['depart_airport'],
+            'destination' => $leg0['arrive_airport'],
+            'depart_date' => $depart_date,
+            'return_date' => $return_date,
+            'trip_hash' => $trip_hash,
+            'outbound_booked' => $leg0['booked'] ?? false,
+            'return_booked' => $leg1['booked'] ?? false,
+        );
+    }
+    
+    /**
+     * Record trip-level price (round-trip)
+     */
+    public static function record_trip_price($event_id, $origin, $destination, $depart_date, $return_date, $price, $source = 'api', $raw_data = null) {
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'ftt_price_history';
+        
+        // Don't record invalid prices
+        if (!$price || $price <= 0) {
+            error_log("FTT: Skipping invalid trip price: $price for $origin -> $destination -> $origin");
+            return false;
+        }
+        
+        $trip_hash = md5($event_id . ':' . $origin . ':' . $destination . ':' . $depart_date . ':' . $return_date);
+        
+        // Extract Google price insights if available
+        $google_insights = null;
+        if ($raw_data && isset($raw_data['price_insights'])) {
+            $google_insights = wp_json_encode($raw_data['price_insights']);
+        }
+        
+        $insert_data = array(
+            'scope'        => 'trip',
+            'event_id'     => $event_id,
+            'leg_index'    => null,
+            'origin'       => $origin,
+            'destination'  => $destination,
+            'depart_date'  => $depart_date,
+            'return_date'  => $return_date,
+            'trip_hash'    => $trip_hash,
+            'price'        => $price,
+            'checked_at'   => current_time('mysql'),
+        );
+        
+        $format = array('%s', '%d', NULL, '%s', '%s', '%s', '%s', '%s', '%f', '%s');
+        
+        if ($google_insights) {
+            $insert_data['google_insights'] = $google_insights;
+            $format[] = '%s';
+        }
+        
+        $result = $wpdb->insert($table_name, $insert_data, $format);
+        
+        if ($result === false) {
+            error_log("FTT record_trip_price ERROR: " . $wpdb->last_error);
+            return false;
+        }
+        
+        $insert_id = $wpdb->insert_id;
+        error_log("FTT record_trip_price SUCCESS: Inserted trip price ID $insert_id for event $event_id");
+        
+        // Check if this triggers any trip-level alerts
+        self::check_trip_price_alerts($event_id, $trip_hash, $price);
+        
+        return $insert_id;
+    }
+    
     
     /**
      * Check linked flights and fetch both round-trip and individual prices
@@ -566,78 +728,51 @@ class FTT_Price_Tracking {
         
         $events = get_posts($args);
         
+        // Check each event using the unified flight search service
         foreach ($events as $event) {
-            $travel_legs = json_decode(get_post_meta($event->ID, 'travel_legs', true) ?: '[]', true);
-            $checked_legs = array(); // Track which legs we've checked to avoid duplicates
+            $trip_info = self::detect_round_trip($event->ID);
             
-            foreach ($travel_legs as $index => $leg) {
-                if (in_array($index, $checked_legs)) {
-                    continue; // Skip if already checked as part of round-trip
+            // 1. Check round-trip price if applicable
+            if ($trip_info && !$trip_info['outbound_booked'] && !$trip_info['return_booked']) {
+                error_log("FTT: Checking round-trip price for event {$event->ID}: {$trip_info['origin']} ⇄ {$trip_info['destination']}");
+                $flights_checked++;
+                
+                // Use unified service for trip-level check
+                $result = FTT_Flight_Search_Service::check_price($event->ID, 'trip', null, 'scheduled');
+                
+                if ($result && $result['price'] > 0) {
+                    $prices_recorded++;
+                    error_log("FTT: Recorded round-trip price {$result['price']} for event {$event->ID}");
                 }
                 
+                // Rate limiting
+                sleep(1);
+            }
+            
+            // 2. Check individual leg prices
+            $travel_legs = json_decode(get_post_meta($event->ID, 'travel_legs', true) ?: '[]', true);
+            
+            foreach ($travel_legs as $index => $leg) {
                 if ($leg['mode'] === 'fly' && !$leg['booked'] && $leg['depart_airport'] && $leg['arrive_airport']) {
                     $depart_date = $leg['depart_date'] ?? ($leg['depart_datetime'] ? substr($leg['depart_datetime'], 0, 10) : null);
                     
                     if ($depart_date) {
-                        // Check if this is part of a round-trip pattern
-                        $is_round_trip = false;
-                        $return_date = null;
-                        
-                        // Method 0: Check explicit is_round_trip flag (new preferred method)
-                        if (!empty($leg['is_round_trip']) && !empty($leg['return_date'])) {
-                            $is_round_trip = true;
-                            $return_date = $leg['return_date'];
-                            error_log("SRT: Event {$event->ID}, Leg {$index}: Using explicit round-trip flag with return date {$return_date}");
-                        }
-                        
-                        // Method 1: Check if arrive_date spans multiple days (legacy method)
-                        if (!$is_round_trip && !empty($leg['arrive_date']) && !empty($leg['depart_date'])) {
-                            $depart_time = strtotime($leg['depart_date']);
-                            $arrive_time = strtotime($leg['arrive_date']);
-                            $days_diff = ($arrive_time - $depart_time) / (60 * 60 * 24);
-                            
-                            if ($days_diff >= 1) {
-                                $is_round_trip = true;
-                                $return_date = $leg['arrive_date'];
-                                error_log("SRT: Event {$event->ID}, Leg {$index}: Detected round-trip from arrive_date span");
-                            }
-                        }
-                        
-                        // Method 2: Look for a return leg (same airports reversed)
-                        if (!$is_round_trip) {
-                            for ($i = $index + 1; $i < count($travel_legs); $i++) {
-                                if ($travel_legs[$i]['mode'] === 'fly' && 
-                                    $travel_legs[$i]['depart_airport'] === $leg['arrive_airport'] && 
-                                    $travel_legs[$i]['arrive_airport'] === $leg['depart_airport'] &&
-                                    !empty($travel_legs[$i]['depart_date'])) {
-                                    $is_round_trip = true;
-                                    $return_date = $travel_legs[$i]['depart_date'];
-                                    $checked_legs[] = $i; // Mark return leg as checked
-                                    error_log("SRT: Event {$event->ID}, Leg {$index}: Detected round-trip from reversed leg {$i}");
-                                    break;
-                                }
-                            }
+                        // Skip individual leg pricing if this is part of a tracked round-trip
+                        if ($trip_info && in_array($index, $trip_info['leg_indices'])) {
+                            error_log("FTT: Skipping individual leg {$index} pricing (part of round-trip)");
+                            continue;
                         }
                         
                         $flights_checked++;
                         
-                        // Fetch price with round-trip detection
-                        if ($is_round_trip && $return_date) {
-                            $price_result = self::fetch_flight_price_serpapi_with_key($api_key, $leg['depart_airport'], $leg['arrive_airport'], $depart_date, $return_date);
-                        } else {
-                            $price_result = self::fetch_flight_price_serpapi_with_key($api_key, $leg['depart_airport'], $leg['arrive_airport'], $depart_date);
+                        // Use unified service for leg-level check
+                        $result = FTT_Flight_Search_Service::check_price($event->ID, 'leg', $index, 'scheduled');
+                        
+                        if ($result && $result['price'] > 0) {
+                            $prices_recorded++;
                         }
                         
-                        $price = is_array($price_result) ? $price_result['price'] : $price_result;
-                        
-                        if ($price !== false && $price > 0) {
-                            $recorded = self::record_price($event->ID, $index, $leg['depart_airport'], $leg['arrive_airport'], $depart_date, $price, 'serpapi', $price_result);
-                            if ($recorded !== false) {
-                                $prices_recorded++;
-                            }
-                        }
-                        
-                        // Rate limiting - SerpAPI allows 1 search per second on paid plans
+                        // Rate limiting
                         sleep(1);
                     }
                 }
@@ -925,6 +1060,136 @@ class FTT_Price_Tracking {
     }
     
     /**
+     * Check trip-level price alerts (for round-trips)
+     */
+    public static function check_trip_price_alerts($event_id, $trip_hash, $current_price) {
+        global $wpdb;
+        $alerts_table = $wpdb->prefix . 'ftt_price_alerts';
+        
+        // Get active trip-level alerts
+        $alerts = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM $alerts_table 
+            WHERE event_id = %d 
+            AND trip_hash = %s
+            AND scope = 'trip'
+            AND is_active = 1",
+            $event_id,
+            $trip_hash
+        ));
+        
+        error_log("FTT: Checking trip alerts for event $event_id trip_hash $trip_hash - Found " . count($alerts) . " active alerts");
+        
+        foreach ($alerts as $alert) {
+            $should_alert = false;
+            $alert_reason = '';
+            
+            switch ($alert->alert_type) {
+                case 'price_drop':
+                    if ($alert->threshold_price && $current_price <= $alert->threshold_price) {
+                        $should_alert = true;
+                        $alert_reason = "Round-trip price $current_price dropped to/below threshold {$alert->threshold_price}";
+                    }
+                    break;
+                    
+                case 'percent_drop':
+                    // Get previous trip price
+                    $prev_price = self::get_previous_trip_price($event_id, $trip_hash);
+                    if ($prev_price) {
+                        $percent_drop = (($prev_price - $current_price) / $prev_price) * 100;
+                        if ($percent_drop >= $alert->threshold_percent) {
+                            $should_alert = true;
+                            $alert_reason = sprintf("Round-trip price dropped %.1f%% (from $%.2f to $%.2f)", $percent_drop, $prev_price, $current_price);
+                        }
+                    }
+                    break;
+                    
+                case 'good_deal':
+                    // Get trip info for stats
+                    $trip_info = $wpdb->get_row($wpdb->prepare(
+                        "SELECT origin, destination, depart_date, return_date FROM {$wpdb->prefix}ftt_price_history
+                        WHERE trip_hash = %s
+                        LIMIT 1",
+                        $trip_hash
+                    ));
+                    
+                    if ($trip_info) {
+                        $stats = self::get_trip_price_stats($trip_info->origin, $trip_info->destination, $trip_info->depart_date, $trip_info->return_date);
+                        if ($stats && $stats->avg_price && $current_price < ($stats->avg_price * 0.85)) {
+                            $should_alert = true;
+                            $alert_reason = sprintf("Good round-trip deal! Price $%.2f is 15%% below avg $%.2f", $current_price, $stats->avg_price);
+                        }
+                    }
+                    break;
+            }
+            
+            if ($should_alert) {
+                error_log("FTT: Triggering trip alert {$alert->id} - $alert_reason");
+                self::send_trip_price_alert($alert, $current_price);
+                
+                // Update last triggered
+                $wpdb->update(
+                    $alerts_table,
+                    array('last_triggered' => current_time('mysql')),
+                    array('id' => $alert->id),
+                    array('%s'),
+                    array('%d')
+                );
+            }
+        }
+    }
+    
+    /**
+     * Get previous trip price
+     */
+    private static function get_previous_trip_price($event_id, $trip_hash) {
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'ftt_price_history';
+        
+        $result = $wpdb->get_var($wpdb->prepare(
+            "SELECT price FROM $table_name 
+            WHERE event_id = %d 
+            AND trip_hash = %s
+            AND scope = 'trip'
+            ORDER BY checked_at DESC 
+            LIMIT 1, 1",
+            $event_id,
+            $trip_hash
+        ));
+        
+        return $result;
+    }
+    
+    /**
+     * Get price statistics for round-trip
+     */
+    public static function get_trip_price_stats($origin, $destination, $depart_date, $return_date) {
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'ftt_price_history';
+        
+        $stats = $wpdb->get_row($wpdb->prepare(
+            "SELECT 
+                MIN(price) as min_price,
+                MAX(price) as max_price,
+                AVG(price) as avg_price,
+                COUNT(*) as data_points
+            FROM $table_name 
+            WHERE origin = %s 
+            AND destination = %s 
+            AND depart_date = %s
+            AND return_date = %s
+            AND scope = 'trip'
+            AND price > 0
+            AND checked_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)",
+            $origin,
+            $destination,
+            $depart_date,
+            $return_date
+        ));
+        
+        return $stats;
+    }
+    
+    /**
      * Send price alert email
      */
     private static function send_price_alert($alert, $current_price) {
@@ -1082,6 +1347,137 @@ class FTT_Price_Tracking {
     }
     
     /**
+     * Send trip-level (round-trip) price alert email
+     */
+    private static function send_trip_price_alert($alert, $current_price) {
+        $user = get_user_by('id', $alert->user_id);
+        $event = get_post($alert->event_id);
+        
+        if (!$user || !$event) {
+            error_log("FTT: Cannot send trip alert - User or event not found");
+            return;
+        }
+        
+        // Get trip info from price history
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'ftt_price_history';
+        $trip_record = $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM $table_name 
+            WHERE trip_hash = %s 
+            ORDER BY checked_at DESC LIMIT 1",
+            $alert->trip_hash
+        ));
+        
+        if (!$trip_record) {
+            error_log("FTT: Cannot send trip alert - Trip record not found");
+            return;
+        }
+        
+        $google_insights = null;
+        if (!empty($trip_record->google_insights)) {
+            $google_insights = json_decode($trip_record->google_insights, true);
+        }
+        
+        $subject = sprintf('[%s] Round-Trip Price Alert: %s',
+            get_bloginfo('name'),
+            $event->post_title
+        );
+        
+        // Build HTML email
+        $message = self::build_trip_price_alert_email($user, $event, $trip_record, $current_price, $google_insights);
+        
+        error_log("FTT: Sending trip price alert email to {$user->user_email}");
+        
+        $from_name = self::get_notification_from_name();
+        $from_email = self::get_notification_email();
+        
+        $headers = array(
+            'Content-Type: text/html; charset=UTF-8',
+            sprintf('From: %s <%s>', $from_name, $from_email),
+        );
+        
+        $result = wp_mail($user->user_email, $subject, $message, $headers);
+        error_log("FTT: Trip email send result: " . ($result ? 'success' : 'failed'));
+        
+        do_action('ftt_trip_price_alert_sent', $alert, $current_price, $user, $event);
+    }
+    
+    /**
+     * Build trip-level price alert email HTML
+     */
+    private static function build_trip_price_alert_email($user, $event, $trip_record, $current_price, $google_insights = null) {
+        $site_name = get_bloginfo('name');
+        $event_url = self::get_event_email_url($event->ID);
+        
+        ob_start();
+        ?>
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f5f5f5;">
+            
+            <div style="background: #fff; border-radius: 8px; padding: 30px; margin-bottom: 20px;">
+                <h1 style="color: #0066cc; border-bottom: 3px solid #0066cc; padding-bottom: 10px; margin-top: 0; font-size: 24px;">✈️ Round-Trip Price Alert</h1>
+                <p style="margin: 15px 0; font-size: 16px;">Hi <?php echo esc_html($user->display_name); ?>,</p>
+                <p style="margin: 15px 0; font-size: 14px; color: #666;">Great news! We found a price update for your round-trip flight:</p>
+            </div>
+            
+            <div style="background: #fff; border-radius: 8px; padding: 25px; margin-bottom: 20px;">
+                <div style="font-weight: bold; font-size: 18px; color: #333; margin-bottom: 10px;">
+                    <?php echo esc_html($event->post_title); ?>
+                </div>
+                
+                <div style="font-size: 14px; color: #666; margin-bottom: 20px;">
+                    <strong>Round Trip:</strong> <?php echo esc_html($trip_record->origin); ?> → <?php echo esc_html($trip_record->destination); ?> → <?php echo esc_html($trip_record->origin); ?>
+                    <br>
+                    <strong>Depart:</strong> <?php echo esc_html($trip_record->depart_date); ?><br>
+                    <strong>Return:</strong> <?php echo esc_html($trip_record->return_date); ?>
+                </div>
+                
+                <div style="background: #e8f5e9; border-left: 4px solid #4caf50; padding: 20px; border-radius: 4px; margin-bottom: 20px;">
+                    <div style="font-size: 14px; color: #2e7d32; margin-bottom: 5px;">Current Round-Trip Price</div>
+                    <div style="font-size: 32px; font-weight: bold; color: #1b5e20;">$<?php echo number_format($current_price, 2); ?></div>
+                </div>
+                
+                <?php if ($google_insights): ?>
+                <div style="background: #fff3cd; border: 1px solid #ffeb3b; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                    <div style="font-weight: bold; margin-bottom: 10px; color: #856404;">💡 Price Insights</div>
+                    <?php if (!empty($google_insights['lowest_price'])): ?>
+                    <p style="margin: 5px 0; font-size: 13px; color: #856404;">Lowest price seen: $<?php echo esc_html($google_insights['lowest_price']); ?></p>
+                    <?php endif; ?>
+                    <?php if (!empty($google_insights['price_level'])): ?>
+                    <p style="margin: 5px 0; font-size: 13px; color: #856404;">Price level: <?php echo esc_html($google_insights['price_level']); ?></p>
+                    <?php endif; ?>
+                    <?php if (!empty($google_insights['typical_price'])): ?>
+                    <p style="margin: 5px 0; font-size: 13px; color: #856404;">Typical price: $<?php echo esc_html($google_insights['typical_price']); ?></p>
+                    <?php endif; ?>
+                </div>
+                <?php endif; ?>
+                
+                <a href="<?php echo esc_url($event_url); ?>" style="display: inline-block; background: #0066cc; color: white; text-decoration: none; padding: 12px 30px; border-radius: 6px; font-weight: 600; font-size: 14px; margin: 5px;">
+                    View Event Details
+                </a>
+                <a href="<?php echo esc_url( self::get_dashboard_url() ); ?>" style="display: inline-block; background: #6b7280; color: white; text-decoration: none; padding: 12px 30px; border-radius: 6px; font-weight: 600; font-size: 14px; margin: 5px;">
+                    Manage All Alerts
+                </a>
+            </div>
+            
+            <div style="background: #fff; border-radius: 8px; padding: 20px; text-align: center; font-size: 12px; color: #666;">
+                <p style="margin: 10px 0;">You're receiving this because you set up a price alert. Manage your alerts in your <a href="<?php echo esc_url( self::get_dashboard_url() ); ?>" style="color: #0066cc; text-decoration: none;">Member Dashboard</a>.</p>
+                <p style="margin: 10px 0;">Need help? Email <a href="mailto:<?php echo esc_attr( self::get_support_email() ); ?>" style="color: #0066cc; text-decoration: none;"><?php echo esc_html( self::get_support_email() ); ?></a></p>
+                <p style="margin: 10px 0;">&copy; <?php echo date('Y'); ?> <?php echo esc_html($site_name); ?></p>
+            </div>
+            
+        </body>
+        </html>
+        <?php
+        return ob_get_clean();
+    }
+    
+    /**
      * Create price alert for user
      */
     public static function create_alert($user_id, $event_id, $leg_index, $alert_type, $threshold_price = null, $threshold_percent = null) {
@@ -1101,6 +1497,44 @@ class FTT_Price_Tracking {
                 'created_at'        => current_time('mysql'),
             ),
             array('%d', '%d', '%d', '%s', '%f', '%d', '%d', '%s')
+        );
+        
+        return $wpdb->insert_id;
+    }
+    
+    /**
+     * Create trip-level alert for user (round-trip)
+     */
+    public static function create_trip_alert($user_id, $event_id, $trip_hash, $alert_type, $threshold_price = null, $threshold_percent = null) {
+        global $wpdb;
+        $alerts_table = $wpdb->prefix . 'ftt_price_alerts';
+        
+        // Get trip info to populate return_date
+        $trip_info = $wpdb->get_row($wpdb->prepare(
+            "SELECT return_date FROM {$wpdb->prefix}ftt_price_history 
+            WHERE trip_hash = %s 
+            LIMIT 1",
+            $trip_hash
+        ));
+        
+        $return_date = $trip_info ? $trip_info->return_date : null;
+        
+        $wpdb->insert(
+            $alerts_table,
+            array(
+                'scope'             => 'trip',
+                'user_id'           => $user_id,
+                'event_id'          => $event_id,
+                'leg_index'         => null,
+                'return_date'       => $return_date,
+                'trip_hash'         => $trip_hash,
+                'alert_type'        => $alert_type,
+                'threshold_price'   => $threshold_price,
+                'threshold_percent' => $threshold_percent,
+                'is_active'         => 1,
+                'created_at'        => current_time('mysql'),
+            ),
+            array('%s', '%d', '%d', NULL, '%s', '%s', '%s', '%f', '%d', '%d', '%s')
         );
         
         return $wpdb->insert_id;

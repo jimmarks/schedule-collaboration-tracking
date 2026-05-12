@@ -1341,13 +1341,13 @@ jQuery(document).ready(function($) {
         // Build billing status
         let billingStatus = 'Trial';
         let billingClass = 'trial';
-        if (group.billing && group.billing.subscription_status) {
-            billingStatus = group.billing.subscription_status.charAt(0).toUpperCase() + 
-                          group.billing.subscription_status.slice(1);
-            billingClass = group.billing.subscription_status;
+        if (group.billing && group.billing.status) {
+            billingStatus = group.billing.status.charAt(0).toUpperCase() + 
+                          group.billing.status.slice(1);
+            billingClass = group.billing.status;
             
             // Add days remaining for trial/canceled
-            if ((group.billing.subscription_status === 'trialing' || group.billing.subscription_status === 'canceled') && 
+            if ((group.billing.status === 'trialing' || group.billing.status === 'canceled') && 
                 group.billing.trial_ends_at) {
                 const endDate = new Date(group.billing.trial_ends_at);
                 const now = new Date();
@@ -1686,7 +1686,7 @@ jQuery(document).ready(function($) {
                     
                     if ($card.length) {
                         // Update card with fresh data
-                        renderGroupCard($card, group);
+                        updateGroupCard($card, group);
                     }
                 }
             },
@@ -1696,8 +1696,8 @@ jQuery(document).ready(function($) {
         });
     }
     
-    // Render/update a group card element
-    function renderGroupCard($card, group) {
+    // Update an existing group card element with fresh data
+    function updateGroupCard($card, group) {
         const isPrimary = (group.id == window.fttUserPrimaryGroup);
         const currentUserId = <?php echo get_current_user_id(); ?>;
         const canManage = group.members?.some(m => m.user_id == currentUserId && m.can_manage_group);
@@ -1712,14 +1712,17 @@ jQuery(document).ready(function($) {
             childCountDisplay = childCountDisplay + ' / ' + group.planned_children;
         }
         
-        // Build billing status display
-        let billingDisplay = group.subscription_status ? group.subscription_status.charAt(0).toUpperCase() + group.subscription_status.slice(1) : 'Trial';
-        let billingStatusClass = group.subscription_status || 'trial';
+        // Build billing status display - use billing object if available, fallback to direct fields
+        const subscriptionStatus = group.billing?.status || group.subscription_status;
+        const trialEndsAt = group.billing?.trial_ends_at || group.trial_ends_at;
+        
+        let billingDisplay = subscriptionStatus ? subscriptionStatus.charAt(0).toUpperCase() + subscriptionStatus.slice(1) : 'Trial';
+        let billingStatusClass = subscriptionStatus || 'trial';
         let billingExtra = '';
         
         // Add days remaining for trialing or canceled status
-        if ((group.subscription_status === 'trialing' || group.subscription_status === 'canceled') && group.trial_ends_at) {
-            const endDate = new Date(group.trial_ends_at);
+        if ((subscriptionStatus === 'trialing' || subscriptionStatus === 'canceled') && trialEndsAt) {
+            const endDate = new Date(trialEndsAt);
             const now = new Date();
             const daysRemaining = Math.ceil((endDate - now) / (1000 * 60 * 60 * 24));
             
@@ -1883,7 +1886,10 @@ jQuery(document).ready(function($) {
     function renderBillingInfo(group) {
         const currentUserId = <?php echo get_current_user_id(); ?>;
         const isBillingOwner = (group.billing_owner == currentUserId);
-        const status = group.subscription_status || 'none';
+        // Use billing object if available, fallback to direct fields
+        const subscriptionStatus = group.billing?.status || group.subscription_status;
+        const trialEndsAt = group.billing?.trial_ends_at || group.trial_ends_at;
+        const status = subscriptionStatus || 'none';
         const statusText = status === 'none' ? 'No Active Subscription' : status.charAt(0).toUpperCase() + status.slice(1);
         const billingOwner = group.members.find(m => m.user_id == group.billing_owner);
         
@@ -1903,8 +1909,8 @@ jQuery(document).ready(function($) {
         
         // Calculate trial days remaining
         let trialInfo = '';
-        if (status === 'trialing' && group.trial_ends_at) {
-            const trialEnd = new Date(group.trial_ends_at);
+        if (status === 'trialing' && trialEndsAt) {
+            const trialEnd = new Date(trialEndsAt);
             const now = new Date();
             const daysRemaining = Math.ceil((trialEnd - now) / (1000 * 60 * 60 * 24));
             if (daysRemaining > 0) {

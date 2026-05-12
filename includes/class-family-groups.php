@@ -1127,9 +1127,45 @@ class FTT_Family_Groups {
             ], 404);
         }
         
+        // Format group data to match the structure from get_user_groups()
+        $user_id = get_current_user_id();
+        $primary_group_id = get_user_meta($user_id, 'ftt_primary_group', true);
+        
+        // Calculate proper parent count
+        $parent_count = 0;
+        if (isset($group->members) && is_array($group->members)) {
+            foreach ($group->members as $member) {
+                if ($member->role === 'parent') {
+                    $parent_count++;
+                }
+            }
+        }
+        
+        $group_data = array(
+            'id' => (int) $group->id,
+            'name' => $group->name,
+            'description' => $group->description ?? '',
+            'color' => $group->color ?? '#6A3E8E',
+            'child_count' => (int) $group->child_count,
+            'parent_count' => $parent_count,
+            'member_count' => (int) $group->member_count,
+            'planned_children' => (int) ($group->planned_children ?? 0),
+            'group_token' => $group->group_token,
+            'is_primary' => ($group->id == $primary_group_id),
+            'can_manage' => self::can_manage_group($group->id, $user_id),
+            'billing_owner' => (int) $group->billing_owner,
+            'members' => $group->members ?? array()
+        );
+        
+        // Add billing info in the same nested format as get_user_groups()
+        if (class_exists('FTT_Billing_Manager')) {
+            $billing_info = FTT_Billing_Manager::get_group_billing_summary($group->id);
+            $group_data['billing'] = $billing_info;
+        }
+        
         return new WP_REST_Response([
             'success' => true,
-            'group' => $group
+            'group' => $group_data
         ]);
     }
     

@@ -248,6 +248,143 @@ class FTT_REST {
             'permission_callback' => 'is_user_logged_in',
         ));
         
+        // Trip-level (round-trip) price endpoints
+        register_rest_route('ftt/v1', '/trip-price-alerts', array(
+            'methods'             => 'POST',
+            'callback'            => array(__CLASS__, 'create_trip_price_alert'),
+            'permission_callback' => '__return_true',
+            'args'                => array(
+                'event_id' => array(
+                    'required'          => true,
+                    'type'              => 'integer',
+                    'validate_callback' => function($param) { return is_numeric($param); },
+                ),
+                'trip_hash' => array(
+                    'required'          => true,
+                    'type'              => 'string',
+                ),
+                'alert_type' => array(
+                    'required'          => true,
+                    'type'              => 'string',
+                    'enum'              => array('price_drop', 'percent_drop', 'good_deal'),
+                ),
+                'threshold_price' => array(
+                    'type'              => 'number',
+                    'required'          => false,
+                ),
+                'threshold_percent' => array(
+                    'type'              => 'integer',
+                    'required'          => false,
+                ),
+            ),
+        ));
+        
+        // Check trip-level price
+        register_rest_route('ftt/v1', '/check-trip-price', array(
+            'methods'             => 'POST',
+            'callback'            => array(__CLASS__, 'manual_trip_price_check'),
+            'permission_callback' => '__return_true',
+            'args'                => array(
+                'event_id' => array(
+                    'required' => true,
+                    'type'     => 'integer',
+                ),
+            ),
+        ));
+        
+        // Get trip price history
+        register_rest_route('ftt/v1', '/trip-price-history', array(
+            'methods'             => 'GET',
+            'callback'            => array(__CLASS__, 'get_trip_price_history'),
+            'permission_callback' => '__return_true',
+            'args'                => array(
+                'event_id' => array(
+                    'required' => true,
+                    'type'     => 'integer',
+                ),
+                'trip_hash' => array(
+                    'required' => true,
+                    'type'     => 'string',
+                ),
+            ),
+        ));
+        
+        // ===== UNIFIED FLIGHT SEARCH ENDPOINTS =====
+        
+        // Check flight price (unified for both trip and leg level)
+        register_rest_route('ftt/v1', '/flights/check', array(
+            'methods'             => 'POST',
+            'callback'            => array(__CLASS__, 'unified_flight_price_check'),
+            'permission_callback' => '__return_true',
+            'args'                => array(
+                'event_id' => array(
+                    'required' => true,
+                    'type'     => 'integer',
+                ),
+                'scope' => array(
+                    'required' => true,
+                    'type'     => 'string',
+                    'enum'     => array('trip', 'leg'),
+                ),
+                'leg_index' => array(
+                    'type'     => 'integer',
+                ),
+            ),
+        ));
+        
+        // Get flight price history (unified)
+        register_rest_route('ftt/v1', '/flights/history', array(
+            'methods'             => 'GET',
+            'callback'            => array(__CLASS__, 'unified_flight_price_history'),
+            'permission_callback' => '__return_true',
+            'args'                => array(
+                'event_id' => array(
+                    'required' => true,
+                    'type'     => 'integer',
+                ),
+                'scope' => array(
+                    'required' => true,
+                    'type'     => 'string',
+                    'enum'     => array('trip', 'leg'),
+                ),
+                'leg_index' => array(
+                    'type'     => 'integer',
+                ),
+            ),
+        ));
+        
+        // Track flight price (create alert, unified)
+        register_rest_route('ftt/v1', '/flights/track', array(
+            'methods'             => 'POST',
+            'callback'            => array(__CLASS__, 'unified_flight_track'),
+            'permission_callback' => 'is_user_logged_in',
+            'args'                => array(
+                'event_id' => array(
+                    'required' => true,
+                    'type'     => 'integer',
+                ),
+                'scope' => array(
+                    'required' => true,
+                    'type'     => 'string',
+                    'enum'     => array('trip', 'leg'),
+                ),
+                'leg_index' => array(
+                    'type'     => 'integer',
+                ),
+                'alert_type' => array(
+                    'required' => true,
+                    'type'     => 'string',
+                    'enum'     => array('price_drop', 'percent_drop', 'good_deal', 'daily_digest'),
+                ),
+                'threshold_price' => array(
+                    'type'     => 'number',
+                ),
+                'threshold_percent' => array(
+                    'type'     => 'integer',
+                ),
+            ),
+        ));
+        
         // Get/Update user preferences
         register_rest_route('ftt/v1', '/user-preferences', array(
             'methods'             => 'GET',
@@ -1583,6 +1720,388 @@ class FTT_REST {
         }
         
         return rest_ensure_response(array('success' => true, 'message' => 'Alert deleted'));
+    }
+    
+    /**
+     * Create trip-level price alert (round-trip)
+     */
+    public static function create_trip_price_alert($request) {
+        global $wpdb;
+        
+        $user_id = get_current_user_id();
+        if (!$user_id) {
+            return new WP_Error('not_logged_in', 'You must be logged in to create price alerts', array('status' => 401));
+        }
+        
+        $event_id = $request->get_param('event_id');
+        $trip_hash = $request->get_param('trip_hash');
+        $alert_type = $request->get_param('alert_type');
+        $threshold_price = $request->get_param('threshold_price');
+        $threshold_percent = $request->get_param('threshold_percent');
+        
+        // Validate event exists
+        $event = get_post($event_id);
+        if (!$event || $event->post_type !== 'ftt_event') {
+            return new WP_Error('invalid_event', 'Invalid event ID', array('status' => 404));
+        }
+        
+        // Create trip-level alert
+        $alert_id = FTT_Price_Tracking::create_trip_alert(
+            $user_id,
+            $event_id,
+            $trip_hash,
+            $alert_type,
+            $threshold_price,
+            $threshold_percent
+        );
+        
+        if (!$alert_id) {
+            return new WP_Error('insert_failed', 'Failed to create trip price alert', array('status' => 500));
+        }
+        
+        return rest_ensure_response(array(
+            'success' => true,
+            'alert_id' => $alert_id,
+            'message' => 'Round-trip price alert created successfully.',
+        ));
+    }
+    
+    /**
+     * Manual trip price check (round-trip)
+     */
+    public static function manual_trip_price_check($request) {
+        $event_id = $request->get_param('event_id');
+        
+        // Validate event exists
+        $event = get_post($event_id);
+        if (!$event || $event->post_type !== 'ftt_event') {
+            return new WP_Error('invalid_event', 'Invalid event ID', array('status' => 404));
+        }
+        
+        // Detect round-trip
+        $trip_info = FTT_Price_Tracking::detect_round_trip($event_id);
+        
+        if (!$trip_info) {
+            return new WP_Error('not_round_trip', 'This event is not a round-trip flight', array('status' => 400));
+        }
+        
+        // Check if flights are booked
+        if ($trip_info['outbound_booked'] || $trip_info['return_booked']) {
+            return new WP_Error('flight_booked', 'Cannot check prices for booked flights', array('status' => 400));
+        }
+        
+        // Fetch price
+        $price_result = FTT_Price_Tracking::fetch_flight_price_serpapi(
+            $trip_info['origin'],
+            $trip_info['destination'],
+            $trip_info['depart_date'],
+            $trip_info['return_date']
+        );
+        
+        $price = is_array($price_result) ? $price_result['price'] : $price_result;
+        
+        if ($price === false || $price === null) {
+            return new WP_Error('price_fetch_failed', 'Failed to fetch price from API', array('status' => 500));
+        }
+        
+        // Record price
+        FTT_Price_Tracking::record_trip_price(
+            $event_id,
+            $trip_info['origin'],
+            $trip_info['destination'],
+            $trip_info['depart_date'],
+            $trip_info['return_date'],
+            $price,
+            'manual',
+            $price_result
+        );
+        
+        // Get statistics
+        $stats = FTT_Price_Tracking::get_trip_price_stats(
+            $trip_info['origin'],
+            $trip_info['destination'],
+            $trip_info['depart_date'],
+            $trip_info['return_date']
+        );
+        
+        $response = array(
+            'success' => true,
+            'price' => $price,
+            'route' => $trip_info['origin'] . ' ⇄ ' . $trip_info['destination'],
+            'depart_date' => $trip_info['depart_date'],
+            'return_date' => $trip_info['return_date'],
+            'trip_hash' => $trip_info['trip_hash'],
+            'stats' => $stats,
+        );
+        
+        // Add Google insights if available
+        if (is_array($price_result) && isset($price_result['price_insights'])) {
+            $response['google_insights'] = $price_result['price_insights'];
+        }
+        
+        return rest_ensure_response($response);
+    }
+    
+    /**
+     * Get trip price history (round-trip)
+     */
+    public static function get_trip_price_history($request) {
+        global $wpdb;
+        
+        $event_id = $request->get_param('event_id');
+        $trip_hash = $request->get_param('trip_hash');
+        
+        // Validate event exists
+        $event = get_post($event_id);
+        if (!$event || $event->post_type !== 'ftt_event') {
+            return new WP_Error('invalid_event', 'Invalid event ID', array('status' => 404));
+        }
+        
+        $table_name = $wpdb->prefix . 'ftt_price_history';
+        
+        // Get price history for this trip
+        $history = $wpdb->get_results($wpdb->prepare(
+            "SELECT price, checked_at, google_insights 
+            FROM $table_name 
+            WHERE event_id = %d 
+            AND trip_hash = %s
+            AND scope = 'trip'
+            ORDER BY checked_at DESC 
+            LIMIT 30",
+            $event_id,
+            $trip_hash
+        ));
+        
+        // Get trip info
+        $trip_info = FTT_Price_Tracking::detect_round_trip($event_id);
+        
+        if (!$trip_info) {
+            return new WP_Error('not_round_trip', 'This event is not a round-trip flight', array('status' => 400));
+        }
+        
+        // Get statistics
+        $stats = FTT_Price_Tracking::get_trip_price_stats(
+            $trip_info['origin'],
+            $trip_info['destination'],
+            $trip_info['depart_date'],
+            $trip_info['return_date']
+        );
+        
+        // Get latest Google insights
+        $google_insights = null;
+        if (!empty($history)) {
+            $latest = $history[0];
+            if (!empty($latest->google_insights)) {
+                $google_insights = json_decode($latest->google_insights, true);
+            }
+        }
+        
+        $response = array(
+            'prices' => $history,
+            'stats' => $stats,
+            'trip_info' => $trip_info,
+        );
+        
+        if ($google_insights) {
+            $response['google_insights'] = $google_insights;
+        }
+        
+        return rest_ensure_response($response);
+    }
+    
+    /**
+     * Unified flight price check
+     */
+    public static function unified_flight_price_check($request) {
+        $event_id = $request->get_param('event_id');
+        $scope = $request->get_param('scope');
+        $leg_index = $request->get_param('leg_index');
+        
+        $result = FTT_Flight_Search_Service::check_price($event_id, $scope, $leg_index, 'manual');
+        
+        if (!$result['success']) {
+            return new WP_Error('price_check_failed', $result['error'] ?? 'Failed to check price', array('status' => 500));
+        }
+        
+        return rest_ensure_response($result);
+    }
+    
+    /**
+     * Unified flight price history
+     */
+    public static function unified_flight_price_history($request) {
+        $event_id = $request->get_param('event_id');
+        $scope = $request->get_param('scope');
+        $leg_index = $request->get_param('leg_index');
+        
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'ftt_price_history';
+        
+        if ($scope === 'leg') {
+            if ($leg_index === null) {
+                return new WP_Error('missing_leg_index', 'Leg index required for leg-level history', array('status' => 400));
+            }
+            
+            // Get leg data for stats
+            $travel_legs = json_decode(get_post_meta($event_id, 'travel_legs', true) ?: '[]', true);
+            if (empty($travel_legs[$leg_index])) {
+                return new WP_Error('invalid_leg', 'Invalid leg index', array('status' => 404));
+            }
+            
+            $leg = $travel_legs[$leg_index];
+            
+            // Extract depart_date - might be 'depart_date' or extracted from 'depart_datetime'
+            $depart_date = $leg['depart_date'] ?? null;
+            if (empty($depart_date) && !empty($leg['depart_datetime'])) {
+                $depart_date = substr($leg['depart_datetime'], 0, 10);
+            }
+            
+            $history = $wpdb->get_results($wpdb->prepare(
+                "SELECT * FROM $table_name 
+                WHERE event_id = %d 
+                AND leg_index = %d 
+                AND scope = 'leg'
+                ORDER BY checked_at DESC 
+                LIMIT 50",
+                $event_id,
+                $leg_index
+            ));
+            
+            $stats = FTT_Price_Tracking::get_price_stats(
+                $leg['depart_airport'],
+                $leg['arrive_airport'],
+                $depart_date
+            );
+            
+        } else {
+            // Trip-level history
+            $payload = FTT_Flight_Search_Service::build_search_payload($event_id, 'trip');
+            
+            if (is_wp_error($payload)) {
+                return $payload;
+            }
+            
+            $legs = $payload['legs'];
+            $trip_hash = md5(
+                $event_id . ':' . 
+                $legs[0]['origin'] . ':' . 
+                $legs[0]['destination'] . ':' . 
+                $legs[0]['depart_date'] . ':' . 
+                $legs[1]['depart_date']
+            );
+            
+            $history = $wpdb->get_results($wpdb->prepare(
+                "SELECT * FROM $table_name 
+                WHERE event_id = %d 
+                AND scope = 'trip'
+                AND trip_hash = %s
+                ORDER BY checked_at DESC 
+                LIMIT 50",
+                $event_id,
+                $trip_hash
+            ));
+            
+            $stats = FTT_Price_Tracking::get_trip_price_stats(
+                $legs[0]['origin'],
+                $legs[0]['destination'],
+                $legs[0]['depart_date'],
+                $legs[1]['depart_date']
+            );
+        }
+        
+        // Get latest Google insights and flights URL
+        $google_insights = null;
+        $google_flights_url = null;
+        if (!empty($history)) {
+            $latest = $history[0];
+            if (!empty($latest->google_insights)) {
+                $google_insights = json_decode($latest->google_insights, true);
+            }
+            if (!empty($latest->google_flights_url)) {
+                $google_flights_url = $latest->google_flights_url;
+            }
+        }
+        
+        $response = array(
+            'success' => true,
+            'history' => $history,
+            'stats' => $stats,
+            'scope' => $scope,
+        );
+        
+        if ($google_insights) {
+            $response['google_insights'] = $google_insights;
+        }
+        
+        if ($google_flights_url) {
+            $response['google_flights_url'] = $google_flights_url;
+        }
+        
+        return rest_ensure_response($response);
+    }
+    
+    /**
+     * Unified flight tracking (create alert)
+     */
+    public static function unified_flight_track($request) {
+        $user_id = get_current_user_id();
+        
+        if (!$user_id) {
+            return new WP_Error('unauthorized', 'Must be logged in to track prices', array('status' => 401));
+        }
+        
+        $event_id = $request->get_param('event_id');
+        $scope = $request->get_param('scope');
+        $leg_index = $request->get_param('leg_index');
+        $alert_type = $request->get_param('alert_type');
+        $threshold_price = $request->get_param('threshold_price');
+        $threshold_percent = $request->get_param('threshold_percent');
+        
+        // Validate payload
+        $payload = FTT_Flight_Search_Service::build_search_payload($event_id, $scope, $leg_index);
+        
+        if (is_wp_error($payload)) {
+            return $payload;
+        }
+        
+        // Create alert using existing functions
+        if ($scope === 'leg') {
+            $leg = $payload['legs'][0];
+            $alert_id = FTT_Price_Tracking::create_alert(
+                $user_id,
+                $event_id,
+                $leg['leg_index'],
+                $leg['origin'],
+                $leg['destination'],
+                $leg['depart_date'],
+                $alert_type,
+                $threshold_price,
+                $threshold_percent
+            );
+        } else {
+            $legs = $payload['legs'];
+            $alert_id = FTT_Price_Tracking::create_trip_alert(
+                $user_id,
+                $event_id,
+                $legs[0]['origin'],
+                $legs[0]['destination'],
+                $legs[0]['depart_date'],
+                $legs[1]['depart_date'],
+                $alert_type,
+                $threshold_price,
+                $threshold_percent
+            );
+        }
+        
+        if (!$alert_id) {
+            return new WP_Error('create_alert_failed', 'Failed to create price alert', array('status' => 500));
+        }
+        
+        return rest_ensure_response(array(
+            'success' => true,
+            'alert_id' => $alert_id,
+            'message' => 'Price alert created successfully',
+        ));
     }
     
     /**

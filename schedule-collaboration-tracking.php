@@ -3,7 +3,7 @@
  * Plugin Name: Family Travel Tracker
  * Plugin URI: https://github.com/jimmarks/schedule-collaboration-tracking
  * Description: Multi-child schedule coordination with travel planning, flight tracking, and shared calendars for families. Perfect for busy parents, co-parenting families, and children's activities.
- * Version: 3.0.27
+ * Version: 3.0.48
  * Author: Jim Marks
  * Author URI: https://github.com/jimmarks
  * License: GPL v2 or later
@@ -19,7 +19,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('FTT_VERSION', '3.0.27');
+define('FTT_VERSION', '3.0.48');
 define('FTT_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('FTT_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('FTT_PLUGIN_BASENAME', plugin_basename(__FILE__));
@@ -86,6 +86,7 @@ class Family_Travel_Tracker {
         require_once FTT_PLUGIN_DIR . 'includes/registration.php';
         require_once FTT_PLUGIN_DIR . 'includes/invitations.php';
         require_once FTT_PLUGIN_DIR . 'includes/price-tracking.php';
+        require_once FTT_PLUGIN_DIR . 'includes/class-flight-search-service.php';
         require_once FTT_PLUGIN_DIR . 'includes/class-api-tracker.php';
         require_once FTT_PLUGIN_DIR . 'includes/cron-setup.php';
         require_once FTT_PLUGIN_DIR . 'includes/flight-linking.php';
@@ -606,6 +607,7 @@ class Family_Travel_Tracker {
             'pluginUrl' => FTT_PLUGIN_URL,
             'restUrl' => rest_url('ftt/v1/'),
             'nonce' => wp_create_nonce('wp_rest'),
+            'restNonce' => wp_create_nonce('wp_rest'),  // Alias for compatibility
             'isAdmin' => current_user_can('edit_posts'),
             'timezone' => wp_timezone_string(),
             'userTimezone' => FTT_User_Profile::get_user_timezone($current_uid),

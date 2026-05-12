@@ -1316,7 +1316,9 @@
             // Build URL with optional group_id parameter (v2.1)
             let dashboardUrl = fttData.restUrl + 'dashboard';
             if (typeof fttSelectedGroupId !== 'undefined' && fttSelectedGroupId) {
-                dashboardUrl += '?group_id=' + fttSelectedGroupId;
+                // Check if restUrl already has query params (index.php?rest_route=)
+                const separator = dashboardUrl.includes('?') ? '&' : '?';
+                dashboardUrl += separator + 'group_id=' + fttSelectedGroupId;
                 console.log('Loading dashboard for group ID:', fttSelectedGroupId);
             }
             
@@ -1562,6 +1564,29 @@
             if (event.travel_legs && event.travel_legs.length > 0) {
                 html += '<h3>Travel</h3>';
                 html += '<p class="ftt-help-text" style="font-size: 13px; color: #666; margin-bottom: 15px;">💡 Click flight search buttons below to compare prices and set up price alerts</p>';
+                
+                // Detect round-trip pattern
+                const roundTrip = this.detectRoundTrip(event.travel_legs);
+                
+                // Show round-trip pricing section if detected
+                if (roundTrip && !roundTrip.outboundBooked && !roundTrip.returnBooked) {
+                    html += this.generateRoundTripPricingSection(event, roundTrip);
+                    
+                    // Add collapsible header for individual legs
+                    html += `
+                        <div class="ftt-individual-legs-section" style="margin-top: 30px;">
+                            <div class="ftt-collapsible-header" style="cursor: pointer; background: #f0f0f0; padding: 12px 15px; border-radius: 4px; display: flex; align-items: center; justify-content: space-between; user-select: none;">
+                                <h4 style="margin: 0; color: #666; font-size: 0.95em;">📋 Individual Leg Details</h4>
+                                <span class="ftt-toggle-icon" style="font-size: 1.2em; transition: transform 0.3s;">▼</span>
+                            </div>
+                            <div class="ftt-collapsible-content" style="max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out;">
+                                <div style="padding-top: 15px;">
+                    `;
+                } else {
+                    // No round-trip, just show legs normally
+                    html += '<div class="ftt-individual-legs-section">';
+                }
+                
                 event.travel_legs.forEach((leg, legIndex) => {
                     // Backward compatibility: handle both old datetime and new date fields
                     let departInfo = 'TBD';
@@ -1615,6 +1640,17 @@
                         </div>
                     `;
                 });
+                
+                // Close collapsible content if round-trip was detected
+                if (roundTrip && !roundTrip.outboundBooked && !roundTrip.returnBooked) {
+                    html += `
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    html += '</div>';
+                }
             }
             
             if (fttData.isAdmin) {
@@ -1628,6 +1664,23 @@
             modal.find('.ftt-modal-content').html(html);
             $('body').append(modal);
             modal.fadeIn();
+            
+            // Handle collapsible toggle for individual legs
+            modal.find('.ftt-collapsible-header').on('click', function() {
+                const $header = $(this);
+                const $content = $header.next('.ftt-collapsible-content');
+                const $icon = $header.find('.ftt-toggle-icon');
+                
+                if ($content.css('max-height') === '0px') {
+                    // Expand
+                    $content.css('max-height', $content[0].scrollHeight + 'px');
+                    $icon.css('transform', 'rotate(180deg)');
+                } else {
+                    // Collapse
+                    $content.css('max-height', '0px');
+                    $icon.css('transform', 'rotate(0deg)');
+                }
+            });
             
             modal.find('.ftt-modal-close').on('click', function() {
                 modal.fadeOut(function() {
@@ -1669,6 +1722,43 @@
                 const eventId = $(this).data('event-id');
                 const legIndex = $(this).data('leg-index');
                 FTT.loadPriceHistory(eventId, legIndex, modal);
+            });
+            
+            // ===== Trip-Level Event Handlers =====
+            
+            // Handle track trip price button
+            modal.find('.ftt-track-trip-price').on('click', function() {
+                const $btn = $(this);
+                const eventId = $btn.data('event-id');
+                const tripHash = $btn.data('trip-hash');
+                const origin = $btn.data('origin');
+                const destination = $btn.data('destination');
+                
+                // Get dates from the trip section (already validated in detectRoundTrip)
+                const event = FTT.events.find(e => e.id == eventId);
+                if (event && event.travel_legs && event.travel_legs.length >= 2) {
+                    const departDate = event.travel_legs[0].depart_date;
+                    const returnDate = event.travel_legs[1].depart_date;
+                    
+                    FTT.showTripPriceTrackingModal(eventId, tripHash, origin, destination, departDate, returnDate);
+                }
+            });
+            
+            // Handle check trip price now button
+            modal.find('.ftt-check-trip-price').on('click', function() {
+                const $btn = $(this);
+                const eventId = $btn.data('event-id');
+                const tripHash = $btn.data('trip-hash');
+                
+                FTT.checkTripPriceNow(eventId, tripHash, modal);
+            });
+            
+            // Load trip price history AND fetch real Google Flights URL
+            modal.find('.ftt-check-trip-price').each(function() {
+                const eventId = $(this).data('event-id');
+                const tripHash = $(this).data('trip-hash');
+                FTT.loadTripPriceHistory(eventId, tripHash, modal);
+                FTT.fetchGoogleFlightsUrl(eventId, modal);
             });
         },
         
@@ -1785,6 +1875,160 @@
         },
         
         /**
+         * Detect round-trip pattern in travel legs
+         */
+        detectRoundTrip: function(travelLegs) {
+            if (!travelLegs || travelLegs.length !== 2) {
+                return null;
+            }
+            
+            const leg0 = travelLegs[0];
+            const leg1 = travelLegs[1];
+            
+            // Must both be flights with airport codes
+            if (leg0.mode !== 'fly' || leg1.mode !== 'fly') {
+                return null;
+            }
+            
+            if (!leg0.depart_airport || !leg0.arrive_airport || !leg1.depart_airport || !leg1.arrive_airport) {
+                return null;
+            }
+            
+            // Check if it's a round trip: A → B, then B → A
+            const isRoundTrip = (
+                leg0.depart_airport === leg1.arrive_airport &&
+                leg0.arrive_airport === leg1.depart_airport
+            );
+            
+            if (!isRoundTrip) {
+                return null;
+            }
+            
+            // Extract dates
+            const departDate = leg0.depart_date || null;
+            const returnDate = leg1.depart_date || null;
+            
+            if (!departDate || !returnDate) {
+                return null;
+            }
+            
+            // Generate trip hash
+            const tripHash = this.generateTripHash(leg0.depart_airport, leg0.arrive_airport, departDate, returnDate);
+            
+            return {
+                origin: leg0.depart_airport,
+                destination: leg0.arrive_airport,
+                departDate: departDate,
+                returnDate: returnDate,
+                departTimeOfDay: leg0.depart_time_of_day || null,
+                returnTimeOfDay: leg1.depart_time_of_day || null,
+                tripHash: tripHash,
+                outboundBooked: leg0.booked || false,
+                returnBooked: leg1.booked || false,
+                legIndices: [0, 1]
+            };
+        },
+        
+        /**
+         * Generate trip hash for round-trip tracking
+         */
+        generateTripHash: function(origin, destination, departDate, returnDate) {
+            // Simple hash - matches backend logic
+            const str = origin + ':' + destination + ':' + departDate + ':' + returnDate;
+            return this.simpleHash(str);
+        },
+        
+        /**
+         * Simple hash function (MD5 equivalent not needed for client-side)
+         */
+        simpleHash: function(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                const char = str.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash & hash; // Convert to 32bit integer
+            }
+            return Math.abs(hash).toString(16);
+        },
+        
+        /**
+         * Generate round-trip pricing section HTML
+         */
+        generateRoundTripPricingSection: function(event, roundTrip) {
+            // Time-of-day phrases for search queries
+            const TIME_OF_DAY_PHRASES = {
+                morning: 'in the morning',
+                midday: 'around midday',
+                afternoon: 'in the afternoon',
+                night: 'at night'
+            };
+            
+            // Build Google Flights query with time-of-day if specified
+            let googleQuery = `Flights+from+${roundTrip.origin}+to+${roundTrip.destination}+departing+${roundTrip.departDate}`;
+            if (roundTrip.departTimeOfDay && TIME_OF_DAY_PHRASES[roundTrip.departTimeOfDay]) {
+                googleQuery += `+${TIME_OF_DAY_PHRASES[roundTrip.departTimeOfDay].replace(/ /g, '+')}`;
+            }
+            googleQuery += `+returning+${roundTrip.returnDate}`;
+            if (roundTrip.returnTimeOfDay && TIME_OF_DAY_PHRASES[roundTrip.returnTimeOfDay]) {
+                googleQuery += `+${TIME_OF_DAY_PHRASES[roundTrip.returnTimeOfDay].replace(/ /g, '+')}`;
+            }
+            
+            const googleFlightsUrl = `https://www.google.com/travel/flights?q=${googleQuery}`;
+            const kayakUrl = `https://www.kayak.com/flights/${roundTrip.origin}-${roundTrip.destination}/${roundTrip.departDate}/${roundTrip.returnDate}?sort=bestflight_a`;
+            
+            // Build time preference display
+            let timePreferenceHtml = '';
+            if (roundTrip.departTimeOfDay || roundTrip.returnTimeOfDay) {
+                timePreferenceHtml = '<div style="background: #fff3cd; padding: 10px; border-radius: 4px; margin: 10px 0; font-size: 0.9em;">';
+                timePreferenceHtml += '<strong>⏰ Time Preferences:</strong> ';
+                const prefs = [];
+                if (roundTrip.departTimeOfDay) {
+                    prefs.push(`Depart ${TIME_OF_DAY_PHRASES[roundTrip.departTimeOfDay] || roundTrip.departTimeOfDay}`);
+                }
+                if (roundTrip.returnTimeOfDay) {
+                    prefs.push(`Return ${TIME_OF_DAY_PHRASES[roundTrip.returnTimeOfDay] || roundTrip.returnTimeOfDay}`);
+                }
+                timePreferenceHtml += prefs.join(' | ');
+                timePreferenceHtml += '</div>';
+            }
+            
+            return `
+                <div class="ftt-round-trip-pricing" style="background: #e3f2fd; border: 2px solid #2196f3; border-radius: 8px; padding: 20px; margin: 20px 0;">
+                    <h4 style="margin: 0 0 15px 0; color: #1976d2;">
+                        ✈️ Round Trip: ${roundTrip.origin} ⇄ ${roundTrip.destination}
+                    </h4>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                        <div>
+                            <strong>Depart:</strong> ${roundTrip.departDate}
+                        </div>
+                        <div>
+                            <strong>Return:</strong> ${roundTrip.returnDate}
+                        </div>
+                    </div>
+                    ${timePreferenceHtml}
+                    
+                    <div class="ftt-trip-price-info" id="ftt-trip-price-info-${event.id}" style="margin: 15px 0;">
+                        <!-- Price info will be loaded here -->
+                    </div>
+                    
+                    <div style="margin-top: 15px;">
+                        <p><strong>Search Round-Trip Flights:</strong></p>
+                        <div class="ftt-flight-buttons" style="display: flex; gap: 10px; flex-wrap: wrap;">
+                            <a href="${googleFlightsUrl}" target="_blank" rel="noopener" class="button button-small ftt-google-flights-link" id="ftt-google-flights-${event.id}" title="✅ Accurate URL loads automatically from Google">Google Flights</a>
+                            <a href="${kayakUrl}" target="_blank" rel="noopener" class="button button-small" title="✅ Round-trip search | ⚠️ Time-of-day filters not supported - apply manually after clicking">Kayak</a>
+                            <button class="button button-small button-primary ftt-check-trip-price" data-event-id="${event.id}" data-trip-hash="${roundTrip.tripHash}">
+                                💰 Check Round-Trip Price
+                            </button>
+                            <button class="button button-small button-secondary ftt-track-trip-price" data-event-id="${event.id}" data-trip-hash="${roundTrip.tripHash}" data-origin="${roundTrip.origin}" data-destination="${roundTrip.destination}">
+                                <span class="dashicons dashicons-bell" style="font-size: 14px;"></span> Track Round-Trip Price
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        },
+        
+        /**
          * Show price tracking modal
          */
         showPriceTrackingModal: function(eventId, legIndex, origin, destination, date) {
@@ -1858,6 +2102,7 @@
                 // Build payload - only include threshold values if they're provided
                 const payload = {
                     event_id: eventId,
+                    scope: 'leg',
                     leg_index: legIndex,
                     alert_type: alertType
                 };
@@ -1871,7 +2116,7 @@
                 
                 // Create alert via REST API
                 $.ajax({
-                    url: fttData.restUrl + 'price-alerts',
+                    url: fttData.restUrl + 'flights/track',
                     method: 'POST',
                     beforeSend: function(xhr) {
                         xhr.setRequestHeader('X-WP-Nonce', fttData.nonce);
@@ -1935,18 +2180,259 @@
         },
         
         /**
-         * Escape HTML
+         * Show trip-level price tracking modal
          */
-        escapeHtml: function(text) {
-            if (!text) return '';
-            const map = {
-                '&': '&amp;',
-                '<': '&lt;',
-                '>': '&gt;',
-                '"': '&quot;',
-                "'": '&#039;'
-            };
-            return text.toString().replace(/[&<>"']/g, m => map[m]);
+        showTripPriceTrackingModal: function(eventId, tripHash, origin, destination, departDate, returnDate) {
+            const modal = $('<div class="ftt-modal"><div class="ftt-modal-content"></div></div>');
+            
+            const html = `
+                <span class="ftt-modal-close">&times;</span>
+                <h2>Track Round-Trip Prices</h2>
+                <p><strong>Route:</strong> ${origin} ⇄ ${destination}</p>
+                <p><strong>Depart:</strong> ${departDate} | <strong>Return:</strong> ${returnDate}</p>
+                
+                <form id="ftt-trip-price-alert-form">
+                    <div class="ftt-form-field">
+                        <label>Alert Type</label>
+                        <select name="alert_type" id="trip_alert_type" required>
+                            <option value="">Select alert type...</option>
+                            <option value="price_drop">Drop Below Price</option>
+                            <option value="percent_drop">Drop By Percentage</option>
+                            <option value="good_deal">Good Deal Alert (15% below average)</option>
+                            <option value="daily_digest">📧 Daily Price Digest</option>
+                        </select>
+                    </div>
+                    
+                    <div class="ftt-form-field" id="trip_threshold_price_field" style="display: none;">
+                        <label>Target Price ($)</label>
+                        <input type="number" name="threshold_price" id="trip_threshold_price" min="0" step="0.01" placeholder="e.g., 500.00">
+                        <p class="description">Alert me when round-trip price drops to this amount or below</p>
+                    </div>
+                    
+                    <div class="ftt-form-field" id="trip_threshold_percent_field" style="display: none;">
+                        <label>Percentage Drop (%)</label>
+                        <input type="number" name="threshold_percent" id="trip_threshold_percent" min="1" max="100" placeholder="e.g., 20">
+                        <p class="description">Alert me when round-trip price drops by this percentage</p>
+                    </div>
+                    
+                    <div class="ftt-form-actions">
+                        <button type="submit" class="button button-primary">Create Round-Trip Alert</button>
+                        <button type="button" class="button ftt-modal-close">Cancel</button>
+                    </div>
+                </form>
+                
+                <div id="ftt-trip-alert-message" style="display: none; margin-top: 15px;"></div>
+            `;
+            
+            modal.find('.ftt-modal-content').html(html);
+            $('body').append(modal);
+            modal.fadeIn();
+            
+            // Show/hide threshold fields based on alert type
+            modal.find('#trip_alert_type').on('change', function() {
+                const alertType = $(this).val();
+                modal.find('#trip_threshold_price_field, #trip_threshold_percent_field').hide();
+                
+                if (alertType === 'price_drop') {
+                    modal.find('#trip_threshold_price_field').show();
+                } else if (alertType === 'percent_drop') {
+                    modal.find('#trip_threshold_percent_field').show();
+                }
+            });
+            
+            // Handle form submission
+            modal.find('#ftt-trip-price-alert-form').on('submit', function(e) {
+                e.preventDefault();
+                
+                const alertType = modal.find('#trip_alert_type').val();
+                const thresholdPrice = modal.find('#trip_threshold_price').val();
+                const thresholdPercent = modal.find('#trip_threshold_percent').val();
+                
+                const data = {
+                    event_id: eventId,
+                    trip_hash: tripHash,
+                    origin: origin,
+                    destination: destination,
+                    depart_date: departDate,
+                    return_date: returnDate,
+                    alert_type: alertType,
+                    threshold_price: thresholdPrice || null,
+                    threshold_percent: thresholdPercent || null
+                };
+                
+                const trackData = {
+                    event_id: eventId,
+                    scope: 'trip',
+                    alert_type: alertType,
+                    threshold_price: thresholdPrice || null,
+                    threshold_percent: thresholdPercent || null
+                };
+                
+                $.ajax({
+                    url: fttData.restUrl + 'flights/track',
+                    method: 'POST',
+                    beforeSend: function(xhr) {
+                        xhr.setRequestHeader('X-WP-Nonce', fttData.nonce);
+                    },
+                    data: JSON.stringify(trackData),
+                    contentType: 'application/json',
+                    success: function(response) {
+                        const msgDiv = modal.find('#ftt-trip-alert-message');
+                        msgDiv.html('<div class="ftt-message success">✅ Round-trip price alert created successfully!</div>').show();
+                        
+                        setTimeout(function() {
+                            modal.fadeOut(function() {
+                                modal.remove();
+                            });
+                        }, 2000);
+                    },
+                    error: function(xhr) {
+                        const msgDiv = modal.find('#ftt-trip-alert-message');
+                        const errorMsg = xhr.responseJSON && xhr.responseJSON.message ? xhr.responseJSON.message : 'Failed to create alert';
+                        msgDiv.html('<div class="ftt-message error">❌ ' + errorMsg + '</div>').show();
+                    }
+                });
+            });
+            
+            // Close modal
+            modal.find('.ftt-modal-close').on('click', function() {
+                modal.fadeOut(function() {
+                    modal.remove();
+                });
+            });
+            
+            modal.on('click', function(e) {
+                if (e.target === modal[0]) {
+                    modal.fadeOut(function() {
+                        modal.remove();
+                    });
+                }
+            });
+        },
+        
+        /**
+         * Check trip price now (manual check)
+         */
+        checkTripPriceNow: function(eventId, tripHash, modal) {
+            const priceInfoDiv = modal.find('#ftt-trip-price-info-' + eventId);
+            priceInfoDiv.html('<p>⏳ Checking round-trip price...</p>');
+            
+            $.ajax({
+                url: fttData.restUrl + 'flights/check',
+                method: 'POST',
+                beforeSend: function(xhr) {
+                    xhr.setRequestHeader('X-WP-Nonce', fttData.nonce);
+                },
+                data: JSON.stringify({
+                    event_id: eventId,
+                    scope: 'trip'
+                }),
+                contentType: 'application/json',
+                success: function(response) {
+                    if (response.success && response.price) {
+                        priceInfoDiv.html(`
+                            <div class="ftt-price-result" style="background: #fff; border: 1px solid #ddd; border-radius: 4px; padding: 15px;">
+                                <strong>Current Round-Trip Price:</strong> $${response.price}<br>
+                                <span style="color: #666; font-size: 0.9em;">Checked: ${new Date().toLocaleString()}</span>
+                            </div>
+                        `);
+                    } else {
+                        priceInfoDiv.html('<p style="color: #d32f2f;">⚠️ Price check failed. Please try again later.</p>');
+                    }
+                },
+                error: function() {
+                    priceInfoDiv.html('<p style="color: #d32f2f;">❌ Error checking price</p>');
+                }
+            });
+        },
+        
+        /**
+         * Load trip price history
+         */
+        loadTripPriceHistory: function(eventId, tripHash, modal) {
+            $.ajax({
+                url: fttData.restUrl + 'flights/history',
+                method: 'GET',
+                beforeSend: function(xhr) {
+                    xhr.setRequestHeader('X-WP-Nonce', fttData.nonce);
+                },
+                data: {
+                    event_id: eventId,
+                    scope: 'trip'
+                },
+                success: function(response) {
+                    if (response.success && response.history && response.history.length > 0) {
+                        const priceInfoDiv = modal.find('#ftt-trip-price-info-' + eventId);
+                        
+                        let html = '<div class="ftt-price-history" style="background: #fff; border: 1px solid #ddd; border-radius: 4px; padding: 15px; margin-top: 10px;">';
+                        html += '<strong>Recent Price History:</strong><ul style="margin: 10px 0; padding-left: 20px;">';
+                        
+                        response.history.slice(0, 5).forEach(function(record) {
+                            const date = new Date(record.checked_at).toLocaleDateString();
+                            html += `<li>$${record.price} - ${date}</li>`;
+                        });
+                        
+                        html += '</ul>';
+                        
+                        if (response.stats) {
+                            html += `<p style="margin-top: 10px; color: #666; font-size: 0.9em;">
+                                Average: $${response.stats.avg} | Lowest: $${response.stats.min} | Highest: $${response.stats.max}
+                            </p>`;
+                        }
+                        
+                        html += '</div>';
+                        
+                        priceInfoDiv.append(html);
+                        
+                        // Update Google Flights button if URL is available from history
+                        if (response.google_flights_url) {
+                            const googleFlightsLink = modal.find('#ftt-google-flights-' + eventId);
+                            if (googleFlightsLink.length) {
+                                googleFlightsLink.attr('href', response.google_flights_url);
+                                googleFlightsLink.addClass('ftt-url-verified');
+                            }
+                        }
+                    }
+                }
+            });
+        },
+        
+        /**
+         * Fetch real Google Flights URL from SerpAPI (only if not already available)
+         */
+        fetchGoogleFlightsUrl: function(eventId, modal) {
+            const googleFlightsLink = modal.find('#ftt-google-flights-' + eventId);
+            
+            // If URL was already set from price history, don't fetch again
+            if (googleFlightsLink.hasClass('ftt-url-verified')) {
+                return;
+            }
+            
+            $.ajax({
+                url: fttData.restUrl + 'flights/check',
+                method: 'POST',
+                beforeSend: function(xhr) {
+                    xhr.setRequestHeader('X-WP-Nonce', fttData.nonce);
+                },
+                data: JSON.stringify({
+                    event_id: eventId,
+                    scope: 'trip'
+                }),
+                contentType: 'application/json',
+                success: function(response) {
+                    if (response.success && response.google_flights_url) {
+                        // Update the Google Flights button with real URL
+                        if (googleFlightsLink.length) {
+                            googleFlightsLink.attr('href', response.google_flights_url);
+                            googleFlightsLink.addClass('ftt-url-verified');
+                        }
+                    }
+                },
+                error: function() {
+                    // Silently fail - the fallback URL is still usable
+                    console.log('Could not fetch real Google Flights URL');
+                }
+            });
         },
         
         /**
@@ -2169,12 +2655,22 @@
             const date = departDate || leg.depart_date || '';
             const origin = leg.depart_airport || '';
             const destination = leg.arrive_airport || '';
+            const timeOfDay = leg.depart_time_of_day || '';
+            
+            // Time-of-day phrases for search queries
+            const TIME_OF_DAY_PHRASES = {
+                morning: 'in the morning',
+                midday: 'around midday',
+                afternoon: 'in the afternoon',
+                night: 'at night'
+            };
             
             console.log('generateFlightSearchLinks called:', {
                 legIndex,
                 date,
                 origin,
                 destination,
+                timeOfDay,
                 leg
             });
             
@@ -2211,13 +2707,28 @@
                     southwestDate = `${parts[1]}/${parts[2]}/${parts[0]}`;
                 }
                 
-                // With specific date and baggage
-                googleFlightsUrl = `https://www.google.com/travel/flights?q=flights%20from%20${origin}%20to%20${destination}%20on%20${date}`;
+                // Map time-of-day to Southwest's time periods
+                const SOUTHWEST_TIME_MAP = {
+                    morning: 'BEFORE_NOON',
+                    midday: 'NOON_TO_SIX',
+                    afternoon: 'NOON_TO_SIX',
+                    night: 'AFTER_SIX'
+                };
+                const southwestTime = (timeOfDay && SOUTHWEST_TIME_MAP[timeOfDay]) || 'ALL_DAY';
+                
+                // Google Flights: Use natural language format with + separators and time-of-day
+                let googleQuery = `Flights+from+${origin}+to+${destination}+on+${date}`;
+                if (timeOfDay && TIME_OF_DAY_PHRASES[timeOfDay]) {
+                    googleQuery += `+${TIME_OF_DAY_PHRASES[timeOfDay].replace(/ /g, '+')}`;
+                }
+                googleFlightsUrl = `https://www.google.com/travel/flights?q=${googleQuery}`;
+                // Kayak: Uses YYYY-MM-DD in path (no time-of-day support)
                 kayakUrl = `https://www.kayak.com/flights/${origin}-${destination}/${date}?sort=bestflight_a&fs=bfc=${baggageCount}`;
-                southwestUrl = `https://www.southwest.com/air/booking/select-depart.html?adultsCount=1&adultPassengersCount=1&destinationAirportCode=${destination}&departureDate=${southwestDate}&departureTimeOfDay=ALL_DAY&fareType=USD&int=HOMEQBOMAIR&originationAirportCode=${origin}&passengerType=ADULT&tripType=oneway`;
+                // Southwest: Uses MM/DD/YYYY format with time-of-day support
+                southwestUrl = `https://www.southwest.com/air/booking/select-depart.html?adultsCount=1&adultPassengersCount=1&destinationAirportCode=${destination}&departureDate=${southwestDate}&departureTimeOfDay=${southwestTime}&fareType=USD&int=HOMEQBOMAIR&originationAirportCode=${origin}&passengerType=ADULT&tripType=oneway`;
             } else {
                 // Without specific date - flexible search
-                googleFlightsUrl = `https://www.google.com/travel/flights?q=flights%20from%20${origin}%20to%20${destination}`;
+                googleFlightsUrl = `https://www.google.com/travel/flights?q=Flights+from+${origin}+to+${destination}`;
                 kayakUrl = `https://www.kayak.com/flights/${origin}-${destination}?sort=bestflight_a&fs=bfc=${baggageCount}`;
                 southwestUrl = `https://www.southwest.com/air/booking/select-depart.html?adultsCount=1&adultPassengersCount=1&destinationAirportCode=${destination}&originationAirportCode=${origin}&passengerType=ADULT&tripType=oneway`;
             }
@@ -2227,14 +2738,21 @@
                 baggageInfoHtml = `<p class="ftt-baggage-note" style="font-size: 12px; color: #666; margin: 5px 0;">Baggage: ${baggageCount} checked bag(s)${baggageNote}</p>`;
             }
             
+            // Time preference display
+            let timePreferenceHtml = '';
+            if (timeOfDay && TIME_OF_DAY_PHRASES[timeOfDay]) {
+                timePreferenceHtml = `<p class="ftt-time-note" style="font-size: 12px; color: #666; margin: 5px 0;">⏰ Preferred: Depart ${TIME_OF_DAY_PHRASES[timeOfDay]}</p>`;
+            }
+            
             return `
                 <div class="ftt-flight-search-links">
                     <p><strong>Search Flights:</strong></p>
+                    ${timePreferenceHtml}
                     ${baggageInfoHtml}
                     <div class="ftt-flight-buttons">
-                        <a href="${googleFlightsUrl}" target="_blank" rel="noopener" class="button button-small">Google Flights</a>
-                        <a href="${kayakUrl}" target="_blank" rel="noopener" class="button button-small">Kayak</a>
-                        <a href="${southwestUrl}" target="_blank" rel="noopener" class="button button-small">Southwest</a>
+                        <a href="${googleFlightsUrl}" target="_blank" rel="noopener" class="button button-small" title="✅ Accurate URL after clicking 'Check Price Now'">Google Flights</a>
+                        <a href="${kayakUrl}" target="_blank" rel="noopener" class="button button-small" title="⚠️ Time-of-day filters not supported in URL - apply manually after clicking">Kayak</a>
+                        <a href="${southwestUrl}" target="_blank" rel="noopener" class="button button-small" title="✅ Time-of-day preferences included">Southwest</a>
                         <button class="button button-small button-primary ftt-check-price-now" data-event-id="${event.id}" data-leg-index="${legIndex}">
                             💰 Check Price Now
                         </button>
@@ -2256,13 +2774,14 @@
             
             const requestData = {
                 event_id: eventId,
+                scope: 'leg',
                 leg_index: legIndex
             };
             
             console.log('🔍 SRT Price Check Request:', requestData);
             
             $.ajax({
-                url: fttData.restUrl + 'check-price',
+                url: fttData.restUrl + 'flights/check',
                 method: 'POST',
                 beforeSend: function(xhr) {
                     xhr.setRequestHeader('X-WP-Nonce', fttData.nonce);
@@ -2350,13 +2869,14 @@
             console.log('🔍 Loading price history:', { eventId, legIndex });
             
             $.ajax({
-                url: fttData.restUrl + 'price-history',
+                url: fttData.restUrl + 'flights/history',
                 method: 'GET',
                 beforeSend: function(xhr) {
                     xhr.setRequestHeader('X-WP-Nonce', fttData.nonce);
                 },
                 data: {
                     event_id: eventId,
+                    scope: 'leg',
                     leg_index: legIndex
                 },
                 success: function(response) {

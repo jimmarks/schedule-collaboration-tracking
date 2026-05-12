@@ -5,6 +5,97 @@ All notable changes to the Summer Regiment Tracker plugin will be documented in 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.47] - 2025-01-XX
+
+### 🎯 User Experience - Flight Search Transparency & Debugging
+
+#### Added
+- **Hover Tooltips on Flight Search Buttons**: All flight search buttons (Google Flights, Kayak, Southwest) now display informative tooltips explaining their capabilities and limitations
+  - Google Flights (individual legs): "✅ Accurate URL after clicking 'Check Price Now'"
+  - Google Flights (round-trip): "✅ Accurate URL loads automatically from Google"
+  - Kayak: "⚠️ Time-of-day filters not supported in URL - apply manually after clicking"
+  - Southwest: "✅ Time-of-day preferences included"
+- **Debug Logging for SerpAPI Integration**: Added comprehensive logging to diagnose potential type parameter issues
+  - Logs outgoing SerpAPI query with type parameter (1=round-trip, 2=one-way)
+  - Logs returned google_flights_url from SerpAPI response
+  - Helps verify if individual leg searches are correctly requesting one-way flights
+- **trip_type Field in API Response**: Added explicit trip_type ('one-way' or 'round-trip') to unified service response for better UI clarity
+
+#### Technical Details
+- Enhanced `generateFlightSearchLinks` in assets/js/main.js with title attributes for hover tooltips
+- Added error_log() calls in `FTT_Flight_Search_Service::run_price_check()` to trace SerpAPI interactions
+- Extended service response to include trip_type based on scope parameter
+
+#### Purpose
+- Provide users with transparent information about service capabilities and limitations
+- Enable debugging of reported issue where individual leg searches might show round-trip results
+- Verify SerpAPI is receiving correct type parameter and returning appropriate URLs
+
+## [3.0.38] - 2024-01-XX
+
+### 🏗️ Architecture - Unified Flight Search Service
+
+#### Overview
+Complete refactoring of flight price checking to eliminate code duplication across frontend, backend, and cron systems. Implements single source of truth for all flight searches using a new service-oriented architecture.
+
+#### New Service Class: `FTT_Flight_Search_Service`
+**File**: `includes/class-flight-search-service.php` (~600 lines)
+
+**Features**:
+- ✅ Unified API for all flight price checking (manual checks, scheduled checks, alerts)
+- ✅ Single place to build SerpAPI queries (no more duplicate logic)
+- ✅ Canonical payload structure shared by all callers
+- ✅ Automatic database storage and alert evaluation
+- ✅ Support for both trip-level (round-trip) and leg-level (one-way) searches
+
+**Key Methods**:
+```php
+build_search_payload($event_id, $scope, $leg_index)  // Creates canonical payload
+build_provider_query($payload)                        // Converts to SerpAPI params
+run_price_check($payload, $check_type)               // Executes API call
+save_price_snapshot($payload, $result)               // Saves to database
+evaluate_alert_rules($payload, $result)              // Checks and sends alerts
+check_price($event_id, $scope, $leg_index, $check_type) // Main entry point
+```
+
+#### Unified REST API Endpoints
+**File**: `includes/rest.php`
+
+New endpoints that replace old duplicated ones:
+```
+POST /ftt/v1/flights/check    - Check price now (replaces check-price, check-trip-price)
+GET  /ftt/v1/flights/history  - Get price history (replaces price-history, trip-price-history)
+POST /ftt/v1/flights/track    - Create alert (replaces price-alerts, trip-price-alerts)
+```
+
+All endpoints accept `scope` parameter ('trip' or 'leg') to determine query type.
+
+#### Updated Components
+
+**Frontend** (`assets/js/main.js`):
+- ✅ Updated `checkPriceNow()` to use unified `flights/check` endpoint with scope='leg'
+- ✅ Updated `loadPriceHistory()` to use unified `flights/history` endpoint with scope='leg'
+- ✅ Updated leg alert creation to use unified `flights/track` endpoint with scope='leg'
+- ✅ Trip-level functions already using unified endpoints (checkTripPriceNow, loadTripPriceHistory)
+
+**Cron Job** (`includes/price-tracking.php`):
+- ✅ Refactored `check_all_prices()` to call `FTT_Flight_Search_Service::check_price()` directly
+- ✅ Eliminated duplicate API call logic
+- ✅ Simplified loop: detect round-trip → check with service → check legs with service
+
+#### Benefits
+- **DRY Principle**: One canonical way to build and execute flight searches
+- **Consistency**: All code paths use same logic and parameters
+- **Maintainability**: Changes to search logic only need to happen in one place
+- **Testability**: Service methods can be unit tested independently
+- **Extensibility**: Easy to add new check sources (mobile app, webhooks, etc.)
+
+#### Technical Details
+- Service called directly from cron (no REST overhead)
+- Service called via REST from frontend (proper nonce security)
+- Old endpoints still exist for backward compatibility but are deprecated
+- All functions properly handle scope parameter for trip vs. leg queries
+
 ## [2.1.0] - 2026-03-05 [IN PROGRESS]
 
 ### 🎉 Major Feature - Family Groups Architecture
